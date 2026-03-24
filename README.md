@@ -1,73 +1,137 @@
-# React + TypeScript + Vite
+# Claude Utils
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A browser-based power toolkit for Claude users — search, analytics, export, conversation browser, prompt library, and a real-time activity tracker. Built with React + TypeScript. Local-first with an optional Fastify + Postgres backend.
 
-Currently, two official plugins are available:
+**[Full docs and PRDs → PRD-AND-CLAUDE-MDs/](./PRD-AND-CLAUDE-MDs/README.md)**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Universal search** — Full-text search across Claude.ai and Claude Code conversations
+- **Analytics dashboard** — Usage stats, token trends, activity heatmaps
+- **Export** — Markdown, PDF, JSON, HTML
+- **Conversation browser** — View conversations with syntax highlighting
+- **Prompt library** — Save, organize, and reuse prompts
+- **Activity tracker** — Chrome extension capturing real-time tokens, artifacts, and tool calls
+- **AIPKMS** *(planned)* — Anchor insights, build knowledge threads, resurface context in future conversations
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Quick start
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Frontend only (no backend required)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev              # http://localhost:4000
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Import your Claude data export (ZIP from claude.ai or JSONL from `~/.claude/`) and start searching.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### With backend (persistent storage + sync)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Requires Docker.
+
+```bash
+npm install
+npm run docker:up        # Start Postgres on port 5433
+npm run db:push          # Apply schema
+npm run dev:all          # Frontend (4000) + backend (3003)
 ```
+
+Create a `.env.local` at the root:
+
+```bash
+VITE_API_URL=http://localhost:3003/api
+```
+
+### Chrome extension (activity tracker)
+
+```bash
+npm run dev:extension    # Watches and rebuilds → dist-extension/
+```
+
+Then in Chrome: Settings → Extensions → Load unpacked → select `dist-extension/`.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS v4 |
+| State | Zustand |
+| Client storage | Dexie.js (IndexedDB) |
+| Search | Fuse.js |
+| Charts | Recharts |
+| PDF export | jsPDF + html2canvas |
+| Backend | Fastify 5, Drizzle ORM |
+| Database | PostgreSQL 16 |
+| Extension | Chrome Manifest V3 |
+
+---
+
+## Project structure
+
+```
+claude-utils/
+├── src/                      # Frontend React app
+├── extension/                # Chrome extension source
+├── backend/                  # Fastify + Postgres API
+├── PRD-AND-CLAUDE-MDs/       # All docs, PRDs, and agent instructions
+├── CLAUDE.md                 # AI agent quick-start (points to PRD-AND-CLAUDE-MDs/)
+├── docker-compose.yml        # Postgres + backend
+└── package.json              # Root scripts
+```
+
+---
+
+## Scripts reference
+
+```bash
+npm run dev              # Frontend dev server
+npm run dev:backend      # Backend dev server
+npm run dev:all          # Both servers
+npm run dev:extension    # Extension build watcher
+
+npm run build            # Frontend production build
+npm run build:extension  # Extension build
+npm run build:all        # Everything
+
+npm run docker:up        # Start Postgres
+npm run docker:down      # Stop Postgres
+npm run db:push          # Apply DB schema
+npm run db:studio        # Drizzle Studio GUI
+
+npm run lint             # ESLint
+npm run typecheck        # TypeScript check
+```
+
+---
+
+## Documentation
+
+All project documentation lives in `PRD-AND-CLAUDE-MDs/`:
+
+| Doc | Purpose |
+|---|---|
+| [README.md](./PRD-AND-CLAUDE-MDs/README.md) | Docs index and architecture overview |
+| [CLAUDE.md](./PRD-AND-CLAUDE-MDs/CLAUDE.md) | Full AI agent instructions |
+| [claude-utils-prd.md](./PRD-AND-CLAUDE-MDs/claude-utils-prd.md) | Core platform PRD |
+| [prd-aipkms.md](./PRD-AND-CLAUDE-MDs/prd-aipkms.md) | AIPKMS feature PRD |
+| [claude-aipkms.md](./PRD-AND-CLAUDE-MDs/claude-aipkms.md) | AIPKMS vision doc |
+| [PRD activity tracker.md](./PRD-AND-CLAUDE-MDs/PRD%20activity%20tracker.md) | Activity Tracker PRD |
+
+---
+
+## Business model
+
+Freemium with a one-time purchase:
+
+| Tier | Price | Highlights |
+|---|---|---|
+| Free | $0 | 100 search results, basic analytics, Markdown export, 10 prompts |
+| Pro | $29 | Unlimited everything, all export formats |
+| Power | $29+ | Pro + synthesis engine, auto-categorization, Obsidian export |

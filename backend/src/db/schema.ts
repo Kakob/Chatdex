@@ -7,6 +7,7 @@ import {
   index,
   primaryKey,
   varchar,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
@@ -86,6 +87,7 @@ export const messages = pgTable(
     text: text('text').notNull(),
     contentBlocks: jsonb('content_blocks').$type<ContentBlock[]>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    conversationName: text('conversation_name'),
     // Tool use fields for backward compat
     toolName: text('tool_name'),
     toolInput: text('tool_input'),
@@ -159,6 +161,44 @@ export const prompts = pgTable(
   ]
 );
 
+// Tags table (shared across prompts, conversations, anchors, threads)
+export const tags = pgTable(
+  'tags',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull().unique(),
+    color: text('color'), // hex color e.g. '#7c3aed'
+    category: varchar('category', { length: 20 }).$type<'prompt' | 'conversation' | 'anchor' | 'thread'>(),
+    usageCount: integer('usage_count').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('tags_name_idx').on(table.name),
+    index('tags_category_idx').on(table.category),
+  ]
+);
+
+// Entity tags join table (polymorphic tagging)
+export const entityTags = pgTable(
+  'entity_tags',
+  {
+    id: text('id').primaryKey(),
+    tagId: text('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+    entityId: text('entity_id').notNull(),
+    entityType: varchar('entity_type', { length: 20 })
+      .notNull()
+      .$type<'prompt' | 'conversation' | 'anchor' | 'thread'>(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('entity_tags_unique_idx').on(table.tagId, table.entityId, table.entityType),
+    index('entity_tags_entity_idx').on(table.entityType, table.entityId),
+    index('entity_tags_tag_id_idx').on(table.tagId),
+  ]
+);
+
 // Type exports for use in routes
 export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
@@ -171,3 +211,7 @@ export type NewDailyStat = typeof dailyStats.$inferInsert;
 export type Metadata = typeof metadata.$inferSelect;
 export type Prompt = typeof prompts.$inferSelect;
 export type NewPrompt = typeof prompts.$inferInsert;
+export type Tag = typeof tags.$inferSelect;
+export type NewTag = typeof tags.$inferInsert;
+export type EntityTag = typeof entityTags.$inferSelect;
+export type NewEntityTag = typeof entityTags.$inferInsert;

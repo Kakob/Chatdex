@@ -144,6 +144,7 @@ function parseConversation(
       sender,
       text: messageText,
       contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
+      conversationName: conv.name || 'Untitled Conversation',
       createdAt: new Date(msg.created_at),
     });
   }

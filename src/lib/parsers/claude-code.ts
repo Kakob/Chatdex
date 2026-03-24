@@ -156,6 +156,12 @@ function parseEntries(
 
   // Derive conversation name from filename or working directory
   const name = deriveConversationName(filename, workingDirectory);
+
+  // Set conversationName on all messages
+  for (const msg of messages) {
+    msg.conversationName = name;
+  }
+
   const fullText = textParts.join(' ');
 
   const conversation: StoredConversation = {

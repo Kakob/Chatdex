@@ -18,6 +18,7 @@ const messageSchema = z.object({
     artifactTitle: z.string().optional(),
     artifactType: z.string().optional(),
   })).optional(),
+  conversationName: z.string().optional(),
   createdAt: z.string().or(z.date()),
   toolName: z.string().optional(),
   toolInput: z.string().optional(),
@@ -54,6 +55,7 @@ export const messagesRoutes: FastifyPluginAsync = async (fastify) => {
       sender: m.sender,
       text: m.text,
       contentBlocks: m.contentBlocks,
+      conversationName: m.conversationName,
       createdAt: new Date(m.createdAt),
       toolName: m.toolName,
       toolInput: m.toolInput,
@@ -69,6 +71,7 @@ export const messagesRoutes: FastifyPluginAsync = async (fastify) => {
         set: {
           text: sql`EXCLUDED.text`,
           contentBlocks: sql`EXCLUDED.content_blocks`,
+          conversationName: sql`EXCLUDED.conversation_name`,
           toolName: sql`EXCLUDED.tool_name`,
           toolInput: sql`EXCLUDED.tool_input`,
           toolResult: sql`EXCLUDED.tool_result`,

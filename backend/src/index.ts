@@ -7,9 +7,11 @@ import { statsRoutes } from './routes/stats.js';
 import { metadataRoutes } from './routes/metadata.js';
 import { importRoutes } from './routes/import.js';
 import { countsRoutes } from './routes/counts.js';
+import { tagRoutes } from './routes/tags.js';
 
 const fastify = Fastify({
   logger: true,
+  bodyLimit: 100 * 1024 * 1024, // 100MB
 });
 
 // Register CORS
@@ -31,6 +33,7 @@ fastify.register(statsRoutes, { prefix: '/api/stats' });
 fastify.register(metadataRoutes, { prefix: '/api/metadata' });
 fastify.register(importRoutes, { prefix: '/api/import' });
 fastify.register(countsRoutes, { prefix: '/api/counts' });
+fastify.register(tagRoutes, { prefix: '/api/tags' });
 
 // Start server
 const port = parseInt(process.env.PORT || '3003', 10);

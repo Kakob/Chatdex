@@ -46,6 +46,7 @@ export interface StoredMessage {
   sender: MessageSender;
   text: string;                    // Keep for search/backward compat
   contentBlocks?: ContentBlock[];  // Structured blocks for rendering
+  conversationName?: string;
   createdAt: Date;
   // Tool use (Claude Code) - kept for backward compat
   toolName?: string;
@@ -63,6 +64,26 @@ export interface StoredPrompt {
   createdAt: Date;
   updatedAt: Date;
   usageCount: number;
+}
+
+// Tags
+export type EntityType = 'prompt' | 'conversation' | 'anchor' | 'thread';
+
+export interface Tag {
+  id: string;
+  name: string;
+  color: string | null;
+  category: EntityType | null;
+  usageCount: number;
+  createdAt: Date;
+}
+
+export interface EntityTag {
+  id: string;
+  tagId: string;
+  entityId: string;
+  entityType: EntityType;
+  createdAt: Date;
 }
 
 export interface AppMetadata {

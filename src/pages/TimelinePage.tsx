@@ -2,6 +2,9 @@ import { useState, useCallback } from 'react';
 import { Clock } from 'lucide-react';
 import { TimelineFilters, TimelineView } from '../components/timeline';
 import { useTimeline } from '../hooks/useTimeline';
+import { buildCsv } from '../lib/exporters/csv';
+import { buildJson } from '../lib/exporters/json';
+import { downloadExport } from '../lib/exporters';
 import type { ActivityFilters, StoredActivity } from '../types';
 
 export function TimelinePage() {
@@ -17,27 +20,19 @@ export function TimelinePage() {
     (format: 'json' | 'csv') => {
       if (activities.length === 0) return;
 
-      let content: string;
-      let mimeType: string;
-      let filename: string;
-
       if (format === 'json') {
-        content = JSON.stringify(activities, null, 2);
-        mimeType = 'application/json';
-        filename = `claude-activities-${new Date().toISOString().split('T')[0]}.json`;
+        downloadExport(
+          buildJson(activities, { source: 'claude-utils' }),
+          'claude-activities',
+          'json'
+        );
       } else {
-        content = activitiesToCSV(activities);
-        mimeType = 'text/csv';
-        filename = `claude-activities-${new Date().toISOString().split('T')[0]}.csv`;
+        downloadExport(
+          activitiesToCSV(activities),
+          'claude-activities',
+          'csv'
+        );
       }
-
-      const blob = new Blob([content], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
     },
     [activities]
   );
@@ -78,22 +73,10 @@ export function TimelinePage() {
 
 function activitiesToCSV(activities: StoredActivity[]): string {
   const headers = [
-    'ID',
-    'Type',
-    'Source',
-    'Conversation ID',
-    'Conversation Title',
-    'Model',
-    'Timestamp',
-    'Input Tokens',
-    'Output Tokens',
-    'Cache Read Tokens',
-    'Message Role',
-    'Message Preview',
-    'Artifact Title',
-    'Artifact Type',
-    'Code Language',
-    'Tool Name',
+    'ID', 'Type', 'Source', 'Conversation ID', 'Conversation Title', 'Model',
+    'Timestamp', 'Input Tokens', 'Output Tokens', 'Cache Read Tokens',
+    'Message Role', 'Message Preview', 'Artifact Title', 'Artifact Type',
+    'Code Language', 'Tool Name',
   ];
 
   const rows = activities.map((a) => [
@@ -115,11 +98,5 @@ function activitiesToCSV(activities: StoredActivity[]): string {
     a.metadata.toolName ?? '',
   ]);
 
-  const csvContent = [headers, ...rows]
-    .map((row) =>
-      row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')
-    )
-    .join('\n');
-
-  return csvContent;
+  return buildCsv(headers, rows);
 }

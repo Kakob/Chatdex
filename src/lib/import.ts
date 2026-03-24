@@ -84,6 +84,7 @@ async function storeData(
     sender: msg.sender,
     text: msg.text,
     contentBlocks: msg.contentBlocks,
+    conversationName: msg.conversationName,
     createdAt: msg.createdAt.toISOString(),
     toolName: msg.toolName,
     toolInput: msg.toolInput,

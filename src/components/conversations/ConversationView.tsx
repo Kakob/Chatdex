@@ -1,5 +1,8 @@
 import { ArrowLeft, Download, Copy, Globe, Terminal, X } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
+import { conversationToMarkdown } from '../../lib/exporters/markdown';
+import { buildJson } from '../../lib/exporters/json';
+import { downloadExport, type ExportFormat } from '../../lib/exporters';
 import type { StoredConversation, StoredMessage } from '../../types';
 
 interface ConversationViewProps {
@@ -31,6 +34,19 @@ export function ConversationView({
       .join('\n\n');
 
     await navigator.clipboard.writeText(text);
+  };
+
+  const handleExport = (format: ExportFormat) => {
+    const slug = conversation.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
+    if (format === 'markdown') {
+      downloadExport(conversationToMarkdown(conversation, messages), slug, 'markdown');
+    } else {
+      downloadExport(
+        buildJson({ conversation, messages }, { source: 'claude-utils' }),
+        slug,
+        'json'
+      );
+    }
   };
 
   const handleClearHighlight = () => {
@@ -77,12 +93,28 @@ export function ConversationView({
           >
             <Copy size={18} className="text-gray-600 dark:text-gray-400" />
           </button>
-          <button
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            title="Export conversation"
-          >
-            <Download size={18} className="text-gray-600 dark:text-gray-400" />
-          </button>
+          <div className="relative group">
+            <button
+              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              title="Export conversation"
+            >
+              <Download size={18} className="text-gray-600 dark:text-gray-400" />
+            </button>
+            <div className="absolute right-0 mt-1 w-36 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
+              <button
+                onClick={() => handleExport('markdown')}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-t-lg"
+              >
+                Export Markdown
+              </button>
+              <button
+                onClick={() => handleExport('json')}
+                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-b-lg"
+              >
+                Export JSON
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

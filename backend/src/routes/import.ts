@@ -39,6 +39,7 @@ const importMessageSchema = z.object({
   text: z.string(),
   contentBlocks: z.array(contentBlockSchema).optional(),
   createdAt: z.string(),
+  conversationName: z.string().optional(),
   toolName: z.string().optional(),
   toolInput: z.string().optional(),
   toolResult: z.string().optional(),
@@ -67,6 +68,11 @@ export const importRoutes: FastifyPluginAsync = async (fastify) => {
           )
         )
       ).map((c) => c.id)
+    );
+
+    // Build conversation name lookup
+    const conversationNameMap = new Map(
+      payload.conversations.map((c) => [c.id, c.name])
     );
 
     // Filter out duplicates
@@ -110,6 +116,7 @@ export const importRoutes: FastifyPluginAsync = async (fastify) => {
         sender: m.sender,
         text: m.text,
         contentBlocks: m.contentBlocks,
+        conversationName: m.conversationName || conversationNameMap.get(m.conversationId),
         createdAt: new Date(m.createdAt),
         toolName: m.toolName,
         toolInput: m.toolInput,

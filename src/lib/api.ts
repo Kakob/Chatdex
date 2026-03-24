@@ -85,6 +85,7 @@ export interface ApiMessage {
     artifactTitle?: string;
     artifactType?: string;
   }>;
+  conversationName?: string;
   createdAt: string;
   toolName?: string;
   toolInput?: string;
@@ -276,6 +277,7 @@ export const api = {
       sender: 'user' | 'assistant' | 'system' | 'tool';
       text: string;
       contentBlocks?: ApiMessage['contentBlocks'];
+      conversationName?: string;
       createdAt: string;
       toolName?: string;
       toolInput?: string;
@@ -313,6 +315,58 @@ export const api = {
       method: 'DELETE',
       params: { source },
     });
+  },
+};
+
+// Tags
+export interface ApiTag {
+  id: string;
+  name: string;
+  color: string | null;
+  category: string | null;
+  usageCount: number;
+  createdAt: string;
+}
+
+export const tagApi = {
+  async getTags(query?: string, category?: string): Promise<ApiTag[]> {
+    return fetchApi('/tags', { params: { q: query, category } });
+  },
+
+  async createTag(tag: { name: string; color?: string; category?: string }): Promise<ApiTag> {
+    return fetchApi('/tags', {
+      method: 'POST',
+      body: JSON.stringify(tag),
+    });
+  },
+
+  async updateTag(id: string, updates: { name?: string; color?: string; category?: string }): Promise<ApiTag> {
+    return fetchApi(`/tags/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  },
+
+  async deleteTag(id: string): Promise<void> {
+    await fetchApi(`/tags/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async tagEntity(tagId: string, entityId: string, entityType: string): Promise<void> {
+    await fetchApi('/tags/entity', {
+      method: 'POST',
+      body: JSON.stringify({ tagId, entityId, entityType }),
+    });
+  },
+
+  async untagEntity(tagId: string, entityId: string, entityType: string): Promise<void> {
+    await fetchApi('/tags/entity', {
+      method: 'DELETE',
+      body: JSON.stringify({ tagId, entityId, entityType }),
+    });
+  },
+
+  async getEntityTags(entityType: string, entityId: string): Promise<ApiTag[]> {
+    return fetchApi(`/tags/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
   },
 };
 

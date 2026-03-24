@@ -1,8 +1,28 @@
 import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { CommandPalette } from '../common/CommandPalette';
+import { useGlobalShortcutListener, useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useShortcutStore } from '../../stores/shortcutStore';
 
 export function Layout() {
+  const togglePalette = useShortcutStore((s) => s.togglePalette);
+
+  // Listen for all registered keyboard shortcuts
+  useGlobalShortcutListener();
+
+  // Register the Cmd+K shortcut for the command palette
+  useKeyboardShortcuts([
+    {
+      id: 'cmd-palette',
+      key: 'k',
+      meta: true,
+      label: 'Command Palette',
+      description: 'Open the command palette',
+      handler: togglePalette,
+    },
+  ]);
+
   return (
     <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-950">
       <Header />
@@ -12,6 +32,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <CommandPalette />
     </div>
   );
 }

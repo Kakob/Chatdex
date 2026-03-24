@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 
 interface SearchBarProps {
   value: string;
@@ -19,27 +20,15 @@ export function SearchBar({
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Global keyboard shortcut: press "/" to focus search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input/textarea
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      if (e.key === '/') {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  useKeyboardShortcuts([
+    {
+      id: 'focus-search',
+      key: '/',
+      label: 'Focus Search',
+      description: 'Focus the search bar',
+      handler: () => inputRef.current?.focus(),
+    },
+  ]);
 
   const handleClear = () => {
     onChange('');

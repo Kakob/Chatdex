@@ -93,6 +93,11 @@ export function MessageBubble({ message, highlightQuery }: MessageBubbleProps) {
           <span className="text-sm font-medium text-gray-900 dark:text-white">
             {isUser ? 'You' : 'Claude'}
           </span>
+          {message.conversationName && (
+            <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]">
+              in {message.conversationName}
+            </span>
+          )}
           <span className="text-xs text-gray-400">
             {formatTime(message.createdAt)}
           </span>
