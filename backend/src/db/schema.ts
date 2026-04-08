@@ -161,24 +161,54 @@ export const prompts = pgTable(
   ]
 );
 
-// Bookmarks table
-export const bookmarks = pgTable(
-  'bookmarks',
+// Anchored items table (AIPKMS)
+export const anchoredItems = pgTable(
+  'anchored_items',
   {
     id: text('id').primaryKey(),
+    contentType: varchar('content_type', { length: 30 })
+      .notNull()
+      .$type<'full_response' | 'selection' | 'prompt_response_pair'>(),
+    userPrompt: text('user_prompt').notNull().default(''),
+    claudeResponse: text('claude_response').notNull().default(''),
+    selectedText: text('selected_text'),
     conversationId: text('conversation_id')
       .notNull()
       .references(() => conversations.id, { onDelete: 'cascade' }),
     messageId: text('message_id')
-      .notNull()
       .references(() => messages.id, { onDelete: 'cascade' }),
-    note: text('note'),
+    conversationUrl: text('conversation_url'),
+    messageIndex: integer('message_index').notNull().default(0),
+    annotation: text('annotation'),
+    priority: varchar('priority', { length: 10 })
+      .notNull()
+      .default('medium')
+      .$type<'low' | 'medium' | 'high'>(),
+    knowledgeType: text('knowledge_type'),
+    workspaceId: text('workspace_id'),
+    folder: text('folder'),
+    autoTags: text('auto_tags').array().notNull().default([]),
+    relatedItemIds: text('related_item_ids').array().notNull().default([]),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('bookmarks_conversation_id_idx').on(table.conversationId),
-    uniqueIndex('bookmarks_message_unique_idx').on(table.messageId),
+    index('anchored_items_conversation_id_idx').on(table.conversationId),
+    index('anchored_items_knowledge_type_idx').on(table.knowledgeType),
+    index('anchored_items_priority_idx').on(table.priority),
+    index('anchored_items_created_at_idx').on(table.createdAt),
+    index('anchored_items_folder_idx').on(table.folder),
   ]
+);
+
+// Knowledge folders table
+export const knowledgeFolders = pgTable(
+  'knowledge_folders',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull().unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  }
 );
 
 // Tags table (shared across prompts, conversations, anchors, threads)
@@ -188,7 +218,7 @@ export const tags = pgTable(
     id: text('id').primaryKey(),
     name: text('name').notNull().unique(),
     color: text('color'), // hex color e.g. '#7c3aed'
-    category: varchar('category', { length: 20 }).$type<'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark'>(),
+    category: varchar('category', { length: 20 }).$type<'prompt' | 'conversation' | 'anchor' | 'thread'>(),
     usageCount: integer('usage_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -209,7 +239,7 @@ export const entityTags = pgTable(
     entityId: text('entity_id').notNull(),
     entityType: varchar('entity_type', { length: 20 })
       .notNull()
-      .$type<'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark'>(),
+      .$type<'prompt' | 'conversation' | 'anchor' | 'thread'>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -231,8 +261,8 @@ export type NewDailyStat = typeof dailyStats.$inferInsert;
 export type Metadata = typeof metadata.$inferSelect;
 export type Prompt = typeof prompts.$inferSelect;
 export type NewPrompt = typeof prompts.$inferInsert;
-export type Bookmark = typeof bookmarks.$inferSelect;
-export type NewBookmark = typeof bookmarks.$inferInsert;
+export type AnchoredItemRow = typeof anchoredItems.$inferSelect;
+export type NewAnchoredItemRow = typeof anchoredItems.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type EntityTag = typeof entityTags.$inferSelect;

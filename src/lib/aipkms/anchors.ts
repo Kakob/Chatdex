@@ -1,5 +1,5 @@
 // Anchor management utilities
-import type { AnchoredItem, ContentType, KnowledgeType, Priority } from './types';
+import type { AnchoredItem, ContentType, Priority } from './types';
 
 export interface CreateAnchorInput {
   contentType: ContentType;
@@ -8,12 +8,13 @@ export interface CreateAnchorInput {
   selectedText?: string;
   conversationId: string;
   conversationUrl?: string;
+  messageId?: string;
   messageIndex: number;
   tags?: string[];
   annotation?: string;
   priority?: Priority;
-  knowledgeType?: KnowledgeType;
   workspaceId?: string;
+  folder?: string;
 }
 
 export function createAnchor(input: CreateAnchorInput): AnchoredItem {
@@ -28,12 +29,13 @@ export function createAnchor(input: CreateAnchorInput): AnchoredItem {
     selectedText: input.selectedText || null,
     conversationId: input.conversationId,
     conversationUrl: input.conversationUrl || null,
+    messageId: input.messageId || null,
     messageIndex: input.messageIndex,
     tags: input.tags || [],
     annotation: input.annotation || null,
     priority: input.priority || 'medium',
-    knowledgeType: input.knowledgeType || null,
     workspaceId: input.workspaceId || null,
+    folder: input.folder || null,
     autoTags: [],
     relatedItemIds: [],
   };
@@ -71,7 +73,7 @@ export function createAnchorFromPromptPair(
 
 export function updateAnchor(
   anchor: AnchoredItem,
-  updates: Partial<Pick<AnchoredItem, 'tags' | 'annotation' | 'priority' | 'knowledgeType' | 'workspaceId'>>
+  updates: Partial<Pick<AnchoredItem, 'tags' | 'annotation' | 'priority' | 'workspaceId' | 'folder'>>
 ): AnchoredItem {
   return {
     ...anchor,

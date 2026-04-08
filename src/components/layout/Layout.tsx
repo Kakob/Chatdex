@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { CommandPalette } from '../common/CommandPalette';
+import { ToastContainer } from '../common/Toast';
 import { useGlobalShortcutListener, useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useShortcutStore } from '../../stores/shortcutStore';
 
@@ -33,6 +34,7 @@ export function Layout() {
         </main>
       </div>
       <CommandPalette />
+      <ToastContainer />
     </div>
   );
 }

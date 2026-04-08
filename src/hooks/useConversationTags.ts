@@ -26,7 +26,7 @@ export function useConversationTags(conversationIds: string[]): UseConversationT
             const tags = await tagApi.getEntityTags('conversation', id);
             return [id, tags] as const;
           } catch {
-            return [id, []] as const;
+            return [id, [] as ApiTag[]] as const;
           }
         })
       );

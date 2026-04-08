@@ -18,4 +18,4 @@ RUN npm run build
 EXPOSE 3001
 
 # Run migrations and start server
-CMD ["sh", "-c", "npm run db:push && npm start"]
+CMD ["sh", "-c", "npx drizzle-kit push --force && npm start"]

@@ -5,23 +5,19 @@ import {
   Clock,
   BarChart3,
   MessageSquare,
-  Bookmark,
-  FileText,
+  Anchor,
   Upload,
   Settings,
   Command,
-  Copy,
 } from 'lucide-react';
 import { useShortcutStore, type ShortcutEntry } from '../../stores/shortcutStore';
-import { usePromptStore } from '../../stores/promptStore';
 
 const NAV_ACTIONS = [
   { id: 'nav-search', label: 'Go to Search', path: '/search', icon: Search },
   { id: 'nav-timeline', label: 'Go to Timeline', path: '/timeline', icon: Clock },
   { id: 'nav-analytics', label: 'Go to Analytics', path: '/analytics', icon: BarChart3 },
   { id: 'nav-browse', label: 'Go to Browse', path: '/conversations', icon: MessageSquare },
-  { id: 'nav-bookmarks', label: 'Go to Bookmarks', path: '/bookmarks', icon: Bookmark },
-  { id: 'nav-prompts', label: 'Go to Prompts', path: '/prompts', icon: FileText },
+  { id: 'nav-knowledge', label: 'Go to Knowledge', path: '/knowledge', icon: Anchor },
   { id: 'nav-import', label: 'Go to Import', path: '/import', icon: Upload },
   { id: 'nav-settings', label: 'Go to Settings', path: '/settings', icon: Settings },
 ];
@@ -45,7 +41,6 @@ export function CommandPalette() {
 
   const { paletteOpen, setPaletteOpen, getAll } = useShortcutStore();
   const shortcuts = getAll().filter((s) => s.id !== 'cmd-palette');
-  const { prompts } = usePromptStore();
 
   const items = useMemo(() => {
     const all = [
@@ -68,24 +63,8 @@ export function CommandPalette() {
     if (!query.trim()) return all;
 
     const q = query.toLowerCase();
-    const filtered = all.filter((item) => item.label.toLowerCase().includes(q));
-
-    // Add matching prompts
-    const matchingPrompts = prompts
-      .filter((p) => p.title.toLowerCase().includes(q) || p.content.toLowerCase().includes(q))
-      .slice(0, 5)
-      .map((p) => ({
-        id: `prompt-${p.id}`,
-        label: p.title,
-        icon: Copy,
-        hint: 'copy',
-        action: () => {
-          navigator.clipboard.writeText(p.content);
-        },
-      }));
-
-    return [...filtered, ...matchingPrompts];
-  }, [query, shortcuts, navigate, prompts]);
+    return all.filter((item) => item.label.toLowerCase().includes(q));
+  }, [query, shortcuts, navigate]);
 
   // Reset selection when items change
   useEffect(() => {

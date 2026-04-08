@@ -50,11 +50,9 @@ describe('createAnchor', () => {
       messageIndex: 0,
       tags: ['react', 'hooks'],
       annotation: 'Important pattern',
-      knowledgeType: 'code_pattern',
     });
     expect(anchor.tags).toEqual(['react', 'hooks']);
     expect(anchor.annotation).toBe('Important pattern');
-    expect(anchor.knowledgeType).toBe('code_pattern');
   });
 });
 

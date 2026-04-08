@@ -5,8 +5,7 @@ import {
   AnalyticsPage,
   TimelinePage,
   ConversationsPage,
-  BookmarksPage,
-  PromptsPage,
+  KnowledgePage,
   ImportPage,
   SettingsPage,
 } from './pages';
@@ -22,8 +21,7 @@ export function App() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:id" element={<ConversationsPage />} />
-          <Route path="bookmarks" element={<BookmarksPage />} />
-          <Route path="prompts" element={<PromptsPage />} />
+          <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>

@@ -66,17 +66,8 @@ export interface StoredPrompt {
   usageCount: number;
 }
 
-// Bookmarks
-export interface StoredBookmark {
-  id: string;
-  conversationId: string;
-  messageId: string;
-  note: string | null;
-  createdAt: Date;
-}
-
 // Tags
-export type EntityType = 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark';
+export type EntityType = 'prompt' | 'conversation' | 'anchor' | 'thread';
 
 export interface Tag {
   id: string;

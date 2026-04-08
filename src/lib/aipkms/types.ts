@@ -2,15 +2,6 @@
 // Based on PRD: docs/prd-aipkms.md Section 3.1
 
 export type ContentType = 'full_response' | 'selection' | 'prompt_response_pair';
-export type KnowledgeType =
-  | 'code_pattern'
-  | 'architecture_decision'
-  | 'explanation'
-  | 'creative_idea'
-  | 'study_material'
-  | 'action_item'
-  | 'reference'
-  | 'debug_solution';
 export type Priority = 'low' | 'medium' | 'high';
 export type SynthesisDocumentType = 'study_guide' | 'decision_log' | 'reference_sheet' | 'retrospective' | 'custom';
 
@@ -24,12 +15,13 @@ export interface AnchoredItem {
   selectedText: string | null;
   conversationId: string;
   conversationUrl: string | null;
+  messageId: string | null;
   messageIndex: number;
   tags: string[];
   annotation: string | null;
   priority: Priority;
-  knowledgeType: KnowledgeType | null;
   workspaceId: string | null;
+  folder: string | null;
   autoTags: string[];
   relatedItemIds: string[];
 }
@@ -67,18 +59,10 @@ export interface SynthesisDocument {
 // Validators
 
 const CONTENT_TYPES: ContentType[] = ['full_response', 'selection', 'prompt_response_pair'];
-const KNOWLEDGE_TYPES: KnowledgeType[] = [
-  'code_pattern', 'architecture_decision', 'explanation', 'creative_idea',
-  'study_material', 'action_item', 'reference', 'debug_solution',
-];
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
 
 export function isValidContentType(value: string): value is ContentType {
   return CONTENT_TYPES.includes(value as ContentType);
-}
-
-export function isValidKnowledgeType(value: string): value is KnowledgeType {
-  return KNOWLEDGE_TYPES.includes(value as KnowledgeType);
 }
 
 export function isValidPriority(value: string): value is Priority {

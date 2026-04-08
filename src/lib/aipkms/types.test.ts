@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   isValidContentType,
-  isValidKnowledgeType,
   isValidPriority,
   validateAnchoredItem,
   validateThread,
@@ -17,21 +16,6 @@ describe('isValidContentType', () => {
   it('rejects invalid values', () => {
     expect(isValidContentType('invalid')).toBe(false);
     expect(isValidContentType('')).toBe(false);
-  });
-});
-
-describe('isValidKnowledgeType', () => {
-  const validTypes = [
-    'code_pattern', 'architecture_decision', 'explanation', 'creative_idea',
-    'study_material', 'action_item', 'reference', 'debug_solution',
-  ];
-
-  it.each(validTypes)('accepts %s', (val) => {
-    expect(isValidKnowledgeType(val)).toBe(true);
-  });
-
-  it('rejects invalid values', () => {
-    expect(isValidKnowledgeType('random')).toBe(false);
   });
 });
 

@@ -4,8 +4,7 @@ import {
   Clock,
   BarChart3,
   MessageSquare,
-  Bookmark,
-  FileText,
+  Anchor,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -16,8 +15,7 @@ const navItems = [
   { to: '/timeline', icon: Clock, label: 'Timeline' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/conversations', icon: MessageSquare, label: 'Browse' },
-  { to: '/bookmarks', icon: Bookmark, label: 'Bookmarks' },
-  { to: '/prompts', icon: FileText, label: 'Prompts' },
+  { to: '/knowledge', icon: Anchor, label: 'Knowledge' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 

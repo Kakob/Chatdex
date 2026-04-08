@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from 'fastify';
 import { db, conversations, messages, metadata, type NewConversation, type NewMessage } from '../db/index.js';
 import { sql, inArray } from 'drizzle-orm';
+import { recomputeDailyStats } from '../utils/statsComputer.js';
 import { z } from 'zod';
 
 const contentBlockSchema = z.object({
@@ -129,6 +130,16 @@ export const importRoutes: FastifyPluginAsync = async (fastify) => {
         const chunk = messageValues.slice(i, i + chunkSize);
         await db.insert(messages).values(chunk).onConflictDoNothing();
       }
+    }
+
+    // Recompute daily stats for the imported date range
+    if (newMessages.length > 0) {
+      const dates = newMessages.map((m) => m.createdAt.split('T')[0]);
+      const minDate = dates.reduce((a, b) => (a < b ? a : b));
+      const maxDate = dates.reduce((a, b) => (a > b ? a : b));
+      await recomputeDailyStats(minDate, maxDate).catch(() => {
+        // Stats recomputation is best-effort, don't fail the import
+      });
     }
 
     // Update last sync metadata

@@ -16,7 +16,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
       conditions.push(ilike(tags.name, `%${q}%`));
     }
     if (category) {
-      conditions.push(eq(tags.category, category as 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark'));
+      conditions.push(eq(tags.category, category as 'prompt' | 'conversation' | 'anchor' | 'thread'));
     }
 
     if (conditions.length > 0) {
@@ -44,7 +44,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
         id,
         name: name.trim().toLowerCase(),
         color: color || null,
-        category: (category as 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark') || null,
+        category: (category as 'prompt' | 'conversation' | 'anchor' | 'thread') || null,
       })
       .onConflictDoNothing({ target: tags.name })
       .returning();
@@ -121,7 +121,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
         id,
         tagId,
         entityId,
-        entityType: entityType as 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark',
+        entityType: entityType as 'prompt' | 'conversation' | 'anchor' | 'thread',
       })
       .onConflictDoNothing()
       .returning();
@@ -153,7 +153,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
         and(
           eq(entityTags.tagId, tagId),
           eq(entityTags.entityId, entityId),
-          eq(entityTags.entityType, entityType as 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark')
+          eq(entityTags.entityType, entityType as 'prompt' | 'conversation' | 'anchor' | 'thread')
         )
       )
       .returning();
@@ -188,7 +188,7 @@ export const tagRoutes: FastifyPluginAsync = async (fastify) => {
       .innerJoin(tags, eq(entityTags.tagId, tags.id))
       .where(
         and(
-          eq(entityTags.entityType, entityType as 'prompt' | 'conversation' | 'anchor' | 'thread' | 'bookmark'),
+          eq(entityTags.entityType, entityType as 'prompt' | 'conversation' | 'anchor' | 'thread'),
           eq(entityTags.entityId, entityId)
         )
       )

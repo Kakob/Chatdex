@@ -12,7 +12,6 @@ interface ConversationCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
-  bookmarkCount?: number;
 }
 
 export function ConversationCard({

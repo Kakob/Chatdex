@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { db, dailyStats } from '../db/index.js';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { recomputeDailyStats } from '../utils/statsComputer.js';
 
 const dateRangeSchema = z.object({
   startDate: z.string(), // YYYY-MM-DD
@@ -68,6 +69,12 @@ export const statsRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     return { success: true };
+  });
+
+  // POST /api/stats/recompute - Recompute all daily stats from messages
+  fastify.post('/recompute', async () => {
+    const result = await recomputeDailyStats();
+    return { success: true, ...result };
   });
 
   // DELETE /api/stats/daily - Clear all daily stats

@@ -1,7 +1,7 @@
 // Database abstraction layer - now uses API calls instead of IndexedDB
 // Maintains the same function signatures for backward compatibility
 
-import { api, type ApiConversation, type ApiMessage, type ApiActivity, type ApiDailyStats } from './api';
+import { api, type ApiConversation, type ApiMessage, type ApiActivity } from './api';
 import type {
   StoredConversation,
   StoredMessage,

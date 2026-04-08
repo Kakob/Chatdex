@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Download, Copy, Globe, Terminal, X, Tag } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Globe, Terminal, X, Tag, Search } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TagBadge } from '../common/TagBadge';
 import { TagInput } from '../common/TagInput';
 import { useTagStore } from '../../stores/tagStore';
-import { useBookmarkStore } from '../../stores/bookmarkStore';
+import { useAnchorStore } from '../../stores/anchorStore';
+import { useToastStore } from '../../stores/toastStore';
 import { conversationToMarkdown } from '../../lib/exporters/markdown';
 import { buildJson } from '../../lib/exporters/json';
 import { downloadExport, type ExportFormat } from '../../lib/exporters';
@@ -29,15 +30,36 @@ export function ConversationView({
   const scrollTo = searchParams.get('scrollTo');
   const [conversationTags, setConversationTags] = useState<ApiTag[]>([]);
   const [showTagInput, setShowTagInput] = useState(false);
+  const [localSearch, setLocalSearch] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
   const { tagEntity, untagEntity, getEntityTags } = useTagStore();
-  const { loadConversationBookmarks } = useBookmarkStore();
+  const { loadConversationAnchors } = useAnchorStore();
+  const addToast = useToastStore((s) => s.addToast);
+
+  // Cmd+F to open in-conversation search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setShowSearch(true);
+      }
+      if (e.key === 'Escape' && showSearch) {
+        setShowSearch(false);
+        setLocalSearch('');
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showSearch]);
+
+  const activeHighlight = localSearch.trim() || highlightQuery;
 
   useEffect(() => {
     getEntityTags('conversation', conversation.id).then(setConversationTags);
-    loadConversationBookmarks(conversation.id);
-  }, [conversation.id, getEntityTags, loadConversationBookmarks]);
+    loadConversationAnchors(conversation.id);
+  }, [conversation.id, getEntityTags, loadConversationAnchors]);
 
-  // Scroll to bookmarked message if scrollTo param is present
+  // Scroll to message if scrollTo param is present
   useEffect(() => {
     if (!scrollTo || messages.length === 0) return;
     const timer = setTimeout(() => {
@@ -77,6 +99,7 @@ export function ConversationView({
       .join('\n\n');
 
     await navigator.clipboard.writeText(text);
+    addToast('Copied to clipboard');
   };
 
   const handleExport = (format: ExportFormat) => {
@@ -159,6 +182,13 @@ export function ConversationView({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowSearch(!showSearch)}
+            className={`p-2 rounded-lg transition-colors ${showSearch ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+            title="Search in conversation (Cmd+F)"
+          >
+            <Search size={18} className={showSearch ? '' : 'text-gray-600 dark:text-gray-400'} />
+          </button>
+          <button
             onClick={handleCopy}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             title="Copy conversation"
@@ -190,8 +220,31 @@ export function ConversationView({
         </div>
       </div>
 
+      {/* In-conversation search */}
+      {showSearch && (
+        <div className="flex items-center gap-2 mb-4">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              placeholder="Search in this conversation..."
+              autoFocus
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+            />
+          </div>
+          <button
+            onClick={() => { setShowSearch(false); setLocalSearch(''); }}
+            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
       {/* Highlight indicator */}
-      {highlightQuery && (
+      {highlightQuery && !localSearch && (
         <div className="flex items-center justify-between px-3 py-2 mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
           <span className="text-sm text-yellow-800 dark:text-yellow-200">
             Highlighting matches for: <strong>"{highlightQuery}"</strong>
@@ -209,11 +262,13 @@ export function ConversationView({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto">
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <MessageBubble
               key={message.id}
               message={message}
-              highlightQuery={highlightQuery}
+              messages={messages}
+              messageIndex={index}
+              highlightQuery={activeHighlight}
               conversationId={conversation.id}
             />
           ))}

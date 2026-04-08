@@ -1,0 +1,6 @@
+- arbitrary knowledge type feature
+- auth
+- remove upgrade to pro button
+- fix failed to fetch on knowledge and analytics before convos uploaded
+- test claude code conversation upload
+- remove prompt library page

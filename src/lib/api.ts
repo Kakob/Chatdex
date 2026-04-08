@@ -7,12 +7,11 @@ interface FetchOptions extends RequestInit {
 }
 
 class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
+  status: number;
+  constructor(status: number, message: string) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
   }
 }
 
@@ -35,12 +34,14 @@ async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promis
     }
   }
 
+  const headers: Record<string, string> = { ...fetchOptions.headers as Record<string, string> };
+  if (fetchOptions.body) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(url, {
     ...fetchOptions,
-    headers: {
-      'Content-Type': 'application/json',
-      ...fetchOptions.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -219,6 +220,10 @@ export const api = {
     return fetchApi('/stats/daily', { params: { startDate, endDate } });
   },
 
+  async recomputeStats(): Promise<{ success: boolean; daysUpdated: number }> {
+    return fetchApi('/stats/recompute', { method: 'POST' });
+  },
+
   async updateDailyStats(date: string, updates: Partial<Omit<ApiDailyStats, 'date'>>): Promise<void> {
     await fetchApi(`/stats/daily/${encodeURIComponent(date)}`, {
       method: 'PUT',
@@ -370,137 +375,111 @@ export const tagApi = {
   },
 };
 
-// Prompts
-export interface ApiPrompt {
+// Anchors (AIPKMS)
+export interface ApiAnchor {
   id: string;
-  title: string;
-  content: string;
-  description: string;
+  contentType: 'full_response' | 'selection' | 'prompt_response_pair';
+  userPrompt: string;
+  claudeResponse: string;
+  selectedText: string | null;
+  conversationId: string;
+  conversationName: string | null;
+  messageId: string | null;
+  conversationUrl: string | null;
+  messageIndex: number;
+  annotation: string | null;
+  priority: 'low' | 'medium' | 'high';
+  workspaceId: string | null;
   folder: string | null;
-  tags: string[];
+  autoTags: string[];
+  relatedItemIds: string[];
+  tags: ApiTag[];
   createdAt: string;
   updatedAt: string;
-  usageCount: number;
 }
 
-export const promptApi = {
-  async getPrompts(options?: {
+export const anchorApi = {
+  async getAnchors(options?: {
+    conversationId?: string;
+    tagId?: string;
+    priority?: string;
     folder?: string;
     search?: string;
     limit?: number;
     offset?: number;
-  }): Promise<PaginatedResponse<ApiPrompt>> {
-    return fetchApi('/prompts', { params: options });
+  }): Promise<PaginatedResponse<ApiAnchor>> {
+    return fetchApi('/anchors', { params: options });
+  },
+
+  async getAnchor(id: string): Promise<ApiAnchor> {
+    return fetchApi(`/anchors/${encodeURIComponent(id)}`);
+  },
+
+  async getConversationAnchors(conversationId: string): Promise<Array<{
+    id: string;
+    messageId: string | null;
+    contentType: string;
+    createdAt: string;
+  }>> {
+    return fetchApi(`/anchors/conversation/${encodeURIComponent(conversationId)}`);
+  },
+
+  async checkAnchor(messageId: string): Promise<{ anchored: boolean; anchorIds: string[] }> {
+    return fetchApi(`/anchors/check/${encodeURIComponent(messageId)}`);
+  },
+
+  async createAnchor(data: {
+    contentType: string;
+    userPrompt?: string;
+    claudeResponse?: string;
+    selectedText?: string;
+    conversationId: string;
+    messageId?: string;
+    conversationUrl?: string;
+    messageIndex?: number;
+    annotation?: string;
+    priority?: string;
+    workspaceId?: string;
+    folder?: string;
+    tagIds?: string[];
+  }): Promise<ApiAnchor> {
+    return fetchApi('/anchors', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAnchor(
+    id: string,
+    data: {
+      annotation?: string;
+      priority?: string;
+      workspaceId?: string;
+      folder?: string;
+    }
+  ): Promise<ApiAnchor> {
+    return fetchApi(`/anchors/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteAnchor(id: string): Promise<void> {
+    await fetchApi(`/anchors/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
 
   async getFolders(): Promise<string[]> {
-    return fetchApi('/prompts/folders');
+    return fetchApi('/anchors/folders');
   },
 
-  async getPrompt(id: string): Promise<ApiPrompt> {
-    return fetchApi(`/prompts/${encodeURIComponent(id)}`);
+  async createFolder(name: string): Promise<{ success: boolean; name: string }> {
+    return fetchApi('/anchors/folders', { method: 'POST', body: JSON.stringify({ name }) });
   },
 
-  async createPrompt(data: {
-    title: string;
-    content: string;
-    description?: string;
-    folder?: string;
-    tags?: string[];
-  }): Promise<ApiPrompt> {
-    return fetchApi('/prompts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async deleteFolder(name: string): Promise<void> {
+    await fetchApi(`/anchors/folders/${encodeURIComponent(name)}`, { method: 'DELETE' });
   },
 
-  async updatePrompt(
-    id: string,
-    data: {
-      title?: string;
-      content?: string;
-      description?: string;
-      folder?: string;
-      tags?: string[];
-    }
-  ): Promise<ApiPrompt> {
-    return fetchApi(`/prompts/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  async deletePrompt(id: string): Promise<void> {
-    await fetchApi(`/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  },
-
-  async usePrompt(id: string): Promise<ApiPrompt> {
-    return fetchApi(`/prompts/${encodeURIComponent(id)}/use`, { method: 'POST' });
-  },
-};
-
-// Bookmarks
-export interface ApiBookmark {
-  id: string;
-  conversationId: string;
-  conversationName: string | null;
-  messageId: string;
-  messageSender: 'user' | 'assistant' | 'system' | 'tool' | null;
-  messagePreview: string;
-  note: string | null;
-  createdAt: string;
-}
-
-export const bookmarkApi = {
-  async getBookmarks(options?: {
-    conversationId?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<PaginatedResponse<ApiBookmark>> {
-    return fetchApi('/bookmarks', { params: options });
-  },
-
-  async getBookmark(id: string): Promise<ApiBookmark> {
-    return fetchApi(`/bookmarks/${encodeURIComponent(id)}`);
-  },
-
-  async createBookmark(data: {
-    conversationId: string;
-    messageId: string;
-    note?: string;
-  }): Promise<{ id: string; conversationId: string; messageId: string; note: string | null; createdAt: string }> {
-    return fetchApi('/bookmarks', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-
-  async updateBookmark(id: string, data: { note?: string }): Promise<void> {
-    await fetchApi(`/bookmarks/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
-  },
-
-  async deleteBookmark(id: string): Promise<void> {
-    await fetchApi(`/bookmarks/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  },
-
-  async checkBookmark(messageId: string): Promise<{ bookmarked: boolean; bookmarkId?: string }> {
-    return fetchApi(`/bookmarks/check/${encodeURIComponent(messageId)}`);
-  },
-
-  async getConversationBookmarks(conversationId: string): Promise<Array<{
-    id: string;
-    conversationId: string;
-    messageId: string;
-    messageSender: string | null;
-    messagePreview: string;
-    note: string | null;
-    createdAt: string;
-  }>> {
-    return fetchApi(`/bookmarks/conversation/${encodeURIComponent(conversationId)}`);
-  },
 };
 
 export { ApiError };
