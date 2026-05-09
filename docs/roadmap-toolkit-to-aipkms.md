@@ -2,7 +2,7 @@
 
 ## Context
 
-Claude Utils has a working core (search, analytics, import, conversation browser, activity tracker) but two layers remain unbuilt: the remaining **power toolkit** features (Prompt Library, Bookmarks, Conversation Tagging, Export, Keyboard Shortcuts) and the entire **AIPKMS** knowledge management system. The user wants a roadmap that shows how these layers connect — building toolkit features that naturally scaffold into AIPKMS capabilities.
+Chatdex has a working core (search, analytics, import, conversation browser, activity tracker) but two layers remain unbuilt: the remaining **power toolkit** features (Prompt Library, Bookmarks, Conversation Tagging, Export, Keyboard Shortcuts) and the entire **AIPKMS** knowledge management system. The user wants a roadmap that shows how these layers connect — building toolkit features that naturally scaffold into AIPKMS capabilities.
 
 **Key insight:** Several toolkit features are *simpler versions* of AIPKMS features. Building them first validates UX patterns, creates shared infrastructure, and provides a migration path.
 

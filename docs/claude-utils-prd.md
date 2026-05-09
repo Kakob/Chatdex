@@ -1,4 +1,4 @@
-# Claude Utils
+# Chatdex
 
 **Product Requirements Document**
 
@@ -8,7 +8,7 @@ Version 2.0 | January 2026
 
 ## Executive Summary
 
-Claude Utils is a browser-based power toolkit for Claude users. It provides search, analytics, export, and organization features that Anthropic doesn't offer natively. The product runs entirely client-side — no server, no data collection — which is both a technical constraint and a core selling point.
+Chatdex is a browser-based power toolkit for Claude users. It provides search, analytics, export, and organization features that Anthropic doesn't offer natively. The product runs entirely client-side — no server, no data collection — which is both a technical constraint and a core selling point.
 
 **Target customer**: Claude Pro/Max subscribers and Claude Code users who use Claude daily for work and have accumulated significant conversation history.
 
@@ -79,7 +79,7 @@ Anthropic is focused on the core AI product, not power-user tooling. These are "
 
 ## Solution Overview
 
-Claude Utils is a browser-based toolkit that solves all five pain points:
+Chatdex is a browser-based toolkit that solves all five pain points:
 
 | Problem | Solution |
 |---------|----------|
@@ -259,7 +259,7 @@ Claude Utils is a browser-based toolkit that solves all five pain points:
 *Markdown*:
 ```markdown
 # Conversation Title
-*Exported from Claude Utils • January 23, 2026*
+*Exported from Chatdex • January 23, 2026*
 
 ---
 
@@ -888,7 +888,7 @@ Yes, it's crackable. Every client-side app is. The target customer (professional
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  [Logo] Claude Utils          [Sync] [Settings] [Theme] [Pro]  │
+│  [Logo] Chatdex          [Sync] [Settings] [Theme] [Pro]  │
 ├──────────┬──────────────────────────────────────────────────────┤
 │          │                                                      │
 │  Search  │                                                      │
@@ -1112,21 +1112,21 @@ Yes, it's crackable. Every client-side app is. The target customer (professional
 
 ### Competitive Positioning
 
-**Claude Utils vs claude-chat-viewer**:
+**Chatdex vs claude-chat-viewer**:
 - We have analytics (they don't)
 - We have persistent storage (they don't)
 - We have prompt library (they don't)
 - We have paid tier with support
 - They're more mature, more GitHub stars
 
-**Claude Utils vs Claude Exporter**:
+**Chatdex vs Claude Exporter**:
 - We're web-based (no extension install)
 - We have search (they don't)
 - We have analytics (they don't)
 - They have more export formats (for now)
 - They can export without manual download
 
-**Claude Utils vs built-in Claude**:
+**Chatdex vs built-in Claude**:
 - We search message content (they don't)
 - We support Claude Code (they don't)
 - We have analytics (they don't)

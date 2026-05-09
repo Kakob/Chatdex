@@ -1,16 +1,16 @@
 # Product Requirements Document: AIPKMS
-## Claude Utils — AI-Powered Knowledge Management System
+## Chatdex — AI-Powered Knowledge Management System
 
 **Author:** Jacob  
 **Status:** Draft  
 **Last Updated:** February 2026  
-**Product:** Claude Utils Browser Extension
+**Product:** Chatdex Browser Extension
 
 ---
 
 ## How AIPKMS relates to the Activity Tracker
 
-Claude Utils contains two complementary capture/curation systems:
+Chatdex contains two complementary capture/curation systems:
 
 | | Activity Tracker | AIPKMS |
 |---|---|---|
@@ -32,7 +32,7 @@ AIPKMS is built **on top of** the conversation store that the Activity Tracker a
 
 ### 1.1 Product Summary
 
-AIPKMS is a feature module within Claude Utils that transforms Claude conversations from ephemeral chat logs into a persistent, searchable, and intelligent personal knowledge management system. Users can anchor specific messages and responses, organize them across projects, and resurface relevant knowledge in future conversations.
+AIPKMS is a feature module within Chatdex that transforms Claude conversations from ephemeral chat logs into a persistent, searchable, and intelligent personal knowledge management system. Users can anchor specific messages and responses, organize them across projects, and resurface relevant knowledge in future conversations.
 
 ### 1.2 Problem Statement
 
@@ -127,7 +127,7 @@ Claude power users generate significant intellectual value through their convers
 | RES-04 | Relevance scoring using tag matching + semantic similarity (via embeddings or API) | P1 |
 | RES-05 | Option to dismiss/hide resurfaced items | P0 |
 | RES-06 | Passive mode (sidebar only) vs. active mode (toast notification for high-relevance matches) | P2 |
-| RES-07 | "Related knowledge" indicator on Claude Utils toolbar showing count of relevant items | P1 |
+| RES-07 | "Related knowledge" indicator on Chatdex toolbar showing count of relevant items | P1 |
 
 ### 2.5 Synthesis Engine
 
@@ -158,7 +158,7 @@ Claude power users generate significant intellectual value through their convers
 | PRJ-02 | Default workspace for unassigned items | P0 |
 | PRJ-03 | Workspace dashboard: item count, recent anchors, threads, synthesis docs | P1 |
 | PRJ-04 | Auto-generated project timeline from anchored items (chronological view of decisions and milestones) | P2 |
-| PRJ-05 | Quick-switch between workspaces from Claude Utils toolbar | P1 |
+| PRJ-05 | Quick-switch between workspaces from Chatdex toolbar | P1 |
 | PRJ-06 | Cross-workspace search | P0 |
 
 ### 2.7 Export & Interop
@@ -301,7 +301,7 @@ SynthesisDocument {
 
 ### 4.3 Information Architecture
 ```
-Claude Utils Toolbar
+Chatdex Toolbar
 ├── Search (existing)
 ├── Analytics (existing)
 ├── Knowledge Base (AIPKMS)
@@ -360,7 +360,7 @@ Claude Utils Toolbar
 
 ## 6. Pricing Integration
 
-AIPKMS should be positioned as the premium differentiator for Claude Utils:
+AIPKMS should be positioned as the premium differentiator for Chatdex:
 
 | Tier | Price | AIPKMS Features |
 |---|---|---|

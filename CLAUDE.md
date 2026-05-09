@@ -1,4 +1,4 @@
-# Claude Utils — AI Agent Instructions
+# Chatdex — AI Agent Instructions
 
 > For the full, detailed instructions read **[PRD-AND-CLAUDE-MDs/CLAUDE.md](./PRD-AND-CLAUDE-MDs/CLAUDE.md)**.
 > For the docs index (PRDs, vision, architecture) read **[PRD-AND-CLAUDE-MDs/README.md](./PRD-AND-CLAUDE-MDs/README.md)**.
@@ -7,7 +7,7 @@
 
 ## Project in one sentence
 
-Claude Utils is a browser-based power toolkit for Claude users — search, analytics, export, conversation browser, prompt library, and a real-time activity tracker — with a planned AIPKMS (AI-Powered Knowledge Management System) feature layer.
+Chatdex is a browser-based power toolkit for Claude users — search, analytics, export, conversation browser, prompt library, and a real-time activity tracker — with a planned AIPKMS (AI-Powered Knowledge Management System) feature layer.
 
 ## Architecture overview
 

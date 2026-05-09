@@ -14,7 +14,7 @@ function injectScript(): void {
 // Listen for captured responses from injected script
 function setupResponseListener(): void {
   window.addEventListener('claude-utils-response', ((event: CustomEvent<CapturedResponse>) => {
-    console.log('[Claude Utils] Content script received response:', event.detail);
+    console.log('[Chatdex] Content script received response:', event.detail);
     sendToBackground({ type: 'CLAUDE_RESPONSE', data: event.detail });
   }) as EventListener);
 }
@@ -136,4 +136,4 @@ setupResponseListener();
 setupDOMObserver();
 setupTitleObserver();
 
-console.log('[Claude Utils] Content script loaded');
+console.log('[Chatdex] Content script loaded');

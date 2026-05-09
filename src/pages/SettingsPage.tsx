@@ -155,7 +155,7 @@ export function SettingsPage() {
             </>
           )}
           <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-            {isPro ? 'Thank you for supporting Claude Utils!' : (
+            {isPro ? 'Thank you for supporting Chatdex!' : (
               <>
                 Don't have a license?{' '}
                 <a href="#" className="text-violet-600 dark:text-violet-400 hover:underline">

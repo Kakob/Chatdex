@@ -1,4 +1,4 @@
-# Claude Utils
+# Chatdex
 
 A browser-based power toolkit for Claude users — search, analytics, export, conversation browser, prompt library, and a real-time activity tracker. Built with React + TypeScript. Local-first with an optional Fastify + Postgres backend.
 

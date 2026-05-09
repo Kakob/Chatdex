@@ -13,4 +13,4 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   return true;
 });
 
-console.log('[Claude Utils] Web app sync listener ready');
+console.log('[Chatdex] Web app sync listener ready');

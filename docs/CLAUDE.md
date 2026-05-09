@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-**Claude Utils** — A browser-based power toolkit for Claude users. Search, analytics, export, conversation browser, prompt library, and a real-time activity tracker. Local-first by design: the core web app stores data in IndexedDB (Dexie.js) and requires no backend for basic usage.
+**Chatdex** — A browser-based power toolkit for Claude users. Search, analytics, export, conversation browser, prompt library, and a real-time activity tracker. Local-first by design: the core web app stores data in IndexedDB (Dexie.js) and requires no backend for basic usage.
 
 **Architecture**: Three independently deployable pieces:
 1. **Frontend webapp** (`src/`) — React 18 + Vite, port 4000. Standalone; uses IndexedDB when no backend is available.

@@ -27,7 +27,7 @@ export function Header() {
 
         <div className="flex items-center gap-2">
           <span className="text-xl font-semibold text-gray-900 dark:text-white">
-            Claude Utils
+            Chatdex
           </span>
           {conversationCount > 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">

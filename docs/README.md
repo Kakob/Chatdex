@@ -1,4 +1,4 @@
-# Claude Utils — Docs Index
+# Chatdex — Docs Index
 
 This folder is the **canonical home for all project documentation** (PRDs, vision docs, and AI coding instructions). If you're human or an AI agent, start here.
 

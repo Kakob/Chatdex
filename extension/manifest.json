@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Claude Utils Companion",
+  "name": "Chatdex Companion",
   "version": "1.0.0",
   "description": "Captures real-time Claude.ai usage for analytics and timeline views",
   "permissions": ["storage", "tabs"],

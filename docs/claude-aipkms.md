@@ -1,4 +1,4 @@
-# Claude Utils: AI-Powered Knowledge Management System (AIPKMS)
+# Chatdex: AI-Powered Knowledge Management System (AIPKMS)
 
 ## The Problem
 
@@ -10,7 +10,7 @@ Power users have dozens of Claude conversations per week spanning multiple proje
 
 ## The Vision
 
-Claude Utils evolves from a power user toolkit into a **personal knowledge graph built from your Claude interactions**. Every good conversation makes future conversations smarter. Your Claude usage compounds over time instead of resetting every session.
+Chatdex evolves from a power user toolkit into a **personal knowledge graph built from your Claude interactions**. Every good conversation makes future conversations smarter. Your Claude usage compounds over time instead of resetting every session.
 
 **In one sentence:** Turn "chat and forget" into a compounding knowledge system where the best parts of every conversation become searchable, organizable, and automatically resurfaceable.
 

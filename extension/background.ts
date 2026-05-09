@@ -27,7 +27,7 @@ type ActivityPayload = {
 
 // Send activity directly to the API
 async function syncActivity(activity: ActivityPayload): Promise<void> {
-  console.log('[Claude Utils] Sending activity to API:', activity.type, activity.id);
+  console.log('[Chatdex] Sending activity to API:', activity.type, activity.id);
 
   try {
     const response = await fetch(`${API_URL}/activities`, {
@@ -43,12 +43,12 @@ async function syncActivity(activity: ActivityPayload): Promise<void> {
       throw new Error(`API error: ${response.status}`);
     }
 
-    console.log('[Claude Utils] Activity stored:', activity.type, activity.id);
+    console.log('[Chatdex] Activity stored:', activity.type, activity.id);
 
     // Notify any open web app tabs for live UI updates
     notifyWebAppTabs(activity);
   } catch (error) {
-    console.error('[Claude Utils] Error sending activity to API:', error);
+    console.error('[Chatdex] Error sending activity to API:', error);
   }
 }
 
@@ -160,7 +160,7 @@ function getCurrentConversationId(): string | null {
 
 // Handle messages from content script
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender) => {
-  console.log('[Claude Utils] Background received message:', message.type);
+  console.log('[Chatdex] Background received message:', message.type);
 
   // Extract conversation ID from tab URL
   if (sender.tab?.url) {
@@ -183,4 +183,4 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender) => {
   }
 });
 
-console.log('[Claude Utils] Background service worker initialized');
+console.log('[Chatdex] Background service worker initialized');

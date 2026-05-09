@@ -102,7 +102,7 @@ window.fetch = async function (
           timestamp: Date.now(),
         };
 
-        console.log('[Claude Utils] Captured API call:', url, capturedData);
+        console.log('[Chatdex] Captured API call:', url, capturedData);
 
         // Dispatch custom event for content script to pick up
         window.dispatchEvent(
@@ -114,7 +114,7 @@ window.fetch = async function (
     }
   } catch (e) {
     // Silently ignore errors to not break the page
-    console.error('[Claude Utils] Error intercepting fetch:', e);
+    console.error('[Chatdex] Error intercepting fetch:', e);
   }
 
   return response;
@@ -216,7 +216,7 @@ async function processStreamingResponse(
       userMessage: baseData.userMessage,
     };
 
-    console.log('[Claude Utils] Captured completion:', capturedData.model, {
+    console.log('[Chatdex] Captured completion:', capturedData.model, {
       userMsgLen: baseData.userMessage?.length ?? 0,
       responseMsgLen: messageContent.length,
     });
@@ -228,7 +228,7 @@ async function processStreamingResponse(
       })
     );
   } catch (e) {
-    console.error('[Claude Utils] Error processing streaming response:', e);
+    console.error('[Chatdex] Error processing streaming response:', e);
 
     // Still dispatch the basic data even if we couldn't parse the body
     window.dispatchEvent(
@@ -267,4 +267,4 @@ function extractTokenHeaders(headers: Headers): TokenHeaders | null {
 }
 
 // Signal that the script is loaded
-console.log('[Claude Utils] Fetch interceptor loaded');
+console.log('[Chatdex] Fetch interceptor loaded');
