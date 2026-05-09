@@ -13,8 +13,8 @@ A browser-based power toolkit for Claude users — search, analytics, export, co
 - **Export** — Markdown, PDF, JSON, HTML
 - **Conversation browser** — View conversations with syntax highlighting
 - **Prompt library** — Save, organize, and reuse prompts
-- **Activity tracker** — Chrome extension capturing real-time tokens, artifacts, and tool calls
 - **AIPKMS** *(planned)* — Anchor insights, build knowledge threads, resurface context in future conversations
+- **Activity tracker** *(experimental)* — Chrome extension on the [`extension-experimental`](../../tree/extension-experimental) branch; future direction includes a Claude Code desktop background worker
 
 ---
 
@@ -46,16 +46,6 @@ Create a `.env.local` at the root:
 VITE_API_URL=http://localhost:3003/api
 ```
 
-### Chrome extension (activity tracker)
-
-```bash
-npm run dev:extension    # Watches and rebuilds → dist-extension/
-```
-
-Then in Chrome: Settings → Extensions → Load unpacked → select `dist-extension/`.
-
----
-
 ## Tech stack
 
 | Layer | Technology |
@@ -69,16 +59,14 @@ Then in Chrome: Settings → Extensions → Load unpacked → select `dist-exten
 | PDF export | jsPDF + html2canvas |
 | Backend | Fastify 5, Drizzle ORM |
 | Database | PostgreSQL 16 |
-| Extension | Chrome Manifest V3 |
 
 ---
 
 ## Project structure
 
 ```
-claude-utils/
+chatdex/
 ├── src/                      # Frontend React app
-├── extension/                # Chrome extension source
 ├── backend/                  # Fastify + Postgres API
 ├── PRD-AND-CLAUDE-MDs/       # All docs, PRDs, and agent instructions
 ├── CLAUDE.md                 # AI agent quick-start (points to PRD-AND-CLAUDE-MDs/)
@@ -94,10 +82,8 @@ claude-utils/
 npm run dev              # Frontend dev server
 npm run dev:backend      # Backend dev server
 npm run dev:all          # Both servers
-npm run dev:extension    # Extension build watcher
 
 npm run build            # Frontend production build
-npm run build:extension  # Extension build
 npm run build:all        # Everything
 
 npm run docker:up        # Start Postgres
