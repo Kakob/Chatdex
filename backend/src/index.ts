@@ -1,14 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import { conversationsRoutes } from './routes/conversations.js';
-import { messagesRoutes } from './routes/messages.js';
-import { activitiesRoutes } from './routes/activities.js';
-import { statsRoutes } from './routes/stats.js';
-import { metadataRoutes } from './routes/metadata.js';
-import { importRoutes } from './routes/import.js';
-import { countsRoutes } from './routes/counts.js';
-import { tagRoutes } from './routes/tags.js';
-import { anchorRoutes } from './routes/anchors.js';
+import { authRoutes } from './routes/auth.js';
+import { syncRoutes } from './routes/sync.js';
+import { registerAuth } from './middleware/auth.js';
 
 const fastify = Fastify({
   logger: true,
@@ -21,21 +15,17 @@ await fastify.register(cors, {
   credentials: true,
 });
 
+// JWT + the `authenticate` decorator. Must be registered before any route uses it.
+await registerAuth(fastify);
+
 // Health check
 fastify.get('/health', async () => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
 // Register routes
-fastify.register(conversationsRoutes, { prefix: '/api/conversations' });
-fastify.register(messagesRoutes, { prefix: '/api/messages' });
-fastify.register(activitiesRoutes, { prefix: '/api/activities' });
-fastify.register(statsRoutes, { prefix: '/api/stats' });
-fastify.register(metadataRoutes, { prefix: '/api/metadata' });
-fastify.register(importRoutes, { prefix: '/api/import' });
-fastify.register(countsRoutes, { prefix: '/api/counts' });
-fastify.register(tagRoutes, { prefix: '/api/tags' });
-fastify.register(anchorRoutes, { prefix: '/api/anchors' });
+fastify.register(authRoutes, { prefix: '/api/auth' });
+fastify.register(syncRoutes, { prefix: '/api/sync' });
 
 // Start server
 const port = parseInt(process.env.PORT || '3003', 10);

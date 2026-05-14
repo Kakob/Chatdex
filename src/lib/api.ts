@@ -1,12 +1,53 @@
-// API client for communicating with the backend
+// Local-first API surface, backed by IndexedDB (Dexie).
+// Existing components import { api, tagApi, anchorApi, ApiTag, ApiAnchor, ... }
+// from this module — those names are preserved as a stable client surface.
+// Cloud sync (Phase 2) will sit underneath this layer, encrypting data on its
+// way out to the backend; the in-app surface stays the same.
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3003/api';
+import {
+  db,
+  bulkPutConversations,
+  getConversation as dbGetConversation,
+  getConversations as dbGetConversations,
+  deleteConversation as dbDeleteConversation,
+  deleteConversationsBySource as dbDeleteConversationsBySource,
+  bulkPutMessages,
+  getMessagesForConversation as dbGetMessagesForConversation,
+  addActivity as dbAddActivity,
+  getActivities as dbGetActivities,
+  clearActivities as dbClearActivities,
+  putAnchor,
+  getAnchor as dbGetAnchor,
+  listAnchors as dbListAnchors,
+  getAnchorsByConversation as dbGetAnchorsByConversation,
+  getAnchorsByMessage as dbGetAnchorsByMessage,
+  updateAnchorRow,
+  deleteAnchor as dbDeleteAnchor,
+  putTag,
+  getTag,
+  listTags as dbListTags,
+  updateTag as dbUpdateTag,
+  deleteTag as dbDeleteTag,
+  tagEntity as dbTagEntity,
+  untagEntity as dbUntagEntity,
+  getEntityTags as dbGetEntityTags,
+  getEntityIdsForTag,
+  listFolders as dbListFolders,
+  createFolder as dbCreateFolder,
+  deleteFolder as dbDeleteFolder,
+  getDailyStats as dbGetDailyStats,
+  updateDailyStats as dbUpdateDailyStats,
+  clearDailyStats,
+  getMetadata as dbGetMetadata,
+  setMetadata as dbSetMetadata,
+  deleteMetadata as dbDeleteMetadata,
+  clearMetadata as dbClearMetadata,
+} from './db';
+import type { StoredConversation, StoredMessage, StoredActivity, EntityType } from '../types';
+import type { AnchoredItem, Priority, ContentType } from './aipkms/types';
 
-interface FetchOptions extends RequestInit {
-  params?: Record<string, string | number | boolean | undefined>;
-}
-
-class ApiError extends Error {
+// Errors
+export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
@@ -15,44 +56,7 @@ class ApiError extends Error {
   }
 }
 
-async function fetchApi<T>(endpoint: string, options: FetchOptions = {}): Promise<T> {
-  const { params, ...fetchOptions } = options;
-
-  let url = `${API_URL}${endpoint}`;
-
-  // Add query parameters
-  if (params) {
-    const searchParams = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value !== undefined) {
-        searchParams.append(key, String(value));
-      }
-    }
-    const queryString = searchParams.toString();
-    if (queryString) {
-      url += `?${queryString}`;
-    }
-  }
-
-  const headers: Record<string, string> = { ...fetchOptions.headers as Record<string, string> };
-  if (fetchOptions.body) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  const response = await fetch(url, {
-    ...fetchOptions,
-    headers,
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new ApiError(response.status, errorData.error || response.statusText);
-  }
-
-  return response.json();
-}
-
-// Types matching the backend API
+// Wire-style shapes — kept stable for components consuming them.
 export interface ApiConversation {
   id: string;
   source: 'claude.ai' | 'claude-code';
@@ -147,46 +151,177 @@ export interface ImportResult {
   source: 'claude.ai' | 'claude-code';
 }
 
-// API Methods
+export interface ApiTag {
+  id: string;
+  name: string;
+  color: string | null;
+  category: string | null;
+  usageCount: number;
+  createdAt: string;
+}
 
-// Conversations
+export interface ApiAnchor {
+  id: string;
+  contentType: ContentType;
+  userPrompt: string;
+  claudeResponse: string;
+  selectedText: string | null;
+  conversationId: string;
+  conversationName: string | null;
+  messageId: string | null;
+  conversationUrl: string | null;
+  messageIndex: number;
+  annotation: string | null;
+  priority: Priority;
+  workspaceId: string | null;
+  folder: string | null;
+  autoTags: string[];
+  relatedItemIds: string[];
+  tags: ApiTag[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// --- shape converters ---
+
+function toApiConversation(c: StoredConversation): ApiConversation {
+  return {
+    id: c.id,
+    source: c.source,
+    name: c.name,
+    summary: c.summary,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    importedAt: c.importedAt.toISOString(),
+    messageCount: c.messageCount,
+    userMessageCount: c.userMessageCount,
+    assistantMessageCount: c.assistantMessageCount,
+    estimatedTokens: c.estimatedTokens,
+    fullText: c.fullText,
+    projectPath: c.projectPath,
+    gitBranch: c.gitBranch,
+    workingDirectory: c.workingDirectory,
+  };
+}
+
+function toApiMessage(m: StoredMessage): ApiMessage {
+  return {
+    id: m.id,
+    conversationId: m.conversationId,
+    sender: m.sender,
+    text: m.text,
+    contentBlocks: m.contentBlocks,
+    conversationName: m.conversationName,
+    createdAt: m.createdAt.toISOString(),
+    toolName: m.toolName,
+    toolInput: m.toolInput,
+    toolResult: m.toolResult,
+  };
+}
+
+function toApiActivity(a: StoredActivity): ApiActivity {
+  return {
+    id: a.id,
+    type: a.type,
+    source: a.source,
+    conversationId: a.conversationId,
+    conversationTitle: a.conversationTitle,
+    model: a.model,
+    timestamp: a.timestamp.toISOString(),
+    tokens: a.tokens,
+    metadata: a.metadata,
+  };
+}
+
+function toApiTag(t: { id: string; name: string; color: string | null; category: string | null; usageCount: number; createdAt: Date }): ApiTag {
+  return {
+    id: t.id,
+    name: t.name,
+    color: t.color,
+    category: t.category,
+    usageCount: t.usageCount,
+    createdAt: t.createdAt.toISOString(),
+  };
+}
+
+async function toApiAnchor(a: AnchoredItem): Promise<ApiAnchor> {
+  const [conv, tags] = await Promise.all([
+    dbGetConversation(a.conversationId),
+    dbGetEntityTags('anchor', a.id),
+  ]);
+  return {
+    id: a.id,
+    contentType: a.contentType,
+    userPrompt: a.userPrompt,
+    claudeResponse: a.claudeResponse,
+    selectedText: a.selectedText,
+    conversationId: a.conversationId,
+    conversationName: conv?.name ?? null,
+    messageId: a.messageId,
+    conversationUrl: a.conversationUrl,
+    messageIndex: a.messageIndex,
+    annotation: a.annotation,
+    priority: a.priority,
+    workspaceId: a.workspaceId,
+    folder: a.folder,
+    autoTags: a.autoTags,
+    relatedItemIds: a.relatedItemIds,
+    tags: tags.map(toApiTag),
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+  };
+}
+
+// --- conversations / messages / activities / stats / metadata / import ---
+
 export const api = {
-  // Conversations
   async getConversations(options?: {
     source?: 'claude.ai' | 'claude-code';
     limit?: number;
     offset?: number;
   }): Promise<PaginatedResponse<ApiConversation>> {
-    return fetchApi('/conversations', { params: options });
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
+    const total = await db.conversations.count();
+    const all = await dbGetConversations({ source: options?.source });
+    const data = all.slice(offset, offset + limit).map(toApiConversation);
+    return {
+      data,
+      pagination: { total, limit, offset, hasMore: offset + data.length < all.length },
+    };
   },
 
   async getConversation(id: string): Promise<ApiConversation> {
-    return fetchApi(`/conversations/${encodeURIComponent(id)}`);
+    const c = await dbGetConversation(id);
+    if (!c) throw new ApiError(404, 'Conversation not found');
+    return toApiConversation(c);
   },
 
   async getMessagesForConversation(conversationId: string): Promise<ApiMessage[]> {
-    return fetchApi(`/conversations/${encodeURIComponent(conversationId)}/messages`);
+    const msgs = await dbGetMessagesForConversation(conversationId);
+    return msgs.map(toApiMessage);
   },
 
   async deleteConversations(source?: 'claude.ai' | 'claude-code'): Promise<void> {
-    await fetchApi('/conversations', {
-      method: 'DELETE',
-      params: source ? { source } : undefined,
-    });
+    if (source) {
+      await dbDeleteConversationsBySource(source);
+    } else {
+      await db.transaction('rw', [db.conversations, db.messages, db.anchors], async () => {
+        await db.conversations.clear();
+        await db.messages.clear();
+        await db.anchors.clear();
+      });
+    }
   },
 
   async deleteConversation(id: string): Promise<void> {
-    await fetchApi(`/conversations/${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-    });
+    await dbDeleteConversation(id);
   },
 
-  // Messages
   async getMessages(conversationId: string): Promise<ApiMessage[]> {
-    return fetchApi('/messages', { params: { conversationId } });
+    return api.getMessagesForConversation(conversationId);
   },
 
-  // Activities
   async getActivities(filters?: {
     source?: 'claude.ai' | 'extension';
     types?: string;
@@ -197,67 +332,95 @@ export const api = {
     limit?: number;
     offset?: number;
   }): Promise<ApiActivity[]> {
-    return fetchApi('/activities', { params: filters });
+    const f = {
+      source: filters?.source,
+      types: filters?.types ? (filters.types.split(',') as ApiActivity['type'][]) : undefined,
+      dateRange:
+        filters?.startDate && filters?.endDate
+          ? { start: new Date(filters.startDate), end: new Date(filters.endDate) }
+          : undefined,
+      conversationId: filters?.conversationId,
+      search: filters?.search,
+    };
+    const all = await dbGetActivities(f);
+    const offset = filters?.offset ?? 0;
+    const limit = filters?.limit ?? all.length;
+    return all.slice(offset, offset + limit).map(toApiActivity);
   },
 
   async addActivity(activity: Omit<ApiActivity, 'id'> & { id?: string }): Promise<{ id: string }> {
-    const activityWithId = {
-      ...activity,
-      id: activity.id || crypto.randomUUID(),
-    };
-    return fetchApi('/activities', {
-      method: 'POST',
-      body: JSON.stringify(activityWithId),
+    const id = activity.id || crypto.randomUUID();
+    await dbAddActivity({
+      id,
+      type: activity.type,
+      source: activity.source,
+      conversationId: activity.conversationId,
+      conversationTitle: activity.conversationTitle,
+      model: activity.model,
+      timestamp: new Date(activity.timestamp),
+      tokens: activity.tokens,
+      metadata: activity.metadata,
     });
+    return { id };
   },
 
   async clearActivities(): Promise<void> {
-    await fetchApi('/activities', { method: 'DELETE' });
+    await dbClearActivities();
   },
 
-  // Stats
   async getDailyStats(startDate: string, endDate: string): Promise<ApiDailyStats[]> {
-    return fetchApi('/stats/daily', { params: { startDate, endDate } });
+    return dbGetDailyStats(startDate, endDate);
   },
 
   async recomputeStats(): Promise<{ success: boolean; daysUpdated: number }> {
-    return fetchApi('/stats/recompute', { method: 'POST' });
+    const messages = await db.messages.toArray();
+    await clearDailyStats();
+    const buckets = new Map<string, ApiDailyStats>();
+
+    for (const m of messages) {
+      const date = m.createdAt.toISOString().split('T')[0];
+      const bucket = buckets.get(date) ?? {
+        date,
+        inputTokens: 0,
+        outputTokens: 0,
+        messageCount: 0,
+        artifactCount: 0,
+        toolUseCount: 0,
+        modelUsage: {},
+      };
+      bucket.messageCount += 1;
+      const estTokens = Math.ceil(m.text.length / 4);
+      if (m.sender === 'user') bucket.inputTokens += estTokens;
+      else if (m.sender === 'assistant') bucket.outputTokens += estTokens;
+      for (const block of m.contentBlocks ?? []) {
+        if (block.type === 'artifact') bucket.artifactCount += 1;
+        if (block.type === 'tool_use') bucket.toolUseCount += 1;
+      }
+      buckets.set(date, bucket);
+    }
+
+    for (const stat of buckets.values()) {
+      await dbUpdateDailyStats(stat.date, stat);
+    }
+    return { success: true, daysUpdated: buckets.size };
   },
 
   async updateDailyStats(date: string, updates: Partial<Omit<ApiDailyStats, 'date'>>): Promise<void> {
-    await fetchApi(`/stats/daily/${encodeURIComponent(date)}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
-    });
+    await dbUpdateDailyStats(date, updates);
   },
 
-  // Metadata
   async getMetadata<T>(key: string): Promise<T | undefined> {
-    try {
-      const result = await fetchApi<{ key: string; value: T }>(`/metadata/${encodeURIComponent(key)}`);
-      return result.value;
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        return undefined;
-      }
-      throw error;
-    }
+    return dbGetMetadata<T>(key);
   },
 
   async setMetadata(key: string, value: unknown): Promise<void> {
-    await fetchApi(`/metadata/${encodeURIComponent(key)}`, {
-      method: 'PUT',
-      body: JSON.stringify({ value }),
-    });
+    await dbSetMetadata(key, value);
   },
 
   async deleteMetadata(key: string): Promise<void> {
-    await fetchApi(`/metadata/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-    });
+    await dbDeleteMetadata(key);
   },
 
-  // Import
   async importData(payload: {
     conversations: Array<{
       id: string;
@@ -290,113 +453,152 @@ export const api = {
     }>;
     source: 'claude.ai' | 'claude-code';
   }): Promise<ImportResult> {
-    return fetchApi('/import', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    let added = 0;
+    let skipped = 0;
+
+    const incomingIds = payload.conversations.map((c) => c.id);
+    const existing = await db.conversations.bulkGet(incomingIds);
+    const existingIds = new Set(existing.filter(Boolean).map((c) => (c as StoredConversation).id));
+
+    const toInsert: StoredConversation[] = [];
+    for (const c of payload.conversations) {
+      if (existingIds.has(c.id)) {
+        skipped += 1;
+        continue;
+      }
+      added += 1;
+      toInsert.push({
+        id: c.id,
+        source: c.source,
+        name: c.name,
+        summary: c.summary ?? null,
+        createdAt: new Date(c.createdAt),
+        updatedAt: new Date(c.updatedAt),
+        importedAt: c.importedAt ? new Date(c.importedAt) : new Date(),
+        messageCount: c.messageCount ?? 0,
+        userMessageCount: c.userMessageCount ?? 0,
+        assistantMessageCount: c.assistantMessageCount ?? 0,
+        estimatedTokens: c.estimatedTokens ?? 0,
+        fullText: c.fullText ?? '',
+        projectPath: c.projectPath,
+        gitBranch: c.gitBranch,
+        workingDirectory: c.workingDirectory,
+      });
+    }
+
+    const insertedIds = new Set(toInsert.map((c) => c.id));
+    const newMessages: StoredMessage[] = payload.messages
+      .filter((m) => insertedIds.has(m.conversationId))
+      .map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        sender: m.sender,
+        text: m.text,
+        contentBlocks: m.contentBlocks,
+        conversationName: m.conversationName,
+        createdAt: new Date(m.createdAt),
+        toolName: m.toolName,
+        toolInput: m.toolInput,
+        toolResult: m.toolResult,
+      }));
+
+    await bulkPutConversations(toInsert);
+    await bulkPutMessages(newMessages);
+
+    return {
+      conversationsAdded: added,
+      conversationsSkipped: skipped,
+      messagesAdded: newMessages.length,
+      source: payload.source,
+    };
   },
 
-  // Counts
   async getCounts(): Promise<{
     conversations: number;
     messages: number;
     activities: number;
   }> {
-    return fetchApi('/counts');
-  },
-
-  // Clear all data
-  async clearAllData(): Promise<void> {
-    await Promise.all([
-      fetchApi('/conversations', { method: 'DELETE' }),
-      fetchApi('/activities', { method: 'DELETE' }),
-      fetchApi('/metadata', { method: 'DELETE' }),
+    const [conversations, messages, activities] = await Promise.all([
+      db.conversations.count(),
+      db.messages.count(),
+      db.activities.count(),
     ]);
+    return { conversations, messages, activities };
   },
 
-  // Clear data by source
+  async clearAllData(): Promise<void> {
+    await db.transaction(
+      'rw',
+      [db.conversations, db.messages, db.activities, db.anchors, db.metadata],
+      async () => {
+        await db.conversations.clear();
+        await db.messages.clear();
+        await db.activities.clear();
+        await db.anchors.clear();
+        await db.metadata.clear();
+      }
+    );
+  },
+
   async clearDataBySource(source: 'claude.ai' | 'claude-code'): Promise<void> {
-    await fetchApi('/conversations', {
-      method: 'DELETE',
-      params: { source },
-    });
+    await dbDeleteConversationsBySource(source);
   },
 };
 
-// Tags
-export interface ApiTag {
-  id: string;
-  name: string;
-  color: string | null;
-  category: string | null;
-  usageCount: number;
-  createdAt: string;
-}
+// --- tags ---
 
 export const tagApi = {
   async getTags(query?: string, category?: string): Promise<ApiTag[]> {
-    return fetchApi('/tags', { params: { q: query, category } });
+    const tags = await dbListTags(query, category as EntityType | undefined);
+    return tags.map(toApiTag);
   },
 
-  async createTag(tag: { name: string; color?: string; category?: string }): Promise<ApiTag> {
-    return fetchApi('/tags', {
-      method: 'POST',
-      body: JSON.stringify(tag),
-    });
+  async createTag(input: { name: string; color?: string; category?: string }): Promise<ApiTag> {
+    const id = crypto.randomUUID();
+    const tag = {
+      id,
+      name: input.name.trim(),
+      color: input.color ?? null,
+      category: (input.category as EntityType | null) ?? null,
+      usageCount: 0,
+      createdAt: new Date(),
+    };
+    await putTag(tag);
+    return toApiTag(tag);
   },
 
-  async updateTag(id: string, updates: { name?: string; color?: string; category?: string }): Promise<ApiTag> {
-    return fetchApi(`/tags/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(updates),
+  async updateTag(
+    id: string,
+    updates: { name?: string; color?: string; category?: string }
+  ): Promise<ApiTag> {
+    const updated = await dbUpdateTag(id, {
+      name: updates.name,
+      color: updates.color,
+      category: updates.category as EntityType | undefined,
     });
+    if (!updated) throw new ApiError(404, 'Tag not found');
+    return toApiTag(updated);
   },
 
   async deleteTag(id: string): Promise<void> {
-    await fetchApi(`/tags/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await dbDeleteTag(id);
   },
 
   async tagEntity(tagId: string, entityId: string, entityType: string): Promise<void> {
-    await fetchApi('/tags/entity', {
-      method: 'POST',
-      body: JSON.stringify({ tagId, entityId, entityType }),
-    });
+    await dbTagEntity(tagId, entityId, entityType as EntityType);
   },
 
   async untagEntity(tagId: string, entityId: string, entityType: string): Promise<void> {
-    await fetchApi('/tags/entity', {
-      method: 'DELETE',
-      body: JSON.stringify({ tagId, entityId, entityType }),
-    });
+    await dbUntagEntity(tagId, entityId, entityType as EntityType);
   },
 
   async getEntityTags(entityType: string, entityId: string): Promise<ApiTag[]> {
-    return fetchApi(`/tags/entity/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}`);
+    const tags = await dbGetEntityTags(entityType as EntityType, entityId);
+    return tags.map(toApiTag);
   },
 };
 
-// Anchors (AIPKMS)
-export interface ApiAnchor {
-  id: string;
-  contentType: 'full_response' | 'selection' | 'prompt_response_pair';
-  userPrompt: string;
-  claudeResponse: string;
-  selectedText: string | null;
-  conversationId: string;
-  conversationName: string | null;
-  messageId: string | null;
-  conversationUrl: string | null;
-  messageIndex: number;
-  annotation: string | null;
-  priority: 'low' | 'medium' | 'high';
-  workspaceId: string | null;
-  folder: string | null;
-  autoTags: string[];
-  relatedItemIds: string[];
-  tags: ApiTag[];
-  createdAt: string;
-  updatedAt: string;
-}
+// --- anchors ---
 
 export const anchorApi = {
   async getAnchors(options?: {
@@ -408,11 +610,44 @@ export const anchorApi = {
     limit?: number;
     offset?: number;
   }): Promise<PaginatedResponse<ApiAnchor>> {
-    return fetchApi('/anchors', { params: options });
+    let anchorIdFilter: Set<string> | null = null;
+    if (options?.tagId) {
+      const ids = await getEntityIdsForTag(options.tagId, 'anchor');
+      anchorIdFilter = new Set(ids);
+    }
+
+    const result = await dbListAnchors({
+      conversationId: options?.conversationId,
+      priority: options?.priority,
+      folder: options?.folder,
+      search: options?.search,
+      limit: options?.limit,
+      offset: options?.offset,
+    });
+
+    let filtered = result.data;
+    if (anchorIdFilter) {
+      filtered = filtered.filter((a) => anchorIdFilter!.has(a.id));
+    }
+
+    const data = await Promise.all(filtered.map(toApiAnchor));
+    const limit = options?.limit ?? data.length;
+    const offset = options?.offset ?? 0;
+    return {
+      data,
+      pagination: {
+        total: result.total,
+        limit,
+        offset,
+        hasMore: offset + data.length < result.total,
+      },
+    };
   },
 
   async getAnchor(id: string): Promise<ApiAnchor> {
-    return fetchApi(`/anchors/${encodeURIComponent(id)}`);
+    const a = await dbGetAnchor(id);
+    if (!a) throw new ApiError(404, 'Anchor not found');
+    return toApiAnchor(a);
   },
 
   async getConversationAnchors(conversationId: string): Promise<Array<{
@@ -421,11 +656,21 @@ export const anchorApi = {
     contentType: string;
     createdAt: string;
   }>> {
-    return fetchApi(`/anchors/conversation/${encodeURIComponent(conversationId)}`);
+    const items = await dbGetAnchorsByConversation(conversationId);
+    return items.map((a) => ({
+      id: a.id,
+      messageId: a.messageId,
+      contentType: a.contentType,
+      createdAt: a.createdAt.toISOString(),
+    }));
   },
 
   async checkAnchor(messageId: string): Promise<{ anchored: boolean; anchorIds: string[] }> {
-    return fetchApi(`/anchors/check/${encodeURIComponent(messageId)}`);
+    const items = await dbGetAnchorsByMessage(messageId);
+    return {
+      anchored: items.length > 0,
+      anchorIds: items.map((a) => a.id),
+    };
   },
 
   async createAnchor(data: {
@@ -443,10 +688,34 @@ export const anchorApi = {
     folder?: string;
     tagIds?: string[];
   }): Promise<ApiAnchor> {
-    return fetchApi('/anchors', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    const now = new Date();
+    const anchor: AnchoredItem = {
+      id: crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+      contentType: data.contentType as ContentType,
+      userPrompt: data.userPrompt ?? '',
+      claudeResponse: data.claudeResponse ?? '',
+      selectedText: data.selectedText ?? null,
+      conversationId: data.conversationId,
+      conversationUrl: data.conversationUrl ?? null,
+      messageId: data.messageId ?? null,
+      messageIndex: data.messageIndex ?? 0,
+      tags: [],
+      annotation: data.annotation ?? null,
+      priority: (data.priority as Priority) ?? 'medium',
+      workspaceId: data.workspaceId ?? null,
+      folder: data.folder ?? null,
+      autoTags: [],
+      relatedItemIds: [],
+    };
+    await putAnchor(anchor);
+    if (data.tagIds && data.tagIds.length > 0) {
+      for (const tagId of data.tagIds) {
+        await dbTagEntity(tagId, anchor.id, 'anchor');
+      }
+    }
+    return toApiAnchor(anchor);
   },
 
   async updateAnchor(
@@ -458,28 +727,41 @@ export const anchorApi = {
       folder?: string;
     }
   ): Promise<ApiAnchor> {
-    return fetchApi(`/anchors/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    const updates: Partial<AnchoredItem> = {};
+    if (data.annotation !== undefined) updates.annotation = data.annotation;
+    if (data.priority !== undefined) updates.priority = data.priority as Priority;
+    if (data.workspaceId !== undefined) updates.workspaceId = data.workspaceId;
+    if (data.folder !== undefined) updates.folder = data.folder;
+    const updated = await updateAnchorRow(id, updates);
+    if (!updated) throw new ApiError(404, 'Anchor not found');
+    return toApiAnchor(updated);
   },
 
   async deleteAnchor(id: string): Promise<void> {
-    await fetchApi(`/anchors/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await dbDeleteAnchor(id);
   },
 
   async getFolders(): Promise<string[]> {
-    return fetchApi('/anchors/folders');
+    return dbListFolders();
   },
 
   async createFolder(name: string): Promise<{ success: boolean; name: string }> {
-    return fetchApi('/anchors/folders', { method: 'POST', body: JSON.stringify({ name }) });
+    const row = await dbCreateFolder(name);
+    return { success: true, name: row.name };
   },
 
   async deleteFolder(name: string): Promise<void> {
-    await fetchApi(`/anchors/folders/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await dbDeleteFolder(name);
   },
-
 };
 
-export { ApiError };
+// Re-export storage layer for direct access where needed.
+export { db };
+
+// Compatibility: some code imports `getTag` directly via api
+export { getTag };
+
+// Stub for the old metadata wipe path (cleanup helpers may still call it)
+export async function clearAllMetadata(): Promise<void> {
+  await dbClearMetadata();
+}

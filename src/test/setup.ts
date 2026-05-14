@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
+import 'fake-indexeddb/auto';
 
 // Mock DOM APIs used by exporters
 global.URL.createObjectURL = vi.fn(() => 'blob:mock');

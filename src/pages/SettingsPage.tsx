@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/appStore';
 import { clearAllData, getMetadata, setMetadata } from '../lib/db';
 import { invalidateIndex } from '../lib/search';
 import { validateLicense } from '../lib/license';
+import { CloudSyncSection } from '../components/settings/CloudSyncSection';
 
 export function SettingsPage() {
   const { theme, setTheme, conversationCount, messageCount, setStats, isPro, setLicense } = useAppStore();
@@ -108,6 +109,9 @@ export function SettingsPage() {
             ))}
           </div>
         </section>
+
+        {/* Cloud sync (E2EE, opt-in) */}
+        <CloudSyncSection />
 
         {/* License */}
         <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">
