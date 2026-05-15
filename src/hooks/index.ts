@@ -6,3 +6,4 @@ export { useAnalytics } from './useAnalytics';
 export { useKeyboardShortcuts, useGlobalShortcutListener } from './useKeyboardShortcuts';
 export { useConversationTags } from './useConversationTags';
 export { useTextSelection } from './useTextSelection';
+export { useClaudeCodeFolder } from './useClaudeCodeFolder';

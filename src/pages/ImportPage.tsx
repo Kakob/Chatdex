@@ -1,9 +1,10 @@
-import { FileArchive, FileCode } from 'lucide-react';
+import { FileArchive, FileCode, FolderOpen, RotateCw, X } from 'lucide-react';
 import { DropZone, ImportProgress } from '../components/import';
-import { useImport } from '../hooks';
+import { useClaudeCodeFolder, useImport } from '../hooks';
 
 export function ImportPage() {
   const { isImporting, progress, error, result, handleFiles, reset } = useImport();
+  const folder = useClaudeCodeFolder({ onFiles: handleFiles, disabled: isImporting });
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -85,8 +86,60 @@ export function ImportPage() {
             disabled={isImporting}
           />
 
+          {folder.supported && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={folder.pickFolder}
+                  disabled={isImporting || folder.isScanning}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FolderOpen size={16} />
+                  Select folder
+                </button>
+                {folder.rememberedName && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={folder.resumeFolder}
+                      disabled={isImporting || folder.isScanning}
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={`Re-scan "${folder.rememberedName}"`}
+                    >
+                      <RotateCw size={14} />
+                      Resume "{folder.rememberedName}"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={folder.forget}
+                      disabled={isImporting || folder.isScanning}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 disabled:opacity-50"
+                      title="Forget remembered folder"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+              {folder.isScanning && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  Scanning folder for .jsonl files…
+                </p>
+              )}
+              {folder.error && (
+                <p className="text-xs text-red-600 dark:text-red-400">{folder.error}</p>
+              )}
+            </div>
+          )}
+
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
             Located at: ~/.claude/projects/
+            {!folder.supported && (
+              <span className="block mt-1">
+                Tip: Chrome/Edge can pick the whole folder in one click.
+              </span>
+            )}
           </p>
         </div>
       </div>
