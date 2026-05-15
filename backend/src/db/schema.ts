@@ -1,9 +1,14 @@
 // Backend schema for Chatdex.
 //
-// Cloud sync is end-to-end encrypted: the backend only stores opaque ciphertext
-// blobs scoped to a user. There are no domain tables (conversations, messages,
-// anchors, etc.) anymore — IndexedDB on the client is the source of truth, and
-// the server is a replication backplane that cannot read user content.
+// Cloud sync is end-to-end encrypted:
+//   - Auth: WebAuthn passkey (Touch ID / Face ID / Windows Hello / security key).
+//   - Key derivation: PRF extension on the same passkey produces the wrapping
+//     key. Server only ever sees the encrypted-at-rest wrap.
+//   - Recovery: a 200-bit recovery code shown once at signup. Server stores a
+//     hash to gate the recovery flow against email-enumeration DoS.
+//
+// The server has no domain knowledge of conversations/messages/etc. — those
+// live in the generic sync_records table as opaque ciphertext blobs.
 
 import {
   pgTable,
@@ -16,22 +21,14 @@ import {
   customType,
   boolean,
   varchar,
+  integer,
 } from 'drizzle-orm/pg-core';
 
-// bytea custom type — Drizzle's stock pg-core doesn't expose one.
 export const bytea = customType<{ data: Buffer; default: false }>({
   dataType() {
     return 'bytea';
   },
 });
-
-export type KdfParamsRow = {
-  algorithm: 'argon2id';
-  iterations: number;
-  memoryKiB: number;
-  parallelism: number;
-  hashBytes: number;
-};
 
 // Users table — created when a user opts into cloud sync.
 export const users = pgTable(
@@ -39,32 +36,45 @@ export const users = pgTable(
   {
     id: text('id').primaryKey(),
     email: text('email').notNull().unique(),
-    authKeyHash: bytea('auth_key_hash').notNull(),
-    authKeyServerSalt: bytea('auth_key_server_salt').notNull(),
-    kdfSaltAuth: bytea('kdf_salt_auth').notNull(),
-    kdfSaltEnc: bytea('kdf_salt_enc').notNull(),
-    kdfParams: jsonb('kdf_params').$type<KdfParamsRow>().notNull(),
-    wrappedByPassphraseIv: bytea('wrapped_by_passphrase_iv').notNull(),
-    wrappedByPassphraseCt: bytea('wrapped_by_passphrase_ct').notNull(),
+
+    // WebAuthn passkey credential. Used both as the second factor (auth)
+    // and to derive the PRF wrapping key (encryption).
+    passkeyCredentialId: text('passkey_credential_id').notNull(),
+    passkeyPublicKey: bytea('passkey_public_key').notNull(),
+    passkeyCounter: integer('passkey_counter').notNull().default(0),
+    passkeyTransports: jsonb('passkey_transports').$type<string[] | null>(),
+
+    // PRF eval salt — sent with each WebAuthn assertion so the authenticator
+    // produces the same wrapping-key bytes each time.
+    prfSalt: bytea('prf_salt').notNull(),
+
+    // Master key wrapped twice: by the PRF-derived key (normal unlock) and by
+    // a key derived from the recovery code (backup).
+    wrappedByPasskeyIv: bytea('wrapped_by_passkey_iv').notNull(),
+    wrappedByPasskeyCt: bytea('wrapped_by_passkey_ct').notNull(),
     wrappedByRecoveryIv: bytea('wrapped_by_recovery_iv').notNull(),
     wrappedByRecoveryCt: bytea('wrapped_by_recovery_ct').notNull(),
+
+    // SHA-256(serverSalt || recoveryCode). Verified at recovery-init to keep
+    // an attacker who only knows the email from triggering account lockout
+    // by re-enrolling a passkey.
+    recoveryCodeHash: bytea('recovery_code_hash').notNull(),
+    recoveryCodeServerSalt: bytea('recovery_code_server_salt').notNull(),
+
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [uniqueIndex('users_email_idx').on(table.email)]
+  (table) => [
+    uniqueIndex('users_email_idx').on(table.email),
+    uniqueIndex('users_passkey_credential_idx').on(table.passkeyCredentialId),
+  ]
 );
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
-// One row per encrypted record the client wants to sync. The server treats
+// One row per encrypted record the client wants to sync. Server treats
 // `iv` and `ciphertext` as opaque bytes — only the client can read them.
-//
-// Composite PK (user_id, id) lets the same client-generated UUID exist across
-// users without collision. `kind` and `parent_id` are kept in plaintext to let
-// the client request, e.g. "all messages for conversation X" without decrypting
-// the whole vault. They are *not* secret — leaking them only reveals counts and
-// shape, not content.
 export const syncRecords = pgTable(
   'sync_records',
   {

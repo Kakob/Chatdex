@@ -1,5 +1,4 @@
 // Public surface for the client-side crypto layer.
-// Application code should depend only on these names.
 
 export type { Sealed } from './primitives';
 export {
@@ -11,26 +10,24 @@ export {
   decryptJSON,
   randomBytes,
   randomIv,
+  generateMasterKey,
+  importRawKey,
+  exportRawKey,
 } from './primitives';
 
-export type { KdfParams } from './kdf';
-export { DEFAULT_KDF_PARAMS } from './kdf';
-
-export type { AccountKeyMaterial, SignupBundle } from './keyManager';
 export {
   isUnlocked,
   getMasterKey,
   getCurrentUserId,
+  setUnlocked,
   lock,
-  provisionAccount,
-  unlockWithPassphrase,
-  unlockWithRecoveryCode,
-  rewrapWithPassphrase,
-  regenerateRecoveryCode,
 } from './keyManager';
 
 export {
   generateRecoveryCode,
   formatRecoveryCode,
   parseRecoveryCode,
+  recoveryCodeToKey,
+  wrapMasterKey,
+  unwrapMasterKey,
 } from './recovery';

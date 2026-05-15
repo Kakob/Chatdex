@@ -1,5 +1,5 @@
 {
-  "id": "1b1924b4-b7c2-4e97-92e4-62514d0283a5",
+  "id": "0ec15608-6e0b-4011-b127-164551e5c09d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -175,44 +175,45 @@
           "primaryKey": false,
           "notNull": true
         },
-        "auth_key_hash": {
-          "name": "auth_key_hash",
+        "passkey_credential_id": {
+          "name": "passkey_credential_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "passkey_public_key": {
+          "name": "passkey_public_key",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
         },
-        "auth_key_server_salt": {
-          "name": "auth_key_server_salt",
-          "type": "bytea",
+        "passkey_counter": {
+          "name": "passkey_counter",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": 0
         },
-        "kdf_salt_auth": {
-          "name": "kdf_salt_auth",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kdf_salt_enc": {
-          "name": "kdf_salt_enc",
-          "type": "bytea",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kdf_params": {
-          "name": "kdf_params",
+        "passkey_transports": {
+          "name": "passkey_transports",
           "type": "jsonb",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
-        "wrapped_by_passphrase_iv": {
-          "name": "wrapped_by_passphrase_iv",
+        "prf_salt": {
+          "name": "prf_salt",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
         },
-        "wrapped_by_passphrase_ct": {
-          "name": "wrapped_by_passphrase_ct",
+        "wrapped_by_passkey_iv": {
+          "name": "wrapped_by_passkey_iv",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "wrapped_by_passkey_ct": {
+          "name": "wrapped_by_passkey_ct",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
@@ -225,6 +226,18 @@
         },
         "wrapped_by_recovery_ct": {
           "name": "wrapped_by_recovery_ct",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recovery_code_hash": {
+          "name": "recovery_code_hash",
+          "type": "bytea",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recovery_code_server_salt": {
+          "name": "recovery_code_server_salt",
           "type": "bytea",
           "primaryKey": false,
           "notNull": true
@@ -250,6 +263,21 @@
           "columns": [
             {
               "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "users_passkey_credential_idx": {
+          "name": "users_passkey_credential_idx",
+          "columns": [
+            {
+              "expression": "passkey_credential_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

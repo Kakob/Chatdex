@@ -8,33 +8,20 @@ import {
   decryptBytes,
   randomBytes,
   randomIv,
-} from './primitives';
-import { generateMasterKey, importRawKey, exportRawKey } from './primitives';
-import { deriveKeyBytes, deriveAesKey, type KdfParams } from './kdf';
-import {
+  generateMasterKey,
+  importRawKey,
+  exportRawKey,
+  isUnlocked,
+  getMasterKey,
+  setUnlocked,
+  lock,
   generateRecoveryCode,
   formatRecoveryCode,
   parseRecoveryCode,
-} from './recovery';
-import {
-  provisionAccount,
-  unlockWithPassphrase,
-  unlockWithRecoveryCode,
-  rewrapWithPassphrase,
-  regenerateRecoveryCode,
-  lock,
-  isUnlocked,
-  getMasterKey,
-} from './keyManager';
-
-// Argon2id is intentionally slow. Use cheap params in tests.
-const TEST_KDF: KdfParams = {
-  algorithm: 'argon2id',
-  iterations: 1,
-  memoryKiB: 1024,
-  parallelism: 1,
-  hashBytes: 32,
-};
+  recoveryCodeToKey,
+  wrapMasterKey,
+  unwrapMasterKey,
+} from './index';
 
 beforeEach(() => {
   lock();
@@ -45,24 +32,21 @@ describe('AES-GCM primitives', () => {
     const key = await generateMasterKey();
     const sealed = await encryptString(key, 'hello, world');
     expect(sealed.iv).toHaveLength(12);
-    const out = await decryptString(key, sealed);
-    expect(out).toBe('hello, world');
+    expect(await decryptString(key, sealed)).toBe('hello, world');
   });
 
   it('round-trips JSON', async () => {
     const key = await generateMasterKey();
     const value = { foo: 'bar', n: 42, nested: { arr: [1, 2, 3] } };
     const sealed = await encryptJSON(key, value);
-    const out = await decryptJSON(key, sealed);
-    expect(out).toEqual(value);
+    expect(await decryptJSON(key, sealed)).toEqual(value);
   });
 
   it('round-trips raw bytes', async () => {
     const key = await generateMasterKey();
     const plaintext = randomBytes(64);
     const sealed = await encryptBytes(key, plaintext);
-    const out = await decryptBytes(key, sealed);
-    expect(out).toEqual(plaintext);
+    expect(await decryptBytes(key, sealed)).toEqual(plaintext);
   });
 
   it('produces a fresh IV per call', async () => {
@@ -108,41 +92,6 @@ describe('AES-GCM primitives', () => {
   });
 });
 
-describe('Argon2id KDF', () => {
-  it('is deterministic for the same passphrase + salt', async () => {
-    const salt = randomBytes(16);
-    const a = await deriveKeyBytes('correct horse', salt, TEST_KDF);
-    const b = await deriveKeyBytes('correct horse', salt, TEST_KDF);
-    expect(a).toEqual(b);
-  });
-
-  it('produces different output for different salts', async () => {
-    const a = await deriveKeyBytes('p', randomBytes(16), TEST_KDF);
-    const b = await deriveKeyBytes('p', randomBytes(16), TEST_KDF);
-    expect(a).not.toEqual(b);
-  });
-
-  it('produces different output for different passphrases', async () => {
-    const salt = randomBytes(16);
-    const a = await deriveKeyBytes('p1', salt, TEST_KDF);
-    const b = await deriveKeyBytes('p2', salt, TEST_KDF);
-    expect(a).not.toEqual(b);
-  });
-
-  it('rejects salts shorter than 16 bytes', async () => {
-    await expect(
-      deriveKeyBytes('p', new Uint8Array(8), TEST_KDF)
-    ).rejects.toThrow(/at least 16 bytes/);
-  });
-
-  it('deriveAesKey yields a usable AES-GCM CryptoKey', async () => {
-    const salt = randomBytes(16);
-    const k = await deriveAesKey('p', salt, TEST_KDF);
-    const sealed = await encryptString(k, 'derived');
-    expect(await decryptString(k, sealed)).toBe('derived');
-  });
-});
-
 describe('recovery code format', () => {
   it('round-trips a freshly generated code', () => {
     const { code, raw } = generateRecoveryCode();
@@ -169,109 +118,59 @@ describe('recovery code format', () => {
   });
 
   it('rejects codes with invalid characters', () => {
-    // U is not in Crockford alphabet
     const bad = 'UUUUU-UUUUU-UUUUU-UUUUU-UUUUU-UUUUU-UUUUU-UUUUU';
     expect(() => parseRecoveryCode(bad)).toThrow(/Invalid recovery-code character/);
   });
 });
 
-describe('keyManager full lifecycle', () => {
-  // Override default KDF in keyManager by going through provisionAccount with
-  // a slow-but-real flow would exceed the test timeout. Use a passphrase-level
-  // shortcut: keyManager always uses DEFAULT_KDF_PARAMS, but we can test the
-  // end-to-end shape by accepting the slower path for one test.
+describe('recovery code wrap/unwrap', () => {
+  it('round-trips the master key through the recovery wrap', async () => {
+    const masterKey = await generateMasterKey();
+    const masterKeyRaw = await exportRawKey(masterKey);
 
-  it('provision -> unlockWithPassphrase round-trips master key', async () => {
-    // Deliberately slow: this exercises the real KDF params end-to-end.
-    const bundle = await provisionAccount('correct horse battery staple');
-    expect(bundle.recoveryCode).toMatch(/^[0-9A-Z-]+$/);
-    expect(bundle.authKey).toHaveLength(32);
-    expect(isUnlocked()).toBe(true);
+    const { code, raw } = generateRecoveryCode();
+    const recoveryKey = await recoveryCodeToKey(raw);
+    const sealed = await wrapMasterKey(recoveryKey, masterKeyRaw);
 
-    lock();
+    // Simulate recovery: parse the displayed code and unwrap.
+    const reparsedRaw = parseRecoveryCode(code);
+    const reparsedKey = await recoveryCodeToKey(reparsedRaw);
+    const unwrapped = await unwrapMasterKey(reparsedKey, sealed);
+    expect(unwrapped).toEqual(masterKeyRaw);
+  });
+
+  it('refuses to unwrap with the wrong recovery code', async () => {
+    const masterKey = await generateMasterKey();
+    const masterKeyRaw = await exportRawKey(masterKey);
+
+    const a = generateRecoveryCode();
+    const b = generateRecoveryCode();
+    const wrappingKey = await recoveryCodeToKey(a.raw);
+    const wrongKey = await recoveryCodeToKey(b.raw);
+    const sealed = await wrapMasterKey(wrappingKey, masterKeyRaw);
+
+    await expect(unwrapMasterKey(wrongKey, sealed)).rejects.toBeDefined();
+  });
+});
+
+describe('key manager', () => {
+  it('starts locked', () => {
     expect(isUnlocked()).toBe(false);
+    expect(() => getMasterKey()).toThrow(/locked/);
+  });
 
-    const { authKey } = await unlockWithPassphrase(
-      'user-1',
-      'correct horse battery staple',
-      bundle.material
-    );
+  it('setUnlocked exposes a usable master key', async () => {
+    const k = await generateMasterKey();
+    setUnlocked('user-1', k);
     expect(isUnlocked()).toBe(true);
-    expect(authKey).toEqual(bundle.authKey);
+    const sealed = await encryptString(getMasterKey(), 'in session');
+    expect(await decryptString(getMasterKey(), sealed)).toBe('in session');
+  });
 
-    const sealed = await encryptString(getMasterKey(), 'session payload');
-    expect(await decryptString(getMasterKey(), sealed)).toBe('session payload');
-  }, 30_000);
-
-  it('unlockWithPassphrase rejects the wrong passphrase', async () => {
-    const bundle = await provisionAccount('right answer');
-    lock();
-    await expect(
-      unlockWithPassphrase('u', 'wrong answer', bundle.material)
-    ).rejects.toBeDefined();
-    expect(isUnlocked()).toBe(false);
-  }, 30_000);
-
-  it('unlockWithRecoveryCode unlocks and re-wraps with new passphrase', async () => {
-    const bundle = await provisionAccount('original passphrase');
-    lock();
-
-    const { authKey, updatedMaterial } = await unlockWithRecoveryCode(
-      'u',
-      bundle.recoveryCode,
-      bundle.material,
-      'new passphrase'
-    );
-    expect(isUnlocked()).toBe(true);
-    expect(updatedMaterial.saltAuth).not.toEqual(bundle.material.saltAuth);
-    expect(updatedMaterial.wrappedByPassphrase.ciphertext).not.toEqual(
-      bundle.material.wrappedByPassphrase.ciphertext
-    );
-
-    // The new passphrase now unlocks against the updated material.
-    lock();
-    const reopened = await unlockWithPassphrase('u', 'new passphrase', updatedMaterial);
-    expect(reopened.authKey).toEqual(authKey);
-  }, 60_000);
-
-  it('rewrapWithPassphrase rotates auth key without rotating master', async () => {
-    const bundle = await provisionAccount('first');
-    const masterAfterUnlock = await exportRawKey(getMasterKey());
-
-    const { updatedMaterial } = await rewrapWithPassphrase('second', bundle.material);
-    expect(updatedMaterial.wrappedByRecovery).toEqual(bundle.material.wrappedByRecovery);
-
-    lock();
-    await unlockWithPassphrase('u', 'second', updatedMaterial);
-    const masterAfterRewrap = await exportRawKey(getMasterKey());
-    expect(masterAfterRewrap).toEqual(masterAfterUnlock);
-  }, 60_000);
-
-  it('regenerateRecoveryCode rotates only the recovery wrap', async () => {
-    const bundle = await provisionAccount('p');
-    const { recoveryCode, updatedMaterial } = await regenerateRecoveryCode(bundle.material);
-
-    expect(recoveryCode).not.toBe(bundle.recoveryCode);
-    expect(updatedMaterial.wrappedByPassphrase).toEqual(bundle.material.wrappedByPassphrase);
-    expect(updatedMaterial.wrappedByRecovery).not.toEqual(bundle.material.wrappedByRecovery);
-
-    lock();
-    // Old recovery code no longer works.
-    await expect(
-      unlockWithRecoveryCode('u', bundle.recoveryCode, updatedMaterial, 'np')
-    ).rejects.toBeDefined();
-
-    // New recovery code does.
-    await expect(
-      unlockWithRecoveryCode('u', recoveryCode, updatedMaterial, 'np')
-    ).resolves.toBeDefined();
-  }, 90_000);
-
-  it('lock() drops the master key', async () => {
-    await provisionAccount('p');
-    expect(isUnlocked()).toBe(true);
+  it('lock() drops the key', async () => {
+    setUnlocked('u', await generateMasterKey());
     lock();
     expect(isUnlocked()).toBe(false);
     expect(() => getMasterKey()).toThrow(/locked/);
-  }, 30_000);
+  });
 });

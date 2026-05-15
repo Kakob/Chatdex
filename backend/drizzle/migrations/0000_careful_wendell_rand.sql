@@ -13,15 +13,17 @@ CREATE TABLE "sync_records" (
 CREATE TABLE "users" (
 	"id" text PRIMARY KEY NOT NULL,
 	"email" text NOT NULL,
-	"auth_key_hash" "bytea" NOT NULL,
-	"auth_key_server_salt" "bytea" NOT NULL,
-	"kdf_salt_auth" "bytea" NOT NULL,
-	"kdf_salt_enc" "bytea" NOT NULL,
-	"kdf_params" jsonb NOT NULL,
-	"wrapped_by_passphrase_iv" "bytea" NOT NULL,
-	"wrapped_by_passphrase_ct" "bytea" NOT NULL,
+	"passkey_credential_id" text NOT NULL,
+	"passkey_public_key" "bytea" NOT NULL,
+	"passkey_counter" integer DEFAULT 0 NOT NULL,
+	"passkey_transports" jsonb,
+	"prf_salt" "bytea" NOT NULL,
+	"wrapped_by_passkey_iv" "bytea" NOT NULL,
+	"wrapped_by_passkey_ct" "bytea" NOT NULL,
 	"wrapped_by_recovery_iv" "bytea" NOT NULL,
 	"wrapped_by_recovery_ct" "bytea" NOT NULL,
+	"recovery_code_hash" "bytea" NOT NULL,
+	"recovery_code_server_salt" "bytea" NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "users_email_unique" UNIQUE("email")
@@ -31,4 +33,5 @@ ALTER TABLE "sync_records" ADD CONSTRAINT "sync_records_user_id_users_id_fk" FOR
 CREATE INDEX "sync_records_user_updated_idx" ON "sync_records" USING btree ("user_id","updated_at");--> statement-breakpoint
 CREATE INDEX "sync_records_user_kind_updated_idx" ON "sync_records" USING btree ("user_id","kind","updated_at");--> statement-breakpoint
 CREATE INDEX "sync_records_user_parent_idx" ON "sync_records" USING btree ("user_id","parent_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "users_email_idx" ON "users" USING btree ("email");
+CREATE UNIQUE INDEX "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
+CREATE UNIQUE INDEX "users_passkey_credential_idx" ON "users" USING btree ("passkey_credential_id");
