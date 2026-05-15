@@ -1,6 +1,5 @@
 import type {
   ClaudeCodeEntry,
-  ClaudeCodeSystemEntry,
   ClaudeCodeContentBlock,
 } from '../../types/claude-code';
 import type { StoredConversation, StoredMessage, ContentBlock } from '../../types/unified';
@@ -49,31 +48,38 @@ function parseEntries(
   const textParts: string[] = [];
   const now = new Date();
 
-  // Extract metadata from first entry if it's a system entry
-  let sessionId = generateId();
+  // Metadata (cwd / sessionId / gitBranch) can live on any entry in real
+  // Claude Code session files — not just a leading `system` entry — so we
+  // sweep every entry and keep the first non-empty value we see.
+  let sessionId: string | undefined;
   let workingDirectory: string | undefined;
   let gitBranch: string | undefined;
-  let projectPath: string | undefined;
+
+  for (const entry of entries) {
+    if (!sessionId) sessionId = entry.sessionId ?? entry.session_id;
+    if (!workingDirectory) workingDirectory = entry.cwd;
+    if (!gitBranch) gitBranch = entry.gitBranch ?? entry.git_branch;
+    if (sessionId && workingDirectory && gitBranch) break;
+  }
+
+  if (!sessionId) sessionId = generateId();
+  const projectPath = workingDirectory;
+
   let firstTimestamp: Date = now;
   let lastTimestamp: Date = now;
-
-  const firstEntry = entries[0];
-  if (firstEntry && firstEntry.type === 'system') {
-    const sysEntry = firstEntry as ClaudeCodeSystemEntry;
-    if (sysEntry.session_id) sessionId = sysEntry.session_id;
-    workingDirectory = sysEntry.cwd;
-    gitBranch = sysEntry.git_branch;
-    projectPath = sysEntry.cwd;
-  }
+  let sawTimestamp = false;
 
   let userMessageCount = 0;
   let assistantMessageCount = 0;
 
   for (const entry of entries) {
-    const timestamp = new Date(entry.timestamp);
-
-    if (timestamp < firstTimestamp) firstTimestamp = timestamp;
-    if (timestamp > lastTimestamp) lastTimestamp = timestamp;
+    const timestamp = entry.timestamp ? new Date(entry.timestamp) : null;
+    if (timestamp && !Number.isNaN(timestamp.getTime())) {
+      if (!sawTimestamp || timestamp < firstTimestamp) firstTimestamp = timestamp;
+      if (!sawTimestamp || timestamp > lastTimestamp) lastTimestamp = timestamp;
+      sawTimestamp = true;
+    }
+    const entryTimestamp = timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp : now;
 
     const msgId = generateId();
 
@@ -88,7 +94,7 @@ function parseEntries(
           sender: 'user',
           text,
           contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
-          createdAt: timestamp,
+          createdAt: entryTimestamp,
         });
         break;
       }
@@ -103,7 +109,7 @@ function parseEntries(
           sender: 'assistant',
           text,
           contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
-          createdAt: timestamp,
+          createdAt: entryTimestamp,
         });
         break;
       }
@@ -126,7 +132,7 @@ function parseEntries(
             toolName: entry.tool_name,
             toolInput: toolInputObj,
           }],
-          createdAt: timestamp,
+          createdAt: entryTimestamp,
           toolName: entry.tool_name,
           toolInput: JSON.stringify(entry.tool_input, null, 2),
         });
@@ -145,7 +151,7 @@ function parseEntries(
             toolName: entry.tool_name,
             toolResult: entry.result, // Full result in content block
           }],
-          createdAt: timestamp,
+          createdAt: entryTimestamp,
           toolName: entry.tool_name,
           toolResult: resultText,
         });
@@ -208,12 +214,18 @@ function extractContent(content: string | ClaudeCodeContentBlock[]): ExtractedCo
       const parsed = parseTextForCodeBlocks(block.text);
       contentBlocks.push(...parsed);
     } else if (block.type === 'thinking' && block.thinking) {
-      const thinking = block.thinking;
-      textParts.push(thinking);
-      contentBlocks.push({
-        type: 'thinking',
-        text: thinking,
-      });
+      textParts.push(block.thinking);
+      contentBlocks.push({ type: 'thinking', text: block.thinking });
+    } else if (block.type === 'tool_use') {
+      // Anthropic API shape uses `name`/`input`; older fixtures used `tool_name`/`tool_input`.
+      const toolName = block.name ?? block.tool_name ?? 'tool';
+      const toolInput = (block.input ?? block.tool_input ?? {}) as Record<string, unknown>;
+      textParts.push(`[Tool: ${toolName}]`);
+      contentBlocks.push({ type: 'tool_use', toolName, toolInput });
+    } else if (block.type === 'tool_result') {
+      const resultText = flattenToolResultContent(block.content ?? block.result);
+      textParts.push(resultText ? `[Tool Result] ${resultText}` : '[Tool Result]');
+      contentBlocks.push({ type: 'tool_result', toolResult: resultText });
     }
   }
 
@@ -221,6 +233,21 @@ function extractContent(content: string | ClaudeCodeContentBlock[]): ExtractedCo
     text: textParts.join('\n'),
     contentBlocks,
   };
+}
+
+function flattenToolResultContent(
+  content: string | ClaudeCodeContentBlock[] | undefined,
+): string {
+  if (content == null) return '';
+  if (typeof content === 'string') return content;
+  return content
+    .map((block) => {
+      if (typeof block === 'string') return block;
+      if (block.type === 'text' && block.text) return block.text;
+      return '';
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 function parseTextForCodeBlocks(text: string): ContentBlock[] {

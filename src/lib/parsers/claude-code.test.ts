@@ -78,6 +78,64 @@ describe('parseClaudeCodeContent', () => {
     expect(conv.gitBranch).toBe('feature-x');
   });
 
+  it('extracts metadata from camelCase fields on non-system entries', () => {
+    // Mirrors the real Claude Code JSONL shape: no leading `system` entry,
+    // metadata attached to user/assistant entries instead.
+    const content = [
+      makeEntry('file-history-snapshot', {}),
+      makeEntry('user', {
+        message: { content: 'hi' },
+        cwd: '/Users/jacie/dev/apps/chatdex',
+        sessionId: 'a38aa66-real-session',
+        gitBranch: 'main',
+      }),
+      makeEntry('assistant', { message: { content: 'hello' } }),
+    ].join('\n');
+
+    const result = parseClaudeCodeContent(content, 'a38aa66.jsonl');
+    const conv = result.conversations[0];
+    expect(conv.name).toBe('chatdex');
+    expect(conv.id).toBe('a38aa66-real-session');
+    expect(conv.gitBranch).toBe('main');
+    expect(conv.workingDirectory).toBe('/Users/jacie/dev/apps/chatdex');
+  });
+
+  it('extracts tool_use and tool_result content blocks from real assistant/user messages', () => {
+    const content = [
+      makeEntry('user', {
+        message: { content: 'run a command' },
+        cwd: '/proj',
+        sessionId: 's1',
+      }),
+      makeEntry('assistant', {
+        message: {
+          content: [
+            { type: 'thinking', thinking: 'I should run ls' },
+            { type: 'tool_use', id: 'tu_1', name: 'Bash', input: { command: 'ls' } },
+          ],
+        },
+      }),
+      makeEntry('user', {
+        message: {
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_1', content: 'file.txt' },
+          ],
+        },
+      }),
+      makeEntry('assistant', { message: { content: [{ type: 'text', text: 'done' }] } }),
+    ].join('\n');
+
+    const result = parseClaudeCodeContent(content, 'tools-inline.jsonl');
+    const assistantMsgs = result.messages.filter((m) => m.sender === 'assistant');
+    const toolUseAsst = assistantMsgs[0];
+    expect(toolUseAsst.contentBlocks?.some((b) => b.type === 'tool_use' && b.toolName === 'Bash')).toBe(true);
+    expect(toolUseAsst.text).toContain('[Tool: Bash]');
+
+    const userMsgs = result.messages.filter((m) => m.sender === 'user');
+    const toolResultUser = userMsgs[1];
+    expect(toolResultUser.contentBlocks?.some((b) => b.type === 'tool_result' && b.toolResult === 'file.txt')).toBe(true);
+  });
+
   it('handles content blocks array format', () => {
     const content = [
       makeEntry('system', { cwd: '/project' }),
