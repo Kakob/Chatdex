@@ -5,7 +5,9 @@ import { ContentBlocks } from './ContentBlocks';
 import { AnchorModal } from '../anchors/AnchorModal';
 import { useAnchorStore } from '../../stores/anchorStore';
 import { useToastStore } from '../../stores/toastStore';
+import { FindingMarkers } from '../detection/FindingMarker';
 import type { StoredMessage } from '../../types';
+import type { StoredFinding } from '../../types/detection';
 
 interface MessageBubbleProps {
   message: StoredMessage;
@@ -13,9 +15,12 @@ interface MessageBubbleProps {
   conversationId?: string;
   messages?: StoredMessage[];
   messageIndex?: number;
+  findings?: StoredFinding[];
+  /** Normalized step label ("#5"), shown for agent-trace sessions. */
+  stepLabel?: string;
 }
 
-export function MessageBubble({ message, highlightQuery, conversationId, messages, messageIndex }: MessageBubbleProps) {
+export function MessageBubble({ message, highlightQuery, conversationId, messages, messageIndex, findings = [], stepLabel }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const isTool = message.sender === 'tool';
   const [anchorModalOpen, setAnchorModalOpen] = useState(false);
@@ -62,14 +67,16 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
   if (isTool) {
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       return (
-        <div className="flex gap-3 py-2">
+        <div id={`message-${message.id}`} className="flex gap-3 py-2">
           <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
             <Wrench size={16} className="text-amber-600 dark:text-amber-400" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
+              {stepLabel && <StepLabel label={stepLabel} />}
               <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{message.toolName || 'Tool'}</span>
               <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+              <FindingMarkers findings={findings} />
             </div>
             <ContentBlocks blocks={message.contentBlocks} highlightQuery={highlightQuery} />
           </div>
@@ -78,14 +85,16 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
     }
 
     return (
-      <div className="flex gap-3 py-2">
+      <div id={`message-${message.id}`} className="flex gap-3 py-2">
         <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
           <Wrench size={16} className="text-amber-600 dark:text-amber-400" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
+            {stepLabel && <StepLabel label={stepLabel} />}
             <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{message.toolName || 'Tool'}</span>
             <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+            <FindingMarkers findings={findings} />
           </div>
           {message.toolInput && (
             <pre className="text-xs bg-gray-100 dark:bg-gray-800 rounded p-2 overflow-x-auto text-gray-700 dark:text-gray-300 mb-2">{message.toolInput}</pre>
@@ -110,11 +119,14 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
 
         <div className={`flex-1 min-w-0 ${isUser ? 'text-right' : ''}`}>
           <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
+            {stepLabel && !isUser && <StepLabel label={stepLabel} />}
             <span className="text-sm font-medium text-gray-900 dark:text-white">{isUser ? 'You' : 'Claude'}</span>
+            {stepLabel && isUser && <StepLabel label={stepLabel} />}
             {message.conversationName && (
               <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]">in {message.conversationName}</span>
             )}
             <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+            <FindingMarkers findings={findings} />
             {conversationId && (
               <button
                 onClick={handleAnchorClick}
@@ -149,6 +161,17 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
         />
       )}
     </>
+  );
+}
+
+function StepLabel({ label }: { label: string }) {
+  return (
+    <span
+      className="text-[10px] font-mono text-gray-300 dark:text-gray-600 select-none"
+      title="Step index in the normalized session — findings reference these"
+    >
+      {label}
+    </span>
   );
 }
 

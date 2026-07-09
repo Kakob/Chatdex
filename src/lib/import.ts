@@ -1,5 +1,6 @@
 import { parseFiles, type ParsedData } from './parsers';
 import { bulkPutConversations, bulkPutMessages, db } from './db/index';
+import { autoAnalyzeConversations } from './detection/autoAnalyze';
 import type { DataSource, StoredConversation, StoredMessage } from '../types';
 
 export interface ImportResult {
@@ -7,6 +8,7 @@ export interface ImportResult {
   conversationsSkipped: number;
   messagesAdded: number;
   source: DataSource;
+  addedConversationIds: string[];
 }
 
 export interface ImportProgress {
@@ -34,6 +36,9 @@ export async function importFiles(
     onProgress?.({ phase: 'storing', current, total });
   });
 
+  // Auto-run failure detection over freshly ingested sessions (SPEC §4).
+  await autoAnalyzeConversations(result.addedConversationIds);
+
   onProgress?.({
     phase: 'complete',
     current: result.conversationsAdded,
@@ -57,6 +62,7 @@ async function storeData(
   let added = 0;
   let skipped = 0;
   let totalMessages = 0;
+  const addedConversationIds: string[] = [];
 
   const CHUNK_SIZE = 500;
   for (let i = 0; i < data.conversations.length; i += CHUNK_SIZE) {
@@ -64,6 +70,7 @@ async function storeData(
     const newConvs = convChunk.filter((c) => !existingIds.has(c.id));
     skipped += convChunk.length - newConvs.length;
     added += newConvs.length;
+    addedConversationIds.push(...newConvs.map((c) => c.id));
 
     if (newConvs.length > 0) {
       const newConvIds = new Set(newConvs.map((c) => c.id));
@@ -86,5 +93,6 @@ async function storeData(
     conversationsSkipped: skipped,
     messagesAdded: totalMessages,
     source: data.source,
+    addedConversationIds,
   };
 }

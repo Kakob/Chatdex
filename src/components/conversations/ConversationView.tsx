@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Download, Copy, Globe, Terminal, X, Tag, Search } from 'lucide-react';
+import { ArrowLeft, Download, Copy, Globe, Terminal, X, Tag, Search, Radar, Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TagBadge } from '../common/TagBadge';
 import { TagInput } from '../common/TagInput';
+import { EvidencePanel } from '../detection/EvidencePanel';
+import { SEVERITY_BADGE, SEVERITY_LABEL, SEVERITY_ORDER } from '../detection/severity';
+import { scrollToFinding, mapMessagesToStepLabels } from '../../lib/detection/findingAnchors';
 import { useTagStore } from '../../stores/tagStore';
 import { useAnchorStore } from '../../stores/anchorStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useFindingsStore } from '../../stores/findingsStore';
+import { normalizeSession } from '../../lib/detection/normalize';
+import { mapFindingsToMessages } from '../../lib/detection/findingAnchors';
 import { conversationToMarkdown } from '../../lib/exporters/markdown';
 import { buildJson } from '../../lib/exporters/json';
 import { downloadExport, type ExportFormat } from '../../lib/exporters';
@@ -35,6 +41,74 @@ export function ConversationView({
   const { tagEntity, untagEntity, getEntityTags } = useTagStore();
   const { loadConversationAnchors } = useAnchorStore();
   const addToast = useToastStore((s) => s.addToast);
+
+  const loadFindings = useFindingsStore((s) => s.loadFindings);
+  const analyzeConversation = useFindingsStore((s) => s.analyze);
+  const selectFinding = useFindingsStore((s) => s.selectFinding);
+  const findings = useFindingsStore(
+    (s) => s.findingsByConversation[conversation.id]
+  );
+  const runCount = useFindingsStore(
+    (s) => s.runCountByConversation[conversation.id]
+  );
+  const analyzingStage = useFindingsStore(
+    (s) => s.analyzingStage[conversation.id]
+  );
+  const selectedFindingId = useFindingsStore((s) => s.selectedFindingId);
+
+  const session = useMemo(
+    () => normalizeSession(conversation.id, messages),
+    [conversation.id, messages]
+  );
+  const findingsByMessage = useMemo(
+    () => mapFindingsToMessages(session, findings ?? []),
+    [session, findings]
+  );
+  // Step numbers only mean something for agent traces.
+  const stepLabels = useMemo(
+    () =>
+      conversation.source === 'claude-code'
+        ? mapMessagesToStepLabels(session)
+        : new Map<string, string>(),
+    [conversation.source, session]
+  );
+  const sortedFindings = useMemo(
+    () => [...(findings ?? [])].sort((a, b) => a.stepRange.start - b.stepRange.start),
+    [findings]
+  );
+  const selectedFinding =
+    sortedFindings.find((f) => f.id === selectedFindingId) ?? null;
+  const severityCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of sortedFindings) counts[f.severity] = (counts[f.severity] ?? 0) + 1;
+    return counts;
+  }, [sortedFindings]);
+
+  // Clicking a severity chip opens the first finding of that severity and
+  // cycles through the rest on repeat clicks.
+  const cycleSeverity = (severity: string) => {
+    const ofSeverity = sortedFindings.filter((f) => f.severity === severity);
+    if (ofSeverity.length === 0) return;
+    const currentIdx = ofSeverity.findIndex((f) => f.id === selectedFindingId);
+    const next = ofSeverity[(currentIdx + 1) % ofSeverity.length];
+    selectFinding(next.id);
+    scrollToFinding(session, next);
+  };
+
+  useEffect(() => {
+    void loadFindings(conversation.id);
+    // Close any panel left open from a previously viewed conversation.
+    selectFinding(null);
+  }, [conversation.id, loadFindings, selectFinding]);
+
+  const handleAnalyze = async () => {
+    try {
+      await analyzeConversation(conversation.id);
+      addToast('Analysis complete');
+    } catch (err) {
+      addToast(`Analysis failed: ${(err as Error).message}`, 'error');
+    }
+  };
 
   // Cmd+F to open in-conversation search
   useEffect(() => {
@@ -181,6 +255,34 @@ export function ConversationView({
         </div>
 
         <div className="flex items-center gap-2">
+          {SEVERITY_ORDER.filter((sev) => severityCounts[sev]).map((sev) => (
+            <button
+              key={sev}
+              onClick={() => cycleSeverity(sev)}
+              title={`${severityCounts[sev]} ${SEVERITY_LABEL[sev].toLowerCase()}-severity finding(s) — click to browse`}
+              className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-shadow hover:ring-1 hover:ring-violet-300 ${SEVERITY_BADGE[sev]}`}
+            >
+              {severityCounts[sev]} {SEVERITY_LABEL[sev]}
+            </button>
+          ))}
+          <button
+            onClick={handleAnalyze}
+            disabled={!!analyzingStage}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-60"
+            title="Run agent-failure detection over this session"
+          >
+            {analyzingStage ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                {analyzingStage}…
+              </>
+            ) : (
+              <>
+                <Radar size={14} />
+                {runCount ? 'Re-analyze' : 'Analyze'}
+              </>
+            )}
+          </button>
           <button
             onClick={() => setShowSearch(!showSearch)}
             className={`p-2 rounded-lg transition-colors ${showSearch ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-600' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
@@ -259,20 +361,32 @@ export function ConversationView({
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto">
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              messages={messages}
-              messageIndex={index}
-              highlightQuery={activeHighlight}
-              conversationId={conversation.id}
-            />
-          ))}
+      {/* Messages + evidence panel */}
+      <div className="flex-1 flex min-h-0">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto">
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                messages={messages}
+                messageIndex={index}
+                highlightQuery={activeHighlight}
+                conversationId={conversation.id}
+                findings={findingsByMessage.get(message.id)}
+                stepLabel={stepLabels.get(message.id)}
+              />
+            ))}
+          </div>
         </div>
+        {selectedFinding && (
+          <EvidencePanel
+            conversationId={conversation.id}
+            finding={selectedFinding}
+            session={session}
+            findings={sortedFindings}
+          />
+        )}
       </div>
     </div>
   );

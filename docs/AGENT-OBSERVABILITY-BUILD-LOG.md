@@ -1,13 +1,15 @@
-# Agent Observability — Build Log (Phases 0–5)
+# Agent Observability — Build Log (Phases 0–6)
 
 Companion to `SPEC-agent-observability.md` and `AGENT-OBSERVABILITY-IMPLEMENTATION_PLAN.md`.
 Records what was actually built per phase: files touched, what changed in them, and the
-design decisions made along the way. Phases 6–8b (UI, dashboard, hardening, dogfooding)
-are not yet started.
+design decisions made along the way. Phases 7–8b (dashboard, hardening, dogfooding) are
+not yet started.
 
-**Status after Phase 5:** all three v1 detectors implemented and registered; the golden-trace
-suite passes 30/30; full frontend suite 329/329; `npm run typecheck` and lint clean on all
-new files.
+**Status after Phase 6:** detectors surfaced in the session browser with markers, evidence
+panel with prev/next browsing, interactive severity chips, step labels in the feed, and
+labeling; auto-analyze on ingest; golden suite 30/30; full frontend suite 342/342;
+production build (including the bundled worker) clean; human click-through done
+2026-07-08.
 
 | Phase | Commit | Summary |
 |---|---|---|
@@ -16,7 +18,8 @@ new files.
 | 2 | `2239b56` | Detector framework, Dexie v2 storage, encrypted sync, Web Worker |
 | 3 | `af840bd` | Loop detector |
 | 4 | `17036ac` | Verification-absence detector |
-| 5 | `beb0a29` | Reversion detector — suite complete |
+| 5 | `beb0a29` | Reversion detector — detector suite complete |
+| 6 | *(pending)* | Findings overlay UI, evidence panel, labeling, auto-analyze |
 
 ---
 
@@ -246,6 +249,76 @@ v1.0.0) + `verificationAbsence.test.ts` (13 tests).
   silent_reversion {3,14} + verification_absence high {20,22}.
 
 ---
+
+## Phase 6 — Findings overlay UI, evidence panel, labeling, auto-analyze
+
+The detectors become visible: markers in the session browser, a self-explaining
+evidence panel, ground-truth labeling, and analysis wired into ingest.
+
+**New files**
+
+- `src/stores/findingsStore.ts` — Zustand store: findings + run counts per conversation,
+  per-conversation analyzing stage (for progress spinners), selected finding, and actions
+  `loadFindings` / `analyze` / `selectFinding` / `labelFinding` (label toggling supports
+  reset-to-unset).
+- `src/lib/detection/autoAnalyze.ts` — shared analysis entry point: uses the Web Worker
+  when `Worker` exists, falls back to main-thread `analyzeSession` otherwise (tests, older
+  webviews); both paths persist via `persistDetectorRun` on the main thread.
+  `autoAnalyzeConversations(ids)` logs per-session failures without throwing.
+- `src/lib/detection/findingAnchors.ts` — `mapFindingsToMessages(session, findings)`:
+  findings anchor to step indices; steps carry `messageId` back-references, so resolving a
+  marker to a message bubble is a lookup, not a heuristic.
+- `src/components/detection/severity.ts` — severity order/labels/badge classes and the
+  cosmetic detector display-name map (unknown detector ids fall back to the raw id — no
+  per-detector UI requirement).
+- `src/components/detection/FindingMarker.tsx` — inline severity-coded marker chips;
+  click selects the finding (ring highlight when selected).
+- `src/components/detection/EvidencePanel.tsx` — the "why this fired" panel, rendered
+  entirely from the stored finding: summary, severity + detector version, step range with
+  a jump-to-location button, generic evidence renderer (detector-agnostic key/value +
+  JSON), suppression checks with fired/not-fired states and details, the raw steps in
+  range, and Confirm / False-positive labeling with a privacy note. Prev/next navigation
+  (with n-of-m counter and wrap-around) browses all findings in step order, scrolling the
+  feed to each; added after Jacob's first click-through showed the chips were dead ends.
+- `src/stores/findingsStore.test.ts` + `src/components/detection/EvidencePanel.test.tsx`
+  — analyze→findings→label flows against real golden traces in fake-indexeddb; marker
+  anchoring verified against `mixed-session` (messages 3/5/20 carry reversion/loop/
+  verification markers); labels persist across a simulated reload with `updatedAt` bumped
+  for sync.
+
+**Modified files**
+
+- `src/components/conversations/ConversationView.tsx` — loads findings per conversation,
+  normalizes the session once (`useMemo`) for anchoring, severity-count chips + an
+  Analyze/Re-analyze button with live pipeline-stage spinner in the header, and the
+  evidence panel rendered beside the message feed when a finding is selected. The
+  severity chips are interactive: clicking one opens the first finding of that severity
+  and cycles through the rest on repeat clicks, scrolling the feed along.
+- `src/components/conversations/MessageBubble.tsx` — accepts `findings` and renders
+  markers in all bubble variants; tool bubbles gained `id="message-…"` anchors so
+  jump-to-finding works for tool steps. Bubbles also show subtle `#n` step labels
+  (`mapMessagesToStepLabels`; ranges like `#5–6` when a message expands to multiple
+  steps) for Claude Code sessions only, so the step numbers findings cite are visible
+  in the feed — added after Jacob's click-through flagged that steps appeared nowhere
+  in the UI.
+- `src/lib/import.ts` — `storeData` returns `addedConversationIds`; `importFiles` runs
+  `autoAnalyzeConversations` over them before reporting completion (auto-analyze on
+  ingest, SPEC §4 trigger (a)).
+
+**Repo bug found and fixed in passing:** `npm run typecheck` was `tsc --noEmit` against
+the solution-style root `tsconfig.json` (`files: []`), which type-checks *nothing* — every
+prior "typecheck clean" was vacuous; the real check only ran inside `npm run build`
+(`tsc -b`). The script is now `tsc -b` (CLAUDE.md updated). Making the check real
+surfaced and fixed three latent issues: discriminated-union narrowing failures in
+`src/lib/parsers/claude-code.ts` (pre-existing: the `ClaudeCodeUnknownEntry.type: string`
+catch-all defeats narrowing — per-case casts added), a non-distributive `Omit` over the
+entry union in `tests/golden-traces/fixture-builder.ts` (now a distributive omit), and an
+unused parameter in `detectors/loop.ts`.
+
+**Verification:** full suite 338/338 (9 new UI tests); production build clean with the
+worker emitted as its own chunk (`dist/assets/worker-*.js`); dev server boots and serves
+the worker module. Interactive click-through (markers → panel → labels in a real browser,
+worker non-blocking under load) still needs a human pass — jsdom cannot exercise it.
 
 ## Invariants held throughout
 
