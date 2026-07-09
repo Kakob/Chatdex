@@ -4,7 +4,11 @@
 // detector ids appear in the data.
 
 import { db } from '../db';
-import type { FindingSeverity, StoredFinding } from '../../types/detection';
+import type {
+  FindingSeverity,
+  StoredDetectorRun,
+  StoredFinding,
+} from '../../types/detection';
 
 export interface WeekBucket {
   /** ISO date of the bucket's Monday. */
@@ -50,17 +54,16 @@ export function weekStartOf(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export async function computeObservabilityStats(): Promise<ObservabilityStats> {
-  const [allFindings, runs] = await Promise.all([
-    db.findings.toArray(),
-    db.detectorRuns.toArray(),
-  ]);
-
-  // Only each conversation's latest run counts (issue #1): older runs stay
-  // stored for auditability but must not double-count here.
+/**
+ * Latest run id per conversation. Only each conversation's latest run counts
+ * in aggregates (issue #1): older runs stay stored for auditability but must
+ * not double-count.
+ */
+export function latestRunIdByConversation(
+  runs: StoredDetectorRun[]
+): Map<string, string> {
   const latestRunByConversation = new Map<string, string>();
   const latestFinishedAt = new Map<string, number>();
-  const unknownTools: Record<string, number> = {};
   for (const run of runs) {
     const finished = run.finishedAt.getTime();
     if (finished >= (latestFinishedAt.get(run.conversationId) ?? -Infinity)) {
@@ -68,6 +71,17 @@ export async function computeObservabilityStats(): Promise<ObservabilityStats> {
       latestRunByConversation.set(run.conversationId, run.id);
     }
   }
+  return latestRunByConversation;
+}
+
+export async function computeObservabilityStats(): Promise<ObservabilityStats> {
+  const [allFindings, runs] = await Promise.all([
+    db.findings.toArray(),
+    db.detectorRuns.toArray(),
+  ]);
+
+  const latestRunByConversation = latestRunIdByConversation(runs);
+  const unknownTools: Record<string, number> = {};
   for (const run of runs) {
     if (latestRunByConversation.get(run.conversationId) !== run.id) continue;
     for (const [tool, count] of Object.entries(run.unknownToolCounts ?? {})) {
@@ -147,6 +161,73 @@ export async function computeObservabilityStats(): Promise<ObservabilityStats> {
     detectorHealth: [...health.values()].sort((a, b) => b.total - a.total),
     unknownTools,
   };
+}
+
+export interface FindingChipSummary {
+  detector: string;
+  count: number;
+  maxSeverity: FindingSeverity;
+}
+
+// Local rank map: the UI's SEVERITY_ORDER lives under components/ and this
+// module must stay importable from workers/tests without UI code.
+const SEVERITY_RANK: Record<FindingSeverity, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+
+/**
+ * Per-conversation, per-detector finding counts for browse-list chips.
+ * Counts only each conversation's latest run and excludes findings the user
+ * labeled false-positive. Conversations without findings have no map entry.
+ */
+export async function getFindingChipSummaries(
+  conversationIds: string[]
+): Promise<Map<string, FindingChipSummary[]>> {
+  if (conversationIds.length === 0) return new Map();
+
+  const [findings, runs] = await Promise.all([
+    db.findings.where('conversationId').anyOf(conversationIds).toArray(),
+    db.detectorRuns.where('conversationId').anyOf(conversationIds).toArray(),
+  ]);
+  const latestRunByConversation = latestRunIdByConversation(runs);
+
+  const byConversation = new Map<string, Map<string, FindingChipSummary>>();
+  for (const finding of findings) {
+    const latest = latestRunByConversation.get(finding.conversationId);
+    if (latest !== undefined && finding.runId !== latest) continue;
+    if (finding.userLabel === 'false_positive') continue;
+
+    const detectors =
+      byConversation.get(finding.conversationId) ??
+      new Map<string, FindingChipSummary>();
+    const summary = detectors.get(finding.detector) ?? {
+      detector: finding.detector,
+      count: 0,
+      maxSeverity: finding.severity,
+    };
+    summary.count++;
+    if (SEVERITY_RANK[finding.severity] > SEVERITY_RANK[summary.maxSeverity]) {
+      summary.maxSeverity = finding.severity;
+    }
+    detectors.set(finding.detector, summary);
+    byConversation.set(finding.conversationId, detectors);
+  }
+
+  const result = new Map<string, FindingChipSummary[]>();
+  for (const [conversationId, detectors] of byConversation) {
+    result.set(
+      conversationId,
+      [...detectors.values()].sort(
+        (a, b) =>
+          SEVERITY_RANK[b.maxSeverity] - SEVERITY_RANK[a.maxSeverity] ||
+          b.count - a.count
+      )
+    );
+  }
+  return result;
 }
 
 export interface BusiestSpan {

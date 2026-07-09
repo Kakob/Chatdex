@@ -6,7 +6,12 @@ import {
   bulkPutFindings,
   putDetectorRun,
 } from '../db';
-import { busiestSpan, computeObservabilityStats, weekStartOf } from './stats';
+import {
+  busiestSpan,
+  computeObservabilityStats,
+  getFindingChipSummaries,
+  weekStartOf,
+} from './stats';
 import type { StoredConversation } from '../../types/unified';
 import type {
   FindingSeverity,
@@ -133,6 +138,127 @@ describe('computeObservabilityStats — reconciliation over a 24-session corpus'
         confirmed + fps > 0 ? fps / (confirmed + fps) : null
       );
     }
+  });
+});
+
+describe('getFindingChipSummaries', () => {
+  function chipFinding(
+    id: string,
+    conversationId: string,
+    runId: string,
+    detector: string,
+    severity: FindingSeverity,
+    userLabel: UserLabel = 'unset'
+  ): StoredFinding {
+    const now = new Date('2026-07-09T10:00:00Z');
+    return {
+      id,
+      conversationId,
+      runId,
+      detector,
+      severity,
+      stepRange: { start: 0, end: 1 },
+      summary: 'synthetic',
+      evidence: {},
+      suppressionsEvaluated: [],
+      detectorVersion: '1.0.0',
+      createdAt: now,
+      updatedAt: now,
+      userLabel,
+    };
+  }
+
+  function chipRun(
+    id: string,
+    conversationId: string,
+    finishedAt: Date
+  ): StoredDetectorRun {
+    return {
+      id,
+      conversationId,
+      runKey: `key-${id}`,
+      detectorVersions: { loop: '1.0.0' },
+      config: {},
+      startedAt: finishedAt,
+      finishedAt,
+      findingsCount: 0,
+    };
+  }
+
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  it('counts per detector with max severity, sorted by severity then count', async () => {
+    await putDetectorRun(chipRun('r1', 'c1', new Date('2026-07-01T00:00:00Z')));
+    await bulkPutFindings([
+      chipFinding('f1', 'c1', 'r1', 'loop', 'low'),
+      chipFinding('f2', 'c1', 'r1', 'loop', 'high'),
+      chipFinding('f3', 'c1', 'r1', 'verification_absence', 'medium'),
+      chipFinding('f4', 'c1', 'r1', 'verification_absence', 'medium'),
+      chipFinding('f5', 'c1', 'r1', 'verification_absence', 'info'),
+      chipFinding('f6', 'c1', 'r1', 'silent_reversion', 'medium'),
+    ]);
+
+    const summaries = await getFindingChipSummaries(['c1']);
+    expect(summaries.get('c1')).toEqual([
+      { detector: 'loop', count: 2, maxSeverity: 'high' },
+      { detector: 'verification_absence', count: 3, maxSeverity: 'medium' },
+      { detector: 'silent_reversion', count: 1, maxSeverity: 'medium' },
+    ]);
+  });
+
+  it('excludes findings labeled false_positive', async () => {
+    await putDetectorRun(chipRun('r1', 'c1', new Date('2026-07-01T00:00:00Z')));
+    await bulkPutFindings([
+      chipFinding('f1', 'c1', 'r1', 'loop', 'high', 'false_positive'),
+      chipFinding('f2', 'c1', 'r1', 'loop', 'low', 'confirmed'),
+      chipFinding('f3', 'c1', 'r1', 'silent_reversion', 'medium', 'false_positive'),
+    ]);
+
+    const summaries = await getFindingChipSummaries(['c1']);
+    expect(summaries.get('c1')).toEqual([
+      { detector: 'loop', count: 1, maxSeverity: 'low' },
+    ]);
+  });
+
+  it('counts only the latest run per conversation', async () => {
+    await putDetectorRun(chipRun('r-old', 'c1', new Date('2026-07-01T00:00:00Z')));
+    await putDetectorRun(chipRun('r-new', 'c1', new Date('2026-07-02T00:00:00Z')));
+    await bulkPutFindings([
+      chipFinding('f1', 'c1', 'r-old', 'loop', 'high'),
+      chipFinding('f2', 'c1', 'r-old', 'loop', 'high'),
+      chipFinding('f3', 'c1', 'r-new', 'loop', 'low'),
+    ]);
+
+    const summaries = await getFindingChipSummaries(['c1']);
+    expect(summaries.get('c1')).toEqual([
+      { detector: 'loop', count: 1, maxSeverity: 'low' },
+    ]);
+  });
+
+  it('batches multiple conversations and omits those without findings', async () => {
+    await putDetectorRun(chipRun('r1', 'c1', new Date('2026-07-01T00:00:00Z')));
+    await putDetectorRun(chipRun('r2', 'c2', new Date('2026-07-01T00:00:00Z')));
+    await putDetectorRun(chipRun('r3', 'c3', new Date('2026-07-01T00:00:00Z')));
+    await bulkPutFindings([
+      chipFinding('f1', 'c1', 'r1', 'loop', 'info'),
+      chipFinding('f2', 'c2', 'r2', 'silent_reversion', 'high'),
+    ]);
+
+    const summaries = await getFindingChipSummaries(['c1', 'c2', 'c3', 'c-unanalyzed']);
+    expect(summaries.get('c1')).toEqual([
+      { detector: 'loop', count: 1, maxSeverity: 'info' },
+    ]);
+    expect(summaries.get('c2')).toEqual([
+      { detector: 'silent_reversion', count: 1, maxSeverity: 'high' },
+    ]);
+    expect(summaries.has('c3')).toBe(false);
+    expect(summaries.has('c-unanalyzed')).toBe(false);
+  });
+
+  it('returns an empty map for empty input', async () => {
+    expect((await getFindingChipSummaries([])).size).toBe(0);
   });
 });
 

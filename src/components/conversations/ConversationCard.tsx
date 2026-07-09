@@ -1,13 +1,16 @@
 import { Globe, Terminal, MessageSquare, Calendar } from 'lucide-react';
 import { TagBadge } from '../common/TagBadge';
+import { FindingChips } from '../detection/FindingChips';
 import type { StoredConversation } from '../../types';
 import type { ApiTag } from '../../lib/api';
+import type { FindingChipSummary } from '../../lib/detection/stats';
 
 interface ConversationCardProps {
   conversation: StoredConversation;
   isSelected?: boolean;
   onClick?: () => void;
   tags?: ApiTag[];
+  findingSummaries?: FindingChipSummary[];
   onTagClick?: (tagId: string) => void;
   selectable?: boolean;
   selected?: boolean;
@@ -19,6 +22,7 @@ export function ConversationCard({
   isSelected = false,
   onClick,
   tags,
+  findingSummaries,
   onTagClick,
   selectable = false,
   selected = false,
@@ -101,6 +105,8 @@ export function ConversationCard({
               </span>
             )}
           </div>
+
+          {findingSummaries && <FindingChips summaries={findingSummaries} />}
 
           {tags && tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-2">

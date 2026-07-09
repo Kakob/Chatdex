@@ -5,6 +5,7 @@ import { ConversationList, ConversationView } from '../components/conversations'
 import { BatchTagBar } from '../components/conversations/BatchTagBar';
 import { TagBadge } from '../components/common/TagBadge';
 import { useConversations, useConversation, useConversationTags } from '../hooks';
+import { useFindingSummaries } from '../hooks/useFindingSummaries';
 import { useTagStore } from '../stores/tagStore';
 import type { StoredConversation, DataSource } from '../types';
 
@@ -47,6 +48,7 @@ export function ConversationsPage() {
     [conversations]
   );
   const { tagsMap, refresh: refreshTags } = useConversationTags(conversationIds);
+  const findingSummaries = useFindingSummaries(conversationIds);
 
   // Filter conversations by selected tags
   const filteredConversations = useMemo(() => {
@@ -237,6 +239,7 @@ export function ConversationsPage() {
         hasMore={hasMore}
         onLoadMore={loadMore}
         conversationTags={tagsMap}
+        findingSummaries={findingSummaries}
         onTagClick={toggleTagFilter}
         selectable={selectionMode}
         selectedIds={selectedIds}
