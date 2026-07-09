@@ -19,7 +19,7 @@ clean.
 | 4 | `17036ac` | Verification-absence detector |
 | 5 | `beb0a29` | Reversion detector — detector suite complete |
 | 6 | `4bb1921` | Findings overlay UI, evidence panel, labeling, auto-analyze (+ `ecc0d8e` typecheck fix) |
-| 7 | *(pending)* | Dashboard, session report, explainer page, detector settings |
+| 7 | `791e07f` | Dashboard, session report, explainer page, detector settings |
 
 ---
 
