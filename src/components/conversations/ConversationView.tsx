@@ -5,6 +5,7 @@ import { MessageBubble } from './MessageBubble';
 import { TagBadge } from '../common/TagBadge';
 import { TagInput } from '../common/TagInput';
 import { EvidencePanel } from '../detection/EvidencePanel';
+import { SessionReport } from '../detection/SessionReport';
 import { SEVERITY_BADGE, SEVERITY_LABEL, SEVERITY_ORDER } from '../detection/severity';
 import { scrollToFinding, mapMessagesToStepLabels } from '../../lib/detection/findingAnchors';
 import { useTagStore } from '../../stores/tagStore';
@@ -359,6 +360,10 @@ export function ConversationView({
             <X size={16} />
           </button>
         </div>
+      )}
+
+      {conversation.source === 'claude-code' && (
+        <SessionReport findings={sortedFindings} analyzed={(runCount ?? 0) > 0} />
       )}
 
       {/* Messages + evidence panel */}

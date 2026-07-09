@@ -1,15 +1,14 @@
-# Agent Observability — Build Log (Phases 0–6)
+# Agent Observability — Build Log (Phases 0–7)
 
 Companion to `SPEC-agent-observability.md` and `AGENT-OBSERVABILITY-IMPLEMENTATION_PLAN.md`.
 Records what was actually built per phase: files touched, what changed in them, and the
-design decisions made along the way. Phases 7–8b (dashboard, hardening, dogfooding) are
-not yet started.
+design decisions made along the way. Phases 8–8b (hardening, dogfooding) are not yet
+started.
 
-**Status after Phase 6:** detectors surfaced in the session browser with markers, evidence
-panel with prev/next browsing, interactive severity chips, step labels in the feed, and
-labeling; auto-analyze on ingest; golden suite 30/30; full frontend suite 342/342;
-production build (including the bundled worker) clean; human click-through done
-2026-07-08.
+**Status after Phase 7:** dashboard (findings over time, per-project, detector health),
+per-session report block, "How detection works" page, and settings-page detector config
+with bulk re-analyze; golden suite 30/30; full frontend suite 352/352; production build
+clean.
 
 | Phase | Commit | Summary |
 |---|---|---|
@@ -19,7 +18,8 @@ production build (including the bundled worker) clean; human click-through done
 | 3 | `af840bd` | Loop detector |
 | 4 | `17036ac` | Verification-absence detector |
 | 5 | `beb0a29` | Reversion detector — detector suite complete |
-| 6 | *(pending)* | Findings overlay UI, evidence panel, labeling, auto-analyze |
+| 6 | `4bb1921` | Findings overlay UI, evidence panel, labeling, auto-analyze (+ `ecc0d8e` typecheck fix) |
+| 7 | *(pending)* | Dashboard, session report, explainer page, detector settings |
 
 ---
 
@@ -320,6 +320,65 @@ worker emitted as its own chunk (`dist/assets/worker-*.js`); dev server boots an
 the worker module. Interactive click-through (markers → panel → labels in a real browser,
 worker non-blocking under load) still needs a human pass — jsdom cannot exercise it.
 
+## Phase 7 — Dashboard, session report, explainer page, detector settings
+
+The longitudinal view — Chatdex's core differentiator vs. one-shot trace viewers —
+plus the settings surface from decisions log #2.
+
+**New files**
+
+- `src/lib/detection/stats.ts` — dashboard aggregates computed client-side from Dexie:
+  `computeObservabilityStats()` joins findings to conversations and returns
+  findings-over-time (weekly `WeekBucket`s keyed by **session date, not analysis date**,
+  so bulk-imported history produces a real longitudinal view; `weekStartOf` is
+  UTC-consistent — a local/UTC mixing bug was caught by its own test), per-project
+  breakdown (via `projectPath`/`workingDirectory`), and per-detector health (confirmed /
+  false-positive / unlabeled counts, FP rate from labels only, `null` until labels
+  exist). Also `busiestSpan()` for the session report (max-overlap step range).
+- `src/components/detection/FindingsOverTimeChart.tsx` — stacked weekly bars (Recharts)
+  with a By severity / By detector toggle; detector series colors assigned by palette
+  index so unknown detectors need no UI changes.
+- `src/components/detection/DetectorHealthCards.tsx` — per-detector cards with the
+  false-positive rate surfaced honestly (highlighted when > 25%).
+- `src/components/detection/ProjectBreakdownTable.tsx` — project × detector counts +
+  session counts, basename display with full-path tooltip.
+- `src/components/detection/ObservabilityDashboard.tsx` — section composition +
+  totals header + "How detection works" link; rendered at the bottom of the Analytics
+  page.
+- `src/components/detection/SessionReport.tsx` — one-line per-session block (SPEC §5.3):
+  severity counts + busiest span, or a green "no failure patterns" state; shown only
+  for analyzed Claude Code sessions.
+- `src/pages/HowDetectionWorksPage.tsx` — the in-app explainer (SPEC §6): privacy model,
+  the three detectors in plain language, the verbatim known-limits/roadmap table, and
+  why labels matter. Routed at `/how-detection-works`, linked from the dashboard and the
+  settings section.
+- `src/components/settings/DetectionSettingsSection.tsx` — detector config editor
+  (decisions log #2). The form is **generated from each detector's `defaultConfig`
+  shape** (numbers → number inputs, string arrays → line-separated textareas), so new
+  detectors get a settings UI with zero per-detector code. Save persists overrides to
+  metadata (`detection.configOverrides`); "Re-analyze all sessions" walks every Claude
+  Code conversation with a progress counter (disabled while unsaved edits exist).
+- `src/lib/detection/stats.test.ts` — acceptance: a synthetic 24-session corpus across
+  8 weeks / 3 projects; every dashboard total reconciles with raw table counts, buckets
+  verify session-date semantics, FP rates verified against per-label queries.
+- `src/lib/detection/autoAnalyze.test.ts` — stored overrides flow: default config
+  doesn't fire on a 2-repeat trace, stored `repeatThreshold: 2` does, the new run
+  records the effective config, prior findings remain untouched, and idempotency holds
+  under overrides.
+
+**Modified files**
+
+- `src/lib/detection/autoAnalyze.ts` — `getStoredConfigOverrides` /
+  `setStoredConfigOverrides` (metadata-backed); `analyzeConversation` now applies stored
+  overrides on every path (UI button, auto-analyze on import, bulk re-analyze) unless
+  explicit overrides are passed.
+- `src/pages/AnalyticsPage.tsx` — renders `<ObservabilityDashboard />` below the
+  existing charts.
+- `src/pages/SettingsPage.tsx` — renders `<DetectionSettingsSection />` after cloud sync.
+- `src/components/conversations/ConversationView.tsx` — renders `<SessionReport />`
+  under the header for Claude Code sessions.
+- `src/App.tsx` + `src/pages/index.ts` — route + barrel export for the explainer page.
+
 ## Invariants held throughout
 
 1. No plaintext leaves the client — findings and labels sync as AES-GCM ciphertext only.
@@ -334,14 +393,12 @@ worker non-blocking under load) still needs a human pass — jsdom cannot exerci
 7. Suppression rules carry equal test weight to detection rules; every surviving finding
    records all evaluated suppressions, fired or not.
 
-## What remains (Phases 6–8b)
+## What remains (Phases 8–8b)
 
-- **Phase 6:** findings overlay in the session browser (`ConversationView` /
-  `MessageBubble`), evidence panel, confirm/false-positive labeling, auto-analyze on
-  ingest + manual re-analyze via `detectionWorkerClient`. Real-browser check of worker
-  non-blocking behavior (jsdom could not exercise it).
-- **Phase 7:** dashboard (findings over time, per-project, detector health), session
-  report block, "How detection works" page, Settings section for `DetectorConfig`.
-- **Phase 8/8b:** performance profiling, bulk re-analysis on version bumps, graceful
-  degradation, then the real-corpus dogfooding pass that turns false positives into new
-  must-NOT-fire fixtures.
+- **Phase 8:** performance profiling against the 10k-step target, bulk re-analysis flow
+  for detector version bumps (the settings-page re-analyze covers config changes),
+  graceful degradation for malformed JSONL / partial sessions / unknown tools (counted
+  so mapping gaps are visible).
+- **Phase 8b:** the real-corpus dogfooding pass — run detectors over the full personal
+  history, label every finding, turn false positives into new must-NOT-fire fixtures +
+  suppression fixes, and read the detector-health view against reality.

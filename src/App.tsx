@@ -8,6 +8,7 @@ import {
   KnowledgePage,
   ImportPage,
   SettingsPage,
+  HowDetectionWorksPage,
 } from './pages';
 
 export function App() {
@@ -24,6 +25,7 @@ export function App() {
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="how-detection-works" element={<HowDetectionWorksPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

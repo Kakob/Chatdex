@@ -5,6 +5,7 @@ import { clearAllData, getMetadata, setMetadata } from '../lib/db';
 import { invalidateIndex } from '../lib/search';
 import { validateLicense } from '../lib/license';
 import { CloudSyncSection } from '../components/settings/CloudSyncSection';
+import { DetectionSettingsSection } from '../components/settings/DetectionSettingsSection';
 
 export function SettingsPage() {
   const { theme, setTheme, conversationCount, messageCount, setStats, isPro, setLicense } = useAppStore();
@@ -112,6 +113,9 @@ export function SettingsPage() {
 
         {/* Cloud sync (E2EE, opt-in) */}
         <CloudSyncSection />
+
+        {/* Agent-failure detection config */}
+        <DetectionSettingsSection />
 
         {/* License */}
         <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">

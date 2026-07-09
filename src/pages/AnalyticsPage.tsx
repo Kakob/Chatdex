@@ -7,6 +7,7 @@ import {
   ModelDistributionChart,
   DailyActivityChart,
 } from '../components/analytics';
+import { ObservabilityDashboard } from '../components/detection/ObservabilityDashboard';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { getDefaultDateRange } from '../lib/analytics';
 import { api } from '../lib/api';
@@ -110,6 +111,8 @@ export function AnalyticsPage() {
         </div>
 
         <DailyActivityChart stats={stats} isLoading={isLoading} />
+
+        <ObservabilityDashboard />
       </div>
     </div>
   );

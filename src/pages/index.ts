@@ -5,3 +5,4 @@ export { ConversationsPage } from './ConversationsPage';
 export { ImportPage } from './ImportPage';
 export { KnowledgePage } from './KnowledgePage';
 export { SettingsPage } from './SettingsPage';
+export { HowDetectionWorksPage } from './HowDetectionWorksPage';

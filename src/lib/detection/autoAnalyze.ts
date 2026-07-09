@@ -4,18 +4,44 @@
 // persistDetectorRun on the main thread, so sync hooks always observe writes.
 
 import { registerAllDetectors } from './registerAll';
-import { analyzeSession, type PipelineProgress, type PipelineResult } from './pipeline';
+import {
+  analyzeSession,
+  type ConfigOverrides,
+  type PipelineProgress,
+  type PipelineResult,
+} from './pipeline';
 import { detectionWorkerClient } from './workerClient';
+import { getMetadata, setMetadata } from '../db/metadata';
+
+// Settings-page detector config (IMPLEMENTATION_PLAN decisions log #2).
+// Stored in metadata so it syncs like other preferences; every analysis path
+// picks it up unless explicit overrides are passed.
+const CONFIG_OVERRIDES_KEY = 'detection.configOverrides';
+
+export async function getStoredConfigOverrides(): Promise<ConfigOverrides | undefined> {
+  return getMetadata<ConfigOverrides>(CONFIG_OVERRIDES_KEY);
+}
+
+export async function setStoredConfigOverrides(
+  overrides: ConfigOverrides
+): Promise<void> {
+  await setMetadata(CONFIG_OVERRIDES_KEY, overrides);
+}
 
 export async function analyzeConversation(
   conversationId: string,
-  onProgress?: (progress: PipelineProgress) => void
+  onProgress?: (progress: PipelineProgress) => void,
+  overrides?: ConfigOverrides
 ): Promise<PipelineResult> {
   registerAllDetectors();
+  const config = overrides ?? (await getStoredConfigOverrides());
   if (typeof Worker !== 'undefined') {
-    return detectionWorkerClient.analyze(conversationId, { onProgress });
+    return detectionWorkerClient.analyze(conversationId, {
+      onProgress,
+      configOverrides: config,
+    });
   }
-  return analyzeSession(conversationId, undefined, onProgress);
+  return analyzeSession(conversationId, config, onProgress);
 }
 
 /** Analyze freshly imported sessions; failures are logged, never thrown. */
