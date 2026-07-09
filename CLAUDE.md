@@ -94,7 +94,7 @@ Extend `src/lib/db.ts` / `src/lib/sync/` for `Finding` and `DetectorRun` storage
 dev server (frontend):     npm run dev            # Vite → http://localhost:4000
 dev server (backend):      npm run dev:backend    # Fastify → http://localhost:3003
 dev server (both):         npm run dev:all
-typecheck:                 npm run typecheck      # tsc --noEmit
+typecheck:                 npm run typecheck      # tsc -b (project refs; plain tsc --noEmit checks nothing here)
 lint:                      npm run lint           # eslint .
 lint (fix):                npm run lint:fix
 unit tests (frontend):     npm test               # vitest run

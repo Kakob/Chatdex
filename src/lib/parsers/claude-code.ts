@@ -1,6 +1,10 @@
 import type {
   ClaudeCodeEntry,
   ClaudeCodeContentBlock,
+  ClaudeCodeUserEntry,
+  ClaudeCodeAssistantEntry,
+  ClaudeCodeToolUseEntry,
+  ClaudeCodeToolResultEntry,
 } from '../../types/claude-code';
 import type { StoredConversation, StoredMessage, ContentBlock } from '../../types/unified';
 import { estimateTokens } from '../utils/tokens';
@@ -85,8 +89,13 @@ function parseEntries(
 
     switch (entry.type) {
       case 'user': {
+        // Casts in this switch: ClaudeCodeUnknownEntry's `type: string`
+        // catch-all defeats discriminated-union narrowing, so each case
+        // asserts the shape its runtime `type` value implies.
         userMessageCount++;
-        const { text, contentBlocks } = extractContent(entry.message.content);
+        const { text, contentBlocks } = extractContent(
+          (entry as ClaudeCodeUserEntry).message.content
+        );
         textParts.push(text);
         messages.push({
           id: msgId,
@@ -101,7 +110,9 @@ function parseEntries(
 
       case 'assistant': {
         assistantMessageCount++;
-        const { text, contentBlocks } = extractContent(entry.message.content);
+        const { text, contentBlocks } = extractContent(
+          (entry as ClaudeCodeAssistantEntry).message.content
+        );
         textParts.push(text);
         messages.push({
           id: msgId,
@@ -120,8 +131,9 @@ function parseEntries(
       }
 
       case 'tool_use': {
-        const toolText = `[Tool: ${entry.tool_name}]`;
-        const toolInputObj = entry.tool_input as Record<string, unknown>;
+        const toolUse = entry as ClaudeCodeToolUseEntry;
+        const toolText = `[Tool: ${toolUse.tool_name}]`;
+        const toolInputObj = toolUse.tool_input as Record<string, unknown>;
         messages.push({
           id: msgId,
           conversationId: sessionId,
@@ -129,30 +141,31 @@ function parseEntries(
           text: toolText,
           contentBlocks: [{
             type: 'tool_use',
-            toolName: entry.tool_name,
+            toolName: toolUse.tool_name,
             toolInput: toolInputObj,
           }],
           createdAt: entryTimestamp,
-          toolName: entry.tool_name,
-          toolInput: JSON.stringify(entry.tool_input, null, 2),
+          toolName: toolUse.tool_name,
+          toolInput: JSON.stringify(toolUse.tool_input, null, 2),
         });
         break;
       }
 
       case 'tool_result': {
-        const resultText = entry.result.slice(0, 500); // Truncate for text field
+        const toolResult = entry as ClaudeCodeToolResultEntry;
+        const resultText = toolResult.result.slice(0, 500); // Truncate for text field
         messages.push({
           id: msgId,
           conversationId: sessionId,
           sender: 'tool',
-          text: `[Tool Result: ${entry.tool_name}]`,
+          text: `[Tool Result: ${toolResult.tool_name}]`,
           contentBlocks: [{
             type: 'tool_result',
-            toolName: entry.tool_name,
-            toolResult: entry.result, // Full result in content block
+            toolName: toolResult.tool_name,
+            toolResult: toolResult.result, // Full result in content block
           }],
           createdAt: entryTimestamp,
-          toolName: entry.tool_name,
+          toolName: toolResult.tool_name,
           toolResult: resultText,
         });
         break;

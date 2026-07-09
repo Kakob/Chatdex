@@ -15,7 +15,13 @@ type TimestampedEntry =
   | ClaudeCodeToolUseEntry
   | ClaudeCodeToolResultEntry;
 
-export type EntrySpec = Omit<TimestampedEntry, 'timestamp'>;
+// Plain Omit over a union collapses to the keys the members share; this
+// distributes so each entry shape keeps its own fields.
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never;
+
+export type EntrySpec = DistributiveOmit<TimestampedEntry, 'timestamp'>;
 
 export interface TraceOptions {
   sessionId: string;

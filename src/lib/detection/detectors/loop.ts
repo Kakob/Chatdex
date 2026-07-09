@@ -70,7 +70,7 @@ export const loopDetector: Detector<LoopDetectorConfig> = {
     const calls = collectToolCalls(session);
 
     const sequenceCandidates = findSequenceCandidates(calls, config);
-    const exactCandidates = findExactCandidates(calls, session, config).filter(
+    const exactCandidates = findExactCandidates(calls, config).filter(
       (candidate) => !isSubsumedBySequence(candidate, sequenceCandidates)
     );
 
@@ -100,7 +100,6 @@ function collectToolCalls(session: NormalizedSession): ToolCallRef[] {
 
 function findExactCandidates(
   calls: ToolCallRef[],
-  session: NormalizedSession,
   config: LoopDetectorConfig
 ): LoopCandidate[] {
   const bySignature = new Map<string, ToolCallRef[]>();
