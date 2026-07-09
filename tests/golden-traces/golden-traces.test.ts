@@ -40,7 +40,9 @@ interface Expectations {
 function analyzeFindings(jsonl: string, name: string): ExpectedFinding[] {
   const { conversations, messages } = parseClaudeCodeContent(jsonl, `${name}.jsonl`);
   const session = normalizeSession(conversations[0].id, messages);
-  return runDetectors(session) as unknown as ExpectedFinding[];
+  const { findings, errors } = runDetectors(session);
+  expect(errors).toEqual({});
+  return findings as unknown as ExpectedFinding[];
 }
 
 function comparable(findings: ExpectedFinding[]): Omit<ExpectedFinding, 'note'>[] {

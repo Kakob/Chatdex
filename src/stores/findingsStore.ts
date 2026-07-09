@@ -35,10 +35,18 @@ export const useFindingsStore = create<FindingsState>((set, get) => ({
       getFindingsForConversation(conversationId),
       getDetectorRunsForConversation(conversationId),
     ]);
+    // Findings are immutable per run; the CURRENT truth is the latest run's
+    // findings only (issue #1 — older runs stay in storage for auditability).
+    // Fallback to all findings when no run rows exist yet, e.g. synced
+    // findings arriving before their run record.
+    const latest = [...runs].sort(
+      (a, b) => b.finishedAt.getTime() - a.finishedAt.getTime()
+    )[0];
+    const visible = latest ? findings.filter((f) => f.runId === latest.id) : findings;
     set({
       findingsByConversation: {
         ...get().findingsByConversation,
-        [conversationId]: findings,
+        [conversationId]: visible,
       },
       runCountByConversation: {
         ...get().runCountByConversation,

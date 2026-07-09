@@ -37,6 +37,8 @@ export interface ObservabilityStats {
   findingsOverTime: WeekBucket[];
   perProject: ProjectBreakdown[];
   detectorHealth: DetectorHealth[];
+  /** Calls to tools outside the curated classifier mapping, across latest runs. */
+  unknownTools: Record<string, number>;
 }
 
 /** Monday of the UTC week containing `date`, as YYYY-MM-DD. */
@@ -49,10 +51,34 @@ export function weekStartOf(date: Date): string {
 }
 
 export async function computeObservabilityStats(): Promise<ObservabilityStats> {
-  const [findings, runs] = await Promise.all([
+  const [allFindings, runs] = await Promise.all([
     db.findings.toArray(),
     db.detectorRuns.toArray(),
   ]);
+
+  // Only each conversation's latest run counts (issue #1): older runs stay
+  // stored for auditability but must not double-count here.
+  const latestRunByConversation = new Map<string, string>();
+  const latestFinishedAt = new Map<string, number>();
+  const unknownTools: Record<string, number> = {};
+  for (const run of runs) {
+    const finished = run.finishedAt.getTime();
+    if (finished >= (latestFinishedAt.get(run.conversationId) ?? -Infinity)) {
+      latestFinishedAt.set(run.conversationId, finished);
+      latestRunByConversation.set(run.conversationId, run.id);
+    }
+  }
+  for (const run of runs) {
+    if (latestRunByConversation.get(run.conversationId) !== run.id) continue;
+    for (const [tool, count] of Object.entries(run.unknownToolCounts ?? {})) {
+      unknownTools[tool] = (unknownTools[tool] ?? 0) + count;
+    }
+  }
+  const findings = allFindings.filter((f) => {
+    const latest = latestRunByConversation.get(f.conversationId);
+    return latest === undefined || f.runId === latest;
+  });
+
   const conversationIds = [...new Set(findings.map((f) => f.conversationId))];
   const conversations = await db.conversations.bulkGet(conversationIds);
   const convById = new Map(
@@ -119,6 +145,7 @@ export async function computeObservabilityStats(): Promise<ObservabilityStats> {
       .map(({ sessions, ...p }) => ({ ...p, sessionCount: sessions.size }))
       .sort((a, b) => b.total - a.total),
     detectorHealth: [...health.values()].sort((a, b) => b.total - a.total),
+    unknownTools,
   };
 }
 

@@ -9,7 +9,7 @@
 // tool_use/tool_result content blocks expand to one step per block.
 
 import type { StoredMessage } from '../../types/unified';
-import { classifyToolCall, type ToolCallClass } from './classify';
+import { classifyToolCall, isKnownTool, type ToolCallClass } from './classify';
 import { normalizePath, signatureFor } from './signatures';
 
 export type StepKind = 'user_msg' | 'agent_text' | 'tool_call' | 'tool_result';
@@ -47,6 +47,12 @@ export interface NormalizedSession {
   steps: Step[];
   /** Keyed by normalized file path, edits in step order. */
   editTimelines: Map<string, TimelineEdit[]>;
+  /**
+   * Tool-call names outside the curated classifier mapping (counted so
+   * mapping gaps stay visible — such calls classify neutral, which can hide
+   * state changes or verifications from the detectors).
+   */
+  unknownToolCounts: Record<string, number>;
 }
 
 export function normalizeSession(
@@ -54,15 +60,25 @@ export function normalizeSession(
   messages: StoredMessage[]
 ): NormalizedSession {
   const steps: Step[] = [];
+  const unknownToolCounts: Record<string, number> = {};
 
   for (const message of messages) {
     if (message.sender === 'system') continue;
     for (const partial of expandMessage(message)) {
-      steps.push(finalizeStep(partial, steps.length, message.id));
+      const step = finalizeStep(partial, steps.length, message.id);
+      steps.push(step);
+      if (step.kind === 'tool_call' && step.toolName && !isKnownTool(step.toolName)) {
+        unknownToolCounts[step.toolName] = (unknownToolCounts[step.toolName] ?? 0) + 1;
+      }
     }
   }
 
-  return { sessionId, steps, editTimelines: buildEditTimelines(steps) };
+  return {
+    sessionId,
+    steps,
+    editTimelines: buildEditTimelines(steps),
+    unknownToolCounts,
+  };
 }
 
 type PartialStep = Omit<Step, 'index' | 'messageId' | 'signature' | 'toolClass' | 'editHunks'>;

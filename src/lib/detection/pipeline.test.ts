@@ -221,15 +221,17 @@ describe('worker handler — message protocol', () => {
     expect(await db.detectorRuns.count()).toBe(0);
   });
 
-  it('reports detector failures as error responses', async () => {
+  it('isolates a throwing detector: run completes, error recorded, others still find', async () => {
     clearDetectorRegistry();
     registerDetector(
       makeStubDetector({
+        id: 'exploder',
         run: () => {
           throw new Error('detector exploded');
         },
       })
     );
+    registerDetector(makeStubDetector());
 
     const responses: WorkerResponse[] = [];
     await handleAnalyzeRequest(
@@ -237,8 +239,13 @@ describe('worker handler — message protocol', () => {
       (r) => responses.push(r)
     );
     const last = responses[responses.length - 1];
-    expect(last.type).toBe('error');
-    if (last.type === 'error') expect(last.message).toBe('detector exploded');
+    expect(last.type).toBe('result');
+    if (last.type === 'result') {
+      expect(last.result.run?.errors).toEqual({ exploder: 'detector exploded' });
+      // The healthy detector's findings survive the neighbor's crash.
+      expect(last.result.findings).toHaveLength(1);
+      expect(last.result.findings[0].detector).toBe('stub');
+    }
   });
 });
 

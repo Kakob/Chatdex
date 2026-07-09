@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Radar, HelpCircle } from 'lucide-react';
 import {
@@ -8,15 +8,20 @@ import {
 import { FindingsOverTimeChart } from './FindingsOverTimeChart';
 import { DetectorHealthCards } from './DetectorHealthCards';
 import { ProjectBreakdownTable } from './ProjectBreakdownTable';
+import { StaleAnalysisBanner } from './StaleAnalysisBanner';
 
 export function ObservabilityDashboard() {
   const [stats, setStats] = useState<ObservabilityStats | null>(null);
 
-  useEffect(() => {
+  const reload = useCallback(() => {
     void computeObservabilityStats().then(setStats);
   }, []);
 
+  useEffect(reload, [reload]);
+
   if (!stats) return null;
+
+  const unknownToolTotal = Object.values(stats.unknownTools).reduce((a, b) => a + b, 0);
 
   return (
     <section className="mt-8 space-y-4" data-testid="observability-dashboard">
@@ -28,6 +33,15 @@ export function ObservabilityDashboard() {
           </h2>
           <span className="text-xs text-gray-400">
             {stats.totalFindings} findings across {stats.analyzedSessionCount} analyzed sessions
+            {unknownToolTotal > 0 && (
+              <span
+                title={Object.entries(stats.unknownTools)
+                  .map(([tool, n]) => `${tool}: ${n}`)
+                  .join(', ')}
+              >
+                {' '}· {unknownToolTotal} call(s) to unmapped tools
+              </span>
+            )}
           </span>
         </div>
         <Link
@@ -38,6 +52,8 @@ export function ObservabilityDashboard() {
           How detection works
         </Link>
       </div>
+
+      <StaleAnalysisBanner onReanalyzed={reload} />
 
       <FindingsOverTimeChart buckets={stats.findingsOverTime} />
       <DetectorHealthCards health={stats.detectorHealth} />

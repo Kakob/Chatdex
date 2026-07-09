@@ -53,4 +53,12 @@ export interface StoredDetectorRun {
   startedAt: Date;
   finishedAt: Date;
   findingsCount: number;
+  /**
+   * Detectors that threw during this run (detector id → message). The other
+   * detectors' findings still persist; deterministic detectors fail the same
+   * way on identical inputs, so idempotent skipping remains correct.
+   */
+  errors?: Record<string, string>;
+  /** Tool names outside the curated classifier mapping, with call counts. */
+  unknownToolCounts?: Record<string, number>;
 }

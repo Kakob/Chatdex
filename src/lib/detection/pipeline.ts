@@ -65,22 +65,36 @@ function resolveConfigs(overrides?: ConfigOverrides): {
   return { detectorVersions, config };
 }
 
+export interface DetectorSuiteResult {
+  findings: DetectorFinding[];
+  /** Detectors that threw (id → message); the others' findings still count. */
+  errors: Record<string, string>;
+}
+
 /**
  * Run all registered detectors over an already-normalized session. Pure
  * compute — no storage access. The golden-trace harness calls this directly.
+ * A throwing detector never takes down the suite (Phase 8 degradation rule);
+ * its error is recorded and the remaining detectors run normally.
  */
 export function runDetectors(
   session: NormalizedSession,
   overrides?: ConfigOverrides,
   onProgress?: (progress: PipelineProgress) => void
-): DetectorFinding[] {
+): DetectorSuiteResult {
   const { config } = resolveConfigs(overrides);
   const findings: DetectorFinding[] = [];
+  const errors: Record<string, string> = {};
   for (const detector of getDetectors()) {
     onProgress?.({ stage: 'detecting', detectorId: detector.id });
-    findings.push(...detector.run(session, config[detector.id]));
+    try {
+      findings.push(...detector.run(session, config[detector.id]));
+    } catch (err) {
+      errors[detector.id] = err instanceof Error ? err.message : String(err);
+      console.error(`[detection] detector "${detector.id}" failed`, err);
+    }
   }
-  return findings;
+  return { findings, errors };
 }
 
 /**
@@ -108,7 +122,11 @@ export async function computeDetectorRun(
   onProgress?.({ stage: 'normalizing' });
   const session = normalizeSession(conversationId, messages);
 
-  const detectorFindings = runDetectors(session, overrides, onProgress);
+  const { findings: detectorFindings, errors } = runDetectors(
+    session,
+    overrides,
+    onProgress
+  );
   const finishedAt = new Date();
 
   const runId = generateId();
@@ -132,6 +150,10 @@ export async function computeDetectorRun(
     startedAt,
     finishedAt,
     findingsCount: findings.length,
+    ...(Object.keys(errors).length > 0 && { errors }),
+    ...(Object.keys(session.unknownToolCounts).length > 0 && {
+      unknownToolCounts: session.unknownToolCounts,
+    }),
   };
 
   return { skipped: false, run, findings };

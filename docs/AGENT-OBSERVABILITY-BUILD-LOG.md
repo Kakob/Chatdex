@@ -379,6 +379,47 @@ plus the settings surface from decisions log #2.
   under the header for Claude Code sessions.
 - `src/App.tsx` + `src/pages/index.ts` — route + barrel export for the explainer page.
 
+## Phase 8 — Hardening
+
+Led with the fix for GitHub issue #1, then the plan's three hardening concerns.
+
+**Issue #1 — latest-run display filtering.** Findings are immutable per run, but the
+display layer aggregated every run, so re-analysis with changed config stacked old + new
+markers and double-counted the dashboard. Now `findingsStore.loadFindings` and
+`computeObservabilityStats` filter to each conversation's **latest** `DetectorRun`
+(by `finishedAt`), falling back to all findings when no run rows exist (synced findings
+can arrive before their run record). Older runs stay in storage untouched — auditability
+of detector/config changes is preserved. Regression tests cover both read paths.
+
+**Graceful degradation.**
+- `runDetectors` now returns `{ findings, errors }`: a throwing detector is caught,
+  logged, and recorded on the run (`StoredDetectorRun.errors`, additive optional field)
+  while the other detectors' findings persist. Deterministic detectors fail identically
+  on identical inputs, so idempotent skipping of the stored run remains correct.
+- `normalizeSession` counts tool calls whose names are outside the curated classifier
+  mapping (`NormalizedSession.unknownToolCounts` → `StoredDetectorRun.unknownToolCounts`);
+  the dashboard header shows "N call(s) to unmapped tools" with a per-tool tooltip, so
+  classifier gaps are visible instead of silently classifying neutral.
+- Partial/malformed traces (dangling tool calls/results, missing edit fields, corrupt
+  JSONL lines, empty conversations) analyze without crashing — covered by tests.
+
+**Bulk re-analysis for version bumps.** `src/lib/detection/staleness.ts` —
+`findStaleSessions()` compares each session's latest-run `detectorVersions` against the
+current registry (never-analyzed sessions reported separately).
+`StaleAnalysisBanner` on the dashboard offers one-click bulk re-analysis with a progress
+counter and reloads stats when done. Config-change re-analysis remains on the Settings
+page; this flow covers detector version bumps.
+
+**Performance.** `perf.test.ts` runs the REAL three-detector suite (the Phase 2 gate
+used a stub) over a synthetic 10k-step session with representative structure — task
+blocks, repeated failing tests, revert pairs, unverified tails — asserting the < 5s
+SPEC §9 budget with all three detectors producing findings.
+
+**Files:** modified `findingsStore.ts`, `stats.ts`, `pipeline.ts`, `normalize.ts`,
+`types/detection.ts`, `ObservabilityDashboard.tsx`, `golden-traces.test.ts`,
+`pipeline.test.ts`; new `staleness.ts`, `StaleAnalysisBanner.tsx`, `hardening.test.ts`,
+`perf.test.ts`.
+
 ## Invariants held throughout
 
 1. No plaintext leaves the client — findings and labels sync as AES-GCM ciphertext only.
