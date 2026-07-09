@@ -1,0 +1,274 @@
+# Agent Observability — Build Log (Phases 0–5)
+
+Companion to `SPEC-agent-observability.md` and `AGENT-OBSERVABILITY-IMPLEMENTATION_PLAN.md`.
+Records what was actually built per phase: files touched, what changed in them, and the
+design decisions made along the way. Phases 6–8b (UI, dashboard, hardening, dogfooding)
+are not yet started.
+
+**Status after Phase 5:** all three v1 detectors implemented and registered; the golden-trace
+suite passes 30/30; full frontend suite 329/329; `npm run typecheck` and lint clean on all
+new files.
+
+| Phase | Commit | Summary |
+|---|---|---|
+| 0 | `e306ced` | Golden-trace harness + 10 fixtures |
+| 1 | `417c33b` | Normalization: signatures, classifier, step stream, edit timelines |
+| 2 | `2239b56` | Detector framework, Dexie v2 storage, encrypted sync, Web Worker |
+| 3 | `af840bd` | Loop detector |
+| 4 | `17036ac` | Verification-absence detector |
+| 5 | `beb0a29` | Reversion detector — suite complete |
+
+---
+
+## Phase 0 — Golden-trace harness and fixtures
+
+Detection code without labeled fixtures is unfalsifiable, so the test bed came first.
+
+**New files**
+
+- `tests/golden-traces/fixture-builder.ts` — `userMsg()`, `agentText()`, `toolCall()`,
+  `toolResult()` helpers plus `buildTrace()`, emitting schema-correct Claude Code JSONL
+  (flat-entry format matching `src/types/claude-code.ts`). Timestamps auto-increment;
+  session metadata (sessionId/cwd/gitBranch) attaches to the first entry the way real
+  session files carry it.
+- `tests/golden-traces/fixtures.ts` — all ten scenarios defined as readable builder code
+  (~20 lines each), exactly as the implementation plan prescribed:
+  `loop-exact-repeat`, `loop-sequence-repeat`, `loop-legit-polling` (must-NOT-fire),
+  `loop-with-state-change` (must-NOT-fire), `verify-clean`, `verify-absent`,
+  `verify-asserted`, `reversion-silent`, `reversion-acknowledged`, `mixed-session`.
+- `tests/golden-traces/*.jsonl` (10) — generated artifacts, committed so the app can
+  import them directly (needed for Phase 6 acceptance). A freshness test compares disk
+  content to builder output; regenerate with `UPDATE_FIXTURES=1 npm test`.
+- `tests/golden-traces/*.expected.json` (10) — hand-authored contracts declaring expected
+  findings (detector, severity, stepRange) per fixture. These are the regression contract:
+  any detector change that alters results means fixing the detector or consciously
+  updating expectations + bumping the detector version.
+- `tests/golden-traces/golden-traces.test.ts` — the runner: per fixture it (1) verifies
+  the on-disk JSONL is fresh, (2) parses it through the real ingestion path
+  (`parseClaudeCodeContent`) unmodified, (3) diffs pipeline findings against expectations.
+
+**Modified files**
+
+- `vitest.config.ts` — test include extended with `tests/**/*.test.{ts,tsx}`.
+- `tsconfig.app.json` — `include` gains `tests`; `types` gains `node` (the runner uses
+  `node:fs`/`node:path`).
+- `docs/IMPLEMENTATION_PLAN.md` → renamed `docs/AGENT-OBSERVABILITY-IMPLEMENTATION_PLAN.md`,
+  with a new decisions log: one phase per session; DetectorConfig user-editable via the
+  Settings page (Phase 7); findings sync batched at DetectorRun completion; and the
+  step-indexing convention (0-based over non-`system` JSONL entries, 1:1 with normalized
+  steps for flat traces).
+
+---
+
+## Phase 1 — Normalization layer
+
+The shared machinery every detector consumes.
+
+**New files** (all under `src/lib/detection/`)
+
+- `signatures.ts` — `signatureFor(toolName, input)` producing the loop-matching signature:
+  recursive canonicalization with sorted keys, whitespace collapsing, textual path
+  normal-form (`normalizePath`: duplicate slashes, `.`/`..` segments, trailing slashes),
+  and an explicitly enumerated `VOLATILE_FIELDS` list (timestamp, request/session/trace/run
+  IDs, nonce) — each field individually proven inert by a test.
+- `classify.ts` — the curated, versioned tool-call classifier
+  (`CLASSIFIER_VERSION = '1.0.0'`): `state_changing` / `verification_shaped` / `neutral`.
+  Non-Bash tools map by name; Bash commands match an ordered regex rule list
+  (mutating-curl → verification patterns → state patterns → neutral default), so
+  `npm test > out.log` classifies as a test run while `curl -X POST` stays state-changing.
+  Unknown tools default to `neutral`; `isKnownTool()` exposed for Phase 8's mapping-gap
+  counter. **Documented judgment call:** local builds (`npm run build`, `cargo build`)
+  classify `verification_shaped` — a build after an edit is a success check, and build
+  artifacts should not suppress loop findings — while deploy/publish commands remain
+  `state_changing`. SPEC §2.2 is ambiguous here; rationale lives in the module comment.
+- `normalize.ts` — `normalizeSession(sessionId, messages)` → `NormalizedSession`:
+  - `Step` stream (`user_msg` / `agent_text` / `tool_call` / `tool_result`) with
+    `messageId` back-references for UI anchoring; flat traces map 1:1 to the golden-trace
+    step convention; messages with embedded `tool_use`/`tool_result` content blocks expand
+    to one step per block.
+  - Tool-call steps carry precomputed `signature`, `toolClass`, and extracted `editHunks`
+    (Edit / MultiEdit / Write / NotebookEdit).
+  - Per-file edit timelines (`Map<normalizedPath, TimelineEdit[]>`) for the reversion
+    detector. Malformed stored tool input degrades to `{}` rather than crashing.
+- `signatures.test.ts`, `classify.test.ts` (39-case classification table),
+  `normalize.test.ts` (includes reconstruction of `mixed-session.jsonl` timelines:
+  config.ts edits at steps 3/14 forming an inverse pair, cache.ts at 20).
+
+---
+
+## Phase 2 — Detector framework, storage, sync, worker
+
+The chassis: everything detector-agnostic.
+
+**New files**
+
+- `src/types/detection.ts` — `StoredFinding` and `StoredDetectorRun` per SPEC §3, plus
+  `FindingSeverity`, `UserLabel`, `StepRange`, `SuppressionOutcome`. Two additive
+  deviations from the spec's field list: `runId` (links finding → run) and `updatedAt`
+  (last-write-wins sync when a user label changes; everything else is immutable per
+  detector version).
+- `src/lib/detection/registry.ts` — the `Detector` interface
+  (`id` / semver `version` / `defaultConfig` / `run(session, config)`), `DetectorFinding`
+  (what detectors emit; the pipeline adds identity/run linkage/timestamps), and the
+  registry (`registerDetector` / `getDetectors` / `clearDetectorRegistry` for tests).
+  Adding a detector requires zero changes outside registration.
+- `src/lib/detection/pipeline.ts` — orchestration split into compute and persist halves:
+  - `runDetectors(session, overrides?)` — pure compute over a normalized session (the
+    golden runner calls this directly).
+  - `computeDetectorRun(conversationId, …)` — loads messages, normalizes, checks
+    idempotency, runs detectors; reads storage but never writes.
+  - `persistDetectorRun(result)` — one batched Dexie transaction writing the run + all
+    findings, rechecking the unique `runKey` inside the transaction.
+  - `buildRunKey` — stable-stringified `(conversationId, detectorVersions, config)`;
+    re-running with unchanged inputs is a no-op (SPEC §4 idempotency).
+- `src/lib/detection/registerAll.ts` — single registration point used by both worker and
+  main thread.
+- `src/lib/detection/workerHandler.ts` — message protocol
+  (`analyze` → `progress`(loading/normalizing/detecting) → `result`/`error`) and the
+  testable handler.
+- `src/lib/detection/worker.ts` — thin Vite module-worker entry binding the handler.
+- `src/lib/detection/workerClient.ts` — main-thread `DetectionWorkerClient`: sends
+  requests, relays progress, and persists results.
+- `src/lib/db/findings.ts`, `src/lib/db/detectorRuns.ts` — CRUD helpers mirroring the
+  existing per-entity module pattern; `setFindingLabel()` is the only mutation path on a
+  finding and bumps `updatedAt`.
+- `src/lib/detection/pipeline.test.ts` — acceptance tests: stub-detector persistence,
+  idempotent re-runs, new run on config/version change with old findings untouched,
+  lossless envelope → AES-GCM encrypt → decrypt → rehydrate round-trips for both
+  entities, worker protocol (including compute-only verification), and a synthetic
+  10k-step session under the 5-second budget.
+
+**Modified files**
+
+- `src/lib/db/schema.ts` — Dexie `version(2)`: `findings` table
+  (`&id, conversationId, runId, detector, severity, userLabel, createdAt,
+  [conversationId+createdAt]`) and `detectorRuns` (`&id, &runKey, conversationId,
+  finishedAt` — the unique `runKey` enforces idempotency at the DB level).
+- `src/lib/db/index.ts` — barrel exports for the new modules; `clearAllData` covers both
+  tables.
+- `src/lib/db/conversations.ts` — `deleteConversation`, `deleteConversationsBySource`,
+  and `clearConversations` cascade to findings and detector runs.
+- `src/lib/sync/syncApi.ts` — `SyncKind` gains `'finding' | 'detector_run'`.
+- `src/lib/sync/serializer.ts` — `envelopeFinding`/`rehydrateFinding`,
+  `envelopeDetectorRun`/`rehydrateDetectorRun` (`parentId = conversationId`; finding
+  `updatedAt` drives last-write-wins for label changes).
+- `src/lib/sync/engine.ts` — hooks, `applyIncomingRecord`, and `buildEnvelope` cases for
+  both kinds; incoming conversation deletes cascade to findings/runs.
+- `backend/src/routes/sync.ts` — zod `KindSchema` accepts the two new kinds.
+- `backend/src/db/schema.ts` — `kind` column type union extended (varchar, so no
+  Postgres migration needed).
+- `tests/golden-traces/golden-traces.test.ts` — placeholder replaced with the real
+  pipeline (`normalizeSession` + `runDetectors`).
+
+**Key design decision:** Dexie hooks are per-instance, so a worker that wrote IndexedDB
+would silently bypass the main thread's sync engine. Therefore **the worker only
+computes; the main thread persists** — which also delivers the "batched at DetectorRun
+completion" sync decision naturally.
+
+---
+
+## Phase 3 — Loop detector
+
+**New:** `src/lib/detection/detectors/loop.ts` (`loop` v1.0.0) + `loop.test.ts` (12 tests).
+**Modified:** `registerAll.ts` (registration only — the framework needed no changes,
+validating the registry invariant).
+
+- **Exact repeats:** sliding-window seed (≥N occurrences of one signature within an
+  M-step window; defaults N=3, M=10) then gap-based extension so an established loop
+  absorbs subsequent repeats. Windowing is precise: occurrences at steps 0/9/18 do not
+  fire because no single 10-step window holds three.
+- **Sequence repeats:** 2–4-signature blocks repeating ≥2× consecutively in the tool-call
+  stream, requiring ≥2 distinct signatures; exact-in-sequence dedupe guarantees one loop
+  never produces two findings.
+- **Suppression 1 — retry whitelist:** configurable regex list (gh run view/watch,
+  sleep, `--watch`, kubectl get, docker ps, status/health/ping); fires only when *every*
+  distinct signature in the candidate is retry-shaped.
+- **Suppression 2 — intervening state change:** an external state-changing call between
+  repeats segments the candidate; surviving segments are re-qualified and the trim is
+  recorded (`fired: true` with the boundary step). The loop's *own* signatures never
+  self-suppress — preserving SPEC §2.3's edit→revert→edit cross-reference case.
+- Both suppressions recorded on every surviving finding; evidence carries signatures,
+  occurrence steps, repeat count, and effective thresholds.
+- Golden results: `loop-exact-repeat` {1,11}, `loop-sequence-repeat` {1,12}, both
+  must-NOT-fire fixtures suppressed, `mixed-session` loop trimmed to {5,10} with step 16
+  correctly excluded.
+
+---
+
+## Phase 4 — Verification-absence detector
+
+**New:** `src/lib/detection/detectors/verificationAbsence.ts` (`verification_absence`
+v1.0.0) + `verificationAbsence.test.ts` (13 tests).
+**Modified:** `registerAll.ts`.
+
+- **Forward scan** from every state-changing call to the span boundary: new user message
+  (`topic_shift`), agent text matching a task-transition pattern (`task_transition`), or
+  `session_end`. Verification appearing *after* a boundary does not clear the earlier
+  action.
+- **What clears a span:** any verification-shaped call, or a **read-back** — a `Read` of
+  the exact (path-normalized) file the action edited. SPEC §2.2 lists read-backs as
+  verification-shaped, but that property is contextual, so the detector resolves it
+  rather than the intrinsic classifier.
+- **Severity escalation:** configurable success-assertion regexes ("should pass/work",
+  "this/that fixes", "fixed", "all set", "good to go") escalate to **high** when asserted
+  but never verified. Tuned so plain completion language ("Done, I have updated the
+  timeout") stays medium — that distinction is pinned by the `verify-absent` fixture.
+- Evidence: scanned span + end reason, assertion excerpt with matched pattern, and the
+  classification of every tool call in the span.
+- Golden results: `verify-clean` no finding; `verify-absent` medium {1,3};
+  `verify-asserted` high {1,3}; `mixed-session` gains high {20,22}.
+
+---
+
+## Phase 5 — Reversion detector
+
+**New:** `src/lib/detection/detectors/reversion.ts` (`silent_reversion` v1.0.0) +
+`reversion.test.ts` (12 tests).
+**Modified:** `registerAll.ts`.
+
+- **Inverse-hunk matching** over the Phase 1 per-file timelines: a later edit restores a
+  region when its normalized `newString` equals an earlier edit's `oldString` and it
+  removes what that edit introduced. Whitespace-normalized textual comparison; whole-file
+  `Write` restores are caught; nearest-earlier pairing yields one finding per reverting
+  edit; cross-file pairs never match.
+- **Acknowledgment downgrade:** configurable patterns (reverting, undoing, rolling back,
+  going back to, restore original) scanned in a configurable window (default 3 steps
+  before/after the reverting edit). Present → `info`; absent → `medium` silent reversion.
+  "Let me adjust the implementation" does not count.
+- **Loop cross-reference:** edit→revert→edit thrash records
+  `crossReference.cycleSteps` in evidence rather than a hard finding-to-finding link
+  (finding IDs don't exist at detector time, and inter-detector coupling would break the
+  registry invariant). The UI connects findings by overlapping step ranges. Unit-verified:
+  the same thrash session yields coexisting reversion findings and a loop
+  sequence-repeat finding.
+- Golden results: `reversion-silent` medium {1,6}; `reversion-acknowledged` info {1,6};
+  `mixed-session` fully green with all three detectors — loop {5,10} +
+  silent_reversion {3,14} + verification_absence high {20,22}.
+
+---
+
+## Invariants held throughout
+
+1. No plaintext leaves the client — findings and labels sync as AES-GCM ciphertext only.
+2. Detection is client-side, worker-ready; the worker never writes.
+3. Findings immutable per detector version — re-runs create new `DetectorRun`s + rows.
+4. Every finding self-explains from stored `evidence` (thresholds, spans, excerpts,
+   classifications included).
+5. Detectors are pluggable — phases 3–5 each changed only their own module plus one
+   registration line.
+6. All thresholds/patterns are `DetectorConfig` fields with documented defaults — no
+   inline magic numbers.
+7. Suppression rules carry equal test weight to detection rules; every surviving finding
+   records all evaluated suppressions, fired or not.
+
+## What remains (Phases 6–8b)
+
+- **Phase 6:** findings overlay in the session browser (`ConversationView` /
+  `MessageBubble`), evidence panel, confirm/false-positive labeling, auto-analyze on
+  ingest + manual re-analyze via `detectionWorkerClient`. Real-browser check of worker
+  non-blocking behavior (jsdom could not exercise it).
+- **Phase 7:** dashboard (findings over time, per-project, detector health), session
+  report block, "How detection works" page, Settings section for `DetectorConfig`.
+- **Phase 8/8b:** performance profiling, bulk re-analysis on version bumps, graceful
+  degradation, then the real-corpus dogfooding pass that turns false positives into new
+  must-NOT-fire fixtures.
