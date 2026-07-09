@@ -28,6 +28,8 @@ import {
   envelopeFolder,
   envelopeDailyStats,
   envelopeMetadata,
+  envelopeFinding,
+  envelopeDetectorRun,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -37,6 +39,8 @@ import {
   rehydrateFolder,
   rehydrateDailyStats,
   rehydrateMetadata,
+  rehydrateFinding,
+  rehydrateDetectorRun,
   type SyncEnvelope,
 } from './serializer';
 
@@ -57,6 +61,8 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         await db.conversations.delete(rec.id);
         await db.messages.where('conversationId').equals(rec.id).delete();
         await db.anchors.where('conversationId').equals(rec.id).delete();
+        await db.findings.where('conversationId').equals(rec.id).delete();
+        await db.detectorRuns.where('conversationId').equals(rec.id).delete();
         return;
       case 'message':
         await db.messages.delete(rec.id);
@@ -81,6 +87,12 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         return;
       case 'metadata':
         await db.metadata.delete(rec.id);
+        return;
+      case 'finding':
+        await db.findings.delete(rec.id);
+        return;
+      case 'detector_run':
+        await db.detectorRuns.delete(rec.id);
         return;
     }
   }
@@ -111,6 +123,12 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'metadata':
       await db.metadata.put(rehydrateMetadata(payload));
+      return;
+    case 'finding':
+      await db.findings.put(rehydrateFinding(payload));
+      return;
+    case 'detector_run':
+      await db.detectorRuns.put(rehydrateDetectorRun(payload));
       return;
   }
 }
@@ -162,6 +180,14 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'metadata': {
       const m = await db.metadata.get(entry.id);
       return m ? envelopeMetadata(m) : null;
+    }
+    case 'finding': {
+      const f = await db.findings.get(entry.id);
+      return f ? envelopeFinding(f) : null;
+    }
+    case 'detector_run': {
+      const r = await db.detectorRuns.get(entry.id);
+      return r ? envelopeDetectorRun(r) : null;
     }
   }
 }
@@ -258,6 +284,17 @@ class SyncEngine {
     db.metadata.hook('creating', upsert('metadata'));
     db.metadata.hook('updating', (_m, k) => upsert('metadata')(k as string));
     db.metadata.hook('deleting', remove('metadata'));
+
+    // Findings/runs are written in one batched transaction at DetectorRun
+    // completion (pipeline.persistDetectorRun), so these hooks fire as one
+    // burst per analysis — plus individual label updates from the UI.
+    db.findings.hook('creating', upsert('finding'));
+    db.findings.hook('updating', (_m, k) => upsert('finding')(k as string));
+    db.findings.hook('deleting', remove('finding'));
+
+    db.detectorRuns.hook('creating', upsert('detector_run'));
+    db.detectorRuns.hook('updating', (_m, k) => upsert('detector_run')(k as string));
+    db.detectorRuns.hook('deleting', remove('detector_run'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().

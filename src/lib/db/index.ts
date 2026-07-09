@@ -11,6 +11,8 @@ export * from './tags';
 export * from './folders';
 export * from './dailyStats';
 export * from './metadata';
+export * from './findings';
+export * from './detectorRuns';
 
 import { db } from './schema';
 
@@ -27,6 +29,8 @@ export async function clearAllData(): Promise<void> {
       db.knowledgeFolders,
       db.dailyStats,
       db.metadata,
+      db.findings,
+      db.detectorRuns,
     ],
     async () => {
       await db.conversations.clear();
@@ -38,6 +42,8 @@ export async function clearAllData(): Promise<void> {
       await db.knowledgeFolders.clear();
       await db.dailyStats.clear();
       await db.metadata.clear();
+      await db.findings.clear();
+      await db.detectorRuns.clear();
     }
   );
 }

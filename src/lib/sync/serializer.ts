@@ -7,6 +7,7 @@
 // ciphertext.
 
 import type { StoredConversation, StoredMessage, StoredActivity, Tag, EntityTag, DailyStats, AppMetadata } from '../../types';
+import type { StoredFinding, StoredDetectorRun } from '../../types/detection';
 import type { AnchoredItem } from '../aipkms/types';
 import type { KnowledgeFolderRow } from '../db/schema';
 import type { SyncKind } from './syncApi';
@@ -158,4 +159,34 @@ export function envelopeMetadata(m: AppMetadata): SyncEnvelope<'metadata'> {
 
 export function rehydrateMetadata(payload: unknown): AppMetadata {
   return payload as AppMetadata;
+}
+
+// --- findings / detector runs (agent observability) ---
+
+export function envelopeFinding(f: StoredFinding): SyncEnvelope<'finding'> {
+  return {
+    kind: 'finding',
+    parentId: f.conversationId,
+    updatedAt: f.updatedAt,
+    payload: { ...f, createdAt: dateToIso(f.createdAt), updatedAt: dateToIso(f.updatedAt) },
+  };
+}
+
+export function rehydrateFinding(payload: unknown): StoredFinding {
+  const p = payload as StoredFinding & { createdAt: string; updatedAt: string };
+  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+}
+
+export function envelopeDetectorRun(r: StoredDetectorRun): SyncEnvelope<'detector_run'> {
+  return {
+    kind: 'detector_run',
+    parentId: r.conversationId,
+    updatedAt: r.finishedAt,
+    payload: { ...r, startedAt: dateToIso(r.startedAt), finishedAt: dateToIso(r.finishedAt) },
+  };
+}
+
+export function rehydrateDetectorRun(payload: unknown): StoredDetectorRun {
+  const p = payload as StoredDetectorRun & { startedAt: string; finishedAt: string };
+  return { ...p, startedAt: isoToDate(p.startedAt), finishedAt: isoToDate(p.finishedAt) };
 }

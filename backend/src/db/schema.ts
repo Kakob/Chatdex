@@ -94,6 +94,8 @@ export const syncRecords = pgTable(
         | 'folder'
         | 'daily_stats'
         | 'metadata'
+        | 'finding'
+        | 'detector_run'
       >(),
     parentId: text('parent_id'),
     iv: bytea('iv').notNull(),

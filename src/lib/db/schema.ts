@@ -11,6 +11,7 @@ import type {
   AppMetadata,
   DailyStats,
 } from '../../types';
+import type { StoredFinding, StoredDetectorRun } from '../../types/detection';
 import type { AnchoredItem } from '../aipkms/types';
 
 export interface KnowledgeFolderRow {
@@ -29,6 +30,8 @@ export class ChatdexDB extends Dexie {
   knowledgeFolders!: Table<KnowledgeFolderRow, string>;
   dailyStats!: Table<DailyStats, string>;
   metadata!: Table<AppMetadata, string>;
+  findings!: Table<StoredFinding, string>;
+  detectorRuns!: Table<StoredDetectorRun, string>;
 
   constructor() {
     super('chatdex');
@@ -44,6 +47,12 @@ export class ChatdexDB extends Dexie {
       knowledgeFolders: '&id, &name',
       dailyStats: '&date',
       metadata: '&key',
+    });
+    // v2: agent-observability entities (SPEC-agent-observability.md §3).
+    this.version(2).stores({
+      findings:
+        '&id, conversationId, runId, detector, severity, userLabel, createdAt, [conversationId+createdAt]',
+      detectorRuns: '&id, &runKey, conversationId, finishedAt',
     });
   }
 }

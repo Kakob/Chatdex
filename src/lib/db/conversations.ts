@@ -38,11 +38,17 @@ export async function getConversationCount(source?: DataSource): Promise<number>
 }
 
 export async function deleteConversation(id: string): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.anchors, async () => {
-    await db.conversations.delete(id);
-    await db.messages.where('conversationId').equals(id).delete();
-    await db.anchors.where('conversationId').equals(id).delete();
-  });
+  await db.transaction(
+    'rw',
+    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    async () => {
+      await db.conversations.delete(id);
+      await db.messages.where('conversationId').equals(id).delete();
+      await db.anchors.where('conversationId').equals(id).delete();
+      await db.findings.where('conversationId').equals(id).delete();
+      await db.detectorRuns.where('conversationId').equals(id).delete();
+    }
+  );
 }
 
 export async function deleteConversationsBySource(source: DataSource): Promise<void> {
@@ -50,17 +56,29 @@ export async function deleteConversationsBySource(source: DataSource): Promise<v
     .where('source')
     .equals(source)
     .primaryKeys();
-  await db.transaction('rw', db.conversations, db.messages, db.anchors, async () => {
-    await db.conversations.bulkDelete(ids);
-    await db.messages.where('conversationId').anyOf(ids).delete();
-    await db.anchors.where('conversationId').anyOf(ids).delete();
-  });
+  await db.transaction(
+    'rw',
+    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    async () => {
+      await db.conversations.bulkDelete(ids);
+      await db.messages.where('conversationId').anyOf(ids).delete();
+      await db.anchors.where('conversationId').anyOf(ids).delete();
+      await db.findings.where('conversationId').anyOf(ids).delete();
+      await db.detectorRuns.where('conversationId').anyOf(ids).delete();
+    }
+  );
 }
 
 export async function clearConversations(): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.anchors, async () => {
-    await db.conversations.clear();
-    await db.messages.clear();
-    await db.anchors.clear();
-  });
+  await db.transaction(
+    'rw',
+    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    async () => {
+      await db.conversations.clear();
+      await db.messages.clear();
+      await db.anchors.clear();
+      await db.findings.clear();
+      await db.detectorRuns.clear();
+    }
+  );
 }

@@ -20,7 +20,9 @@ export type SyncKind =
   | 'entity_tag'
   | 'folder'
   | 'daily_stats'
-  | 'metadata';
+  | 'metadata'
+  | 'finding'
+  | 'detector_run';
 
 export interface PushRecord extends WireSealed {
   id: string;

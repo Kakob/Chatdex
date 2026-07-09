@@ -14,6 +14,8 @@ const KindSchema = z.enum([
   'folder',
   'daily_stats',
   'metadata',
+  'finding',
+  'detector_run',
 ]);
 
 const PushRecordSchema = z.object({
