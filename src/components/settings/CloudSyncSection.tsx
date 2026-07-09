@@ -7,6 +7,7 @@ import {
   AlertCircle,
   Copy,
   Fingerprint,
+  KeyRound,
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import {
@@ -155,44 +156,55 @@ export function CloudSyncSection() {
       )}
 
       {mode === 'recovery-shown' && recoveryCode && (
-        <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-medium">
-            <AlertCircle size={16} /> Save this recovery code now
-          </div>
-          <p className="text-xs text-amber-700 dark:text-amber-400">
-            Shown <strong>only once</strong>. If you lose this device, this code is the only way to recover access on a new one. Store it in a password manager.
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded font-mono text-sm break-all">
-              {recoveryCode}
-            </code>
+        <>
+          <div className="space-y-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-medium">
+              <AlertCircle size={16} /> Save this recovery code now
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              Shown <strong>only once</strong>. If you lose this device, this code is the only way to recover access on a new one. Store it in a password manager.
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded font-mono text-sm break-all">
+                {recoveryCode}
+              </code>
+              <button
+                onClick={copyCode}
+                className="p-2 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded"
+                title="Copy"
+              >
+                <Copy size={16} />
+              </button>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+              <input
+                type="checkbox"
+                checked={savedRecovery}
+                onChange={(e) => setSavedRecovery(e.target.checked)}
+              />
+              I've saved my recovery code somewhere safe
+            </label>
             <button
-              onClick={copyCode}
-              className="p-2 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded"
-              title="Copy"
+              disabled={!savedRecovery}
+              onClick={() => {
+                setMode('idle');
+                reset();
+              }}
+              className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg text-sm"
             >
-              <Copy size={16} />
+              Continue
             </button>
           </div>
-          <label className="flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
-            <input
-              type="checkbox"
-              checked={savedRecovery}
-              onChange={(e) => setSavedRecovery(e.target.checked)}
-            />
-            I've saved my recovery code somewhere safe
-          </label>
-          <button
-            disabled={!savedRecovery}
-            onClick={() => {
-              setMode('idle');
-              reset();
-            }}
-            className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg text-sm"
-          >
-            Continue
-          </button>
-        </div>
+
+          <div className="mt-3 space-y-2 p-4 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg">
+            <div className="flex items-center gap-2 text-violet-700 dark:text-violet-300 font-medium">
+              <KeyRound size={16} /> Back up your passkey
+            </div>
+            <p className="text-xs text-violet-700 dark:text-violet-400">
+              The easiest way to keep access if you lose this device is to save the passkey to a password manager that syncs across devices — <strong>1Password</strong>, <strong>iCloud Keychain</strong>, <strong>Bitwarden</strong>, or <strong>Google Password Manager</strong>. If your browser saved it to one of those when you enrolled, you're set. Otherwise the recovery code above is your only fallback.
+            </p>
+          </div>
+        </>
       )}
 
       {mode === 'idle' && status === 'logged-out' && passkeysOk && (
