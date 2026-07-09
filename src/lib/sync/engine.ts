@@ -8,12 +8,13 @@
 // conversations is good enough at v1 (messages are append-only, anchors are
 // rarely edited concurrently).
 
-import { db } from '../db';
+import { db, clearAllData } from '../db';
 import { encryptJSON, decryptJSON, getMasterKey, isUnlocked } from '../crypto';
 import { getMetadata, setMetadata } from '../db/metadata';
 import {
   pushRecords,
   pullRecords,
+  wipeServerData,
   type PushRecord,
   type PullRecord,
   type SyncKind,
@@ -47,6 +48,19 @@ import {
 const PULL_CURSOR_KEY = 'sync.pullCursor';
 const DIRTY_KEY = 'sync.dirty'; // queue of { id, kind, deleted? } pending push
 
+// Metadata under the `sync.` prefix is per-device engine state (dirty queue,
+// pull cursor). It must never enter the sync stream: pushing it leaks local
+// state to the server, and because persisting the dirty queue is itself a
+// metadata write, syncing it makes every markDirty re-dirty the queue — an
+// infinite push loop.
+function isDeviceLocalMetadata(key: string): boolean {
+  return key.startsWith('sync.');
+}
+
+function isSyncableEntry(entry: DirtyEntry): boolean {
+  return !(entry.kind === 'metadata' && isDeviceLocalMetadata(entry.id));
+}
+
 interface DirtyEntry {
   id: string;
   kind: SyncKind;
@@ -55,6 +69,9 @@ interface DirtyEntry {
 
 // Apply an incoming record's payload to the right Dexie table.
 async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<void> {
+  // Device-local sync state that older engine versions pushed to the server:
+  // never apply it, or one device's queue/cursor clobbers another's.
+  if (rec.kind === 'metadata' && isDeviceLocalMetadata(rec.id)) return;
   if (rec.deleted) {
     switch (rec.kind) {
       case 'conversation':
@@ -196,6 +213,7 @@ class SyncEngine {
   private timer: ReturnType<typeof setInterval> | null = null;
   private hookHandles: Array<() => void> = [];
   private inflight = false;
+  private suspended = false;
   private dirty: DirtyEntry[] = [];
 
   async start(intervalMs = 10_000): Promise<void> {
@@ -204,9 +222,10 @@ class SyncEngine {
       throw new Error('Cannot start sync engine while vault is locked');
     }
 
-    // Restore dirty queue from a previous session.
+    // Restore dirty queue from a previous session. Filter out device-local
+    // metadata entries that older engine versions enqueued.
     const saved = (await getMetadata<DirtyEntry[]>(DIRTY_KEY)) ?? [];
-    this.dirty = [...saved];
+    this.dirty = saved.filter(isSyncableEntry);
 
     this.installHooks();
     this.timer = setInterval(() => {
@@ -225,7 +244,7 @@ class SyncEngine {
 
   /** Force a flush + pull. Useful for tests and a manual "Sync now" button. */
   async tick(): Promise<void> {
-    if (this.inflight || !isUnlocked()) return;
+    if (this.inflight || this.suspended || !isUnlocked()) return;
     this.inflight = true;
     try {
       await this.flushDirty();
@@ -241,6 +260,88 @@ class SyncEngine {
     await setMetadata(PULL_CURSOR_KEY, null);
     this.dirty = [];
     await setMetadata(DIRTY_KEY, []);
+  }
+
+  /**
+   * Suspend hooks/ticks, wait out any in-flight tick, run fn, resume.
+   * Suspending BEFORE draining matters: doing it the other way around leaves
+   * a window where the interval starts a new tick between the drain and the
+   * suspend.
+   */
+  private async whilePaused<T>(fn: () => Promise<T>): Promise<T> {
+    this.suspended = true;
+    try {
+      while (this.inflight) await new Promise((r) => setTimeout(r, 50));
+      return await fn();
+    } finally {
+      this.suspended = false;
+    }
+  }
+
+  /**
+   * Clear all local data WITHOUT emitting sync tombstones — the server copy
+   * is untouched (use wipeServer for that). Suspends hooks and ticks for the
+   * duration: running Dexie's per-row deleting hooks inside clearAllData's
+   * transaction would both spam tombstones and write to the metadata table
+   * mid-clear, which is what used to hang the transaction. Resets
+   * device-local sync state so a later pull starts from scratch.
+   */
+  async clearLocalData(): Promise<void> {
+    await this.whilePaused(async () => {
+      await clearAllData();
+      this.dirty = [];
+      await setMetadata(DIRTY_KEY, []);
+      await setMetadata(PULL_CURSOR_KEY, null);
+    });
+  }
+
+  /**
+   * Delete every record on the server and reset local sync state, leaving
+   * local data untouched. Pauses the engine first: without that, a push
+   * batch already in flight lands after the wipe, and a failed push re-queues
+   * its batch even though the queue was just cleared — both resurrect
+   * records (typically tombstones) on a freshly wiped server.
+   */
+  async wipeServer(): Promise<void> {
+    await this.whilePaused(async () => {
+      this.dirty = [];
+      await setMetadata(DIRTY_KEY, []);
+      await wipeServerData();
+      await setMetadata(PULL_CURSOR_KEY, null);
+    });
+  }
+
+  /**
+   * Mark every local row dirty and flush, re-pushing the full dataset.
+   * Recovery path after a server wipe, and for rows created while the engine
+   * was stopped (hooks never saw them, so they otherwise never upload).
+   */
+  async resyncAll(): Promise<void> {
+    if (!isUnlocked()) throw new Error('Cannot re-upload while vault is locked');
+    const tables: Array<[SyncKind, { toCollection(): { primaryKeys(): Promise<unknown[]> } }]> = [
+      ['conversation', db.conversations],
+      ['message', db.messages],
+      ['activity', db.activities],
+      ['anchor', db.anchors],
+      ['tag', db.tags],
+      ['entity_tag', db.entityTags],
+      ['folder', db.knowledgeFolders],
+      ['daily_stats', db.dailyStats],
+      ['metadata', db.metadata],
+      ['finding', db.findings],
+      ['detector_run', db.detectorRuns],
+    ];
+    for (const [kind, table] of tables) {
+      for (const key of await table.toCollection().primaryKeys()) {
+        this.markDirty({ id: String(key), kind });
+      }
+    }
+    // Flush everything now rather than waiting for interval ticks.
+    while (this.dirty.length > 0) {
+      const before = this.dirty.length;
+      await this.tick();
+      if (this.dirty.length >= before) break; // push failing; stop, interval will retry
+    }
   }
 
   private installHooks(): void {
@@ -301,12 +402,18 @@ class SyncEngine {
   }
 
   private markDirty(entry: DirtyEntry): void {
+    if (this.suspended || !isSyncableEntry(entry)) return;
     // Coalesce: keep latest state per (kind, id). If a delete arrives after an
     // upsert (or vice versa), the latter wins.
     this.dirty = this.dirty.filter((d) => !(d.id === entry.id && d.kind === entry.kind));
     this.dirty.push(entry);
-    // Persist asynchronously; ignore failures (best-effort).
-    void setMetadata(DIRTY_KEY, this.dirty);
+    // Persist asynchronously; best-effort (flushDirty re-persists after every
+    // push). setTimeout escapes the caller's Dexie transaction zone: hooks
+    // fire inside transactions that usually don't include the metadata store,
+    // and a put issued in-zone there throws NotFoundError.
+    setTimeout(() => {
+      setMetadata(DIRTY_KEY, this.dirty).catch(() => {});
+    }, 0);
   }
 
   private async flushDirty(): Promise<void> {

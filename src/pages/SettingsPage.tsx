@@ -1,7 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Key, Trash2, HardDrive, Moon, Sun, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
-import { clearAllData, getMetadata, setMetadata } from '../lib/db';
+import {
+  db,
+  getMetadata,
+  setMetadata,
+  findLegacyClaudeCodeImports,
+  deleteLegacyClaudeCodeImports,
+  getConversationCount,
+} from '../lib/db';
+import { syncEngine } from '../lib/sync/engine';
 import { invalidateIndex } from '../lib/search';
 import { validateLicense } from '../lib/license';
 import { CloudSyncSection } from '../components/settings/CloudSyncSection';
@@ -10,6 +18,8 @@ import { DetectionSettingsSection } from '../components/settings/DetectionSettin
 export function SettingsPage() {
   const { theme, setTheme, conversationCount, messageCount, setStats, isPro, setLicense } = useAppStore();
   const [isClearing, setIsClearing] = useState(false);
+  const [legacyCount, setLegacyCount] = useState<number | null>(null);
+  const [isCleaningLegacy, setIsCleaningLegacy] = useState(false);
   const [licenseInput, setLicenseInput] = useState('');
   const [isActivating, setIsActivating] = useState(false);
   const [licenseError, setLicenseError] = useState<string | null>(null);
@@ -57,14 +67,47 @@ export function SettingsPage() {
     }
   };
 
+  // Count broken pre-2026-05-14 imports so the cleanup button can show scope.
+  useEffect(() => {
+    findLegacyClaudeCodeImports()
+      .then((rows) => setLegacyCount(rows.length))
+      .catch(() => setLegacyCount(null));
+  }, []);
+
+  const handleCleanupLegacy = async () => {
+    if (
+      !confirm(
+        `Delete ${legacyCount} legacy Claude Code import(s)? These were imported by an old parser ("agent xxx" names, blank tool calls) and cannot be repaired. If cloud sync is unlocked, they are deleted from the server too.`
+      )
+    ) {
+      return;
+    }
+    setIsCleaningLegacy(true);
+    try {
+      await deleteLegacyClaudeCodeImports();
+      setLegacyCount(0);
+      const [conversationCount, messageCount] = await Promise.all([
+        getConversationCount(),
+        db.messages.count(),
+      ]);
+      setStats({ conversationCount, messageCount });
+      await invalidateIndex();
+    } catch (err) {
+      console.error('Failed to clean up legacy imports:', err);
+      alert('Failed to clean up legacy imports. Please try again.');
+    } finally {
+      setIsCleaningLegacy(false);
+    }
+  };
+
   const handleClearData = async () => {
-    if (!confirm('Are you sure? This will delete all imported conversations and cannot be undone.')) {
+    if (!confirm('Delete all local data on this device? Synced data on the server is NOT affected (use "Wipe server data" in Cloud Sync for that). This cannot be undone.')) {
       return;
     }
 
     setIsClearing(true);
     try {
-      await clearAllData();
+      await syncEngine.clearLocalData();
       setStats({ conversationCount: 0, messageCount: 0 });
       // Invalidate search index so cleared data is no longer searchable
       await invalidateIndex();
@@ -206,8 +249,25 @@ export function SettingsPage() {
             <Trash2 size={20} />
             Danger Zone
           </h2>
+          {legacyCount !== null && legacyCount > 0 && (
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {legacyCount} conversation(s) were imported by an old parser and are
+                missing tool calls and project names. They cannot be repaired.
+              </p>
+              <button
+                onClick={handleCleanupLegacy}
+                disabled={isCleaningLegacy}
+                className="px-4 py-2 border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-2"
+              >
+                {isCleaningLegacy && <Loader2 size={16} className="animate-spin" />}
+                {isCleaningLegacy ? 'Removing...' : `Remove ${legacyCount} legacy import(s)`}
+              </button>
+            </div>
+          )}
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            This action cannot be undone. All imported data will be permanently deleted.
+            Deletes all local data on this device. Synced data on the server is not
+            affected. This cannot be undone.
           </p>
           <button
             onClick={handleClearData}
@@ -215,7 +275,7 @@ export function SettingsPage() {
             className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg transition-colors flex items-center gap-2"
           >
             {isClearing && <Loader2 size={16} className="animate-spin" />}
-            {isClearing ? 'Clearing...' : 'Clear All Data'}
+            {isClearing ? 'Clearing...' : 'Clear Local Data'}
           </button>
         </section>
       </div>

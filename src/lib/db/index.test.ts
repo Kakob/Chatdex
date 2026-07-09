@@ -28,6 +28,8 @@ import {
   getMetadata,
   setMetadata,
   clearAllData,
+  findLegacyClaudeCodeImports,
+  deleteLegacyClaudeCodeImports,
 } from './index';
 import type { StoredConversation, StoredMessage, StoredActivity, Tag } from '../../types';
 import type { AnchoredItem } from '../aipkms/types';
@@ -373,5 +375,35 @@ describe('clearAllData', () => {
     expect(await db.conversations.count()).toBe(0);
     expect(await db.activities.count()).toBe(0);
     expect(await getMetadata('k')).toBeUndefined();
+  });
+});
+
+describe('legacy claude-code import cleanup', () => {
+  it('finds only claude-code conversations without a projectPath', async () => {
+    const fossil = makeConv({ source: 'claude-code', name: 'agent a0c09c84', projectPath: undefined });
+    const good = makeConv({ source: 'claude-code', projectPath: '/Users/x/dev/proj' });
+    const webChat = makeConv({ source: 'claude.ai' }); // no projectPath, but not claude-code
+    await putConversation(fossil);
+    await putConversation(good);
+    await putConversation(webChat);
+
+    const legacy = await findLegacyClaudeCodeImports();
+    expect(legacy.map((c) => c.id)).toEqual([fossil.id]);
+  });
+
+  it('deletes fossils with full cascade and leaves everything else', async () => {
+    const fossil = makeConv({ source: 'claude-code', projectPath: undefined });
+    const good = makeConv({ source: 'claude-code', projectPath: '/Users/x/dev/proj' });
+    await putConversation(fossil);
+    await putConversation(good);
+    await bulkPutMessages([makeMsg(fossil.id), makeMsg(good.id)]);
+
+    const deleted = await deleteLegacyClaudeCodeImports();
+
+    expect(deleted).toBe(1);
+    expect(await getConversation(fossil.id)).toBeUndefined();
+    expect(await getMessagesForConversation(fossil.id)).toEqual([]);
+    expect(await getConversation(good.id)).toBeDefined();
+    expect((await getMessagesForConversation(good.id)).length).toBe(1);
   });
 });

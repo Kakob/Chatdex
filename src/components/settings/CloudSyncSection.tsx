@@ -19,7 +19,6 @@ import {
 } from '../../lib/auth/session';
 import { isPasskeySupported } from '../../lib/auth/webauthn';
 import { syncEngine } from '../../lib/sync/engine';
-import { wipeServerData } from '../../lib/sync/syncApi';
 import { lock as lockVault } from '../../lib/crypto';
 
 type Mode = 'idle' | 'signup' | 'login' | 'recover' | 'recovery-shown';
@@ -118,6 +117,17 @@ export function CloudSyncSection() {
     setStatus('logged-out');
   };
 
+  const handleResyncAll = () =>
+    wrap(async () => {
+      if (
+        !confirm(
+          'Re-upload every local record to the server? Use this after a server wipe, or if data was imported while the vault was locked.'
+        )
+      )
+        return;
+      await syncEngine.resyncAll();
+    });
+
   const handleWipeServer = () =>
     wrap(async () => {
       if (
@@ -126,8 +136,7 @@ export function CloudSyncSection() {
         )
       )
         return;
-      await wipeServerData();
-      await syncEngine.wipeLocalCursor();
+      await syncEngine.wipeServer();
     });
 
   const copyCode = () => {
@@ -280,6 +289,13 @@ export function CloudSyncSection() {
               className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
             >
               Sync now
+            </button>
+            <button
+              onClick={() => void handleResyncAll()}
+              disabled={busy}
+              className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg disabled:opacity-50"
+            >
+              Re-upload local data
             </button>
             <button
               onClick={handleLock}

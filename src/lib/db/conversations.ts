@@ -51,6 +51,29 @@ export async function deleteConversation(id: string): Promise<void> {
   );
 }
 
+/**
+ * Conversations imported by the pre-2026-05-14 Claude Code parser (fixed in
+ * 101e063): it never found cwd in real session files, so projectPath is
+ * unset, names fell back to filenames ("agent <hash>"), and tool-only turns
+ * are blank. Unrepairable — the tool content was dropped at parse time.
+ */
+export async function findLegacyClaudeCodeImports(): Promise<StoredConversation[]> {
+  const rows = await db.conversations.where('source').equals('claude-code').toArray();
+  return rows.filter((c) => !c.projectPath);
+}
+
+/**
+ * Delete legacy imports one conversation at a time (not bulk) so per-row
+ * Dexie hooks fire and the sync engine tombstones each record on the server.
+ */
+export async function deleteLegacyClaudeCodeImports(): Promise<number> {
+  const legacy = await findLegacyClaudeCodeImports();
+  for (const conv of legacy) {
+    await deleteConversation(conv.id);
+  }
+  return legacy.length;
+}
+
 export async function deleteConversationsBySource(source: DataSource): Promise<void> {
   const ids = await db.conversations
     .where('source')
