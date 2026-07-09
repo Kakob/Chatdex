@@ -1,0 +1,11 @@
+{
+  "description": "Edit at step 1, then the user changes topic at step 4 with no verification-shaped action in between.",
+  "findings": [
+    {
+      "detector": "verification_absence",
+      "severity": "medium",
+      "stepRange": { "start": 1, "end": 3 },
+      "note": "Span scanned from the state-changing edit to the topic shift (new user message at step 4); no verification-shaped call and no success assertion."
+    }
+  ]
+}

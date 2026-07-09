@@ -1,0 +1,4 @@
+{
+  "description": "npm test runs 3x, but a file edit intervenes between every pair of repeats. The state-change suppression must prevent a finding.",
+  "findings": []
+}

@@ -1,0 +1,11 @@
+{
+  "description": "Edit at step 1 sets limit 100->500; edit at step 6 restores 500->100. No acknowledgment language around the reverting edit.",
+  "findings": [
+    {
+      "detector": "silent_reversion",
+      "severity": "medium",
+      "stepRange": { "start": 1, "end": 6 },
+      "note": "Later edit restores the file region to its pre-step-1 state; surrounding agent text ('Let me adjust the implementation.') contains no revert acknowledgment."
+    }
+  ]
+}

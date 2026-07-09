@@ -1,0 +1,10 @@
+{"type":"user","message":{"content":"Kick off the CI run and wait for it to finish"},"timestamp":"2026-07-01T10:00:00.000Z","sessionId":"golden-loop-legit-polling","cwd":"/home/user/project","gitBranch":"main"}
+{"type":"tool_use","tool_name":"Bash","tool_input":{"command":"gh run view 12345 --json status"},"timestamp":"2026-07-01T10:00:15.000Z"}
+{"type":"tool_result","tool_name":"Bash","result":"{\"status\":\"in_progress\"}","timestamp":"2026-07-01T10:00:30.000Z"}
+{"type":"assistant","message":{"content":"Still running, checking again shortly."},"timestamp":"2026-07-01T10:00:45.000Z"}
+{"type":"tool_use","tool_name":"Bash","tool_input":{"command":"gh run view 12345 --json status"},"timestamp":"2026-07-01T10:01:00.000Z"}
+{"type":"tool_result","tool_name":"Bash","result":"{\"status\":\"in_progress\"}","timestamp":"2026-07-01T10:01:15.000Z"}
+{"type":"assistant","message":{"content":"Not done yet."},"timestamp":"2026-07-01T10:01:30.000Z"}
+{"type":"tool_use","tool_name":"Bash","tool_input":{"command":"gh run view 12345 --json status"},"timestamp":"2026-07-01T10:01:45.000Z"}
+{"type":"tool_result","tool_name":"Bash","result":"{\"status\":\"completed\",\"conclusion\":\"success\"}","timestamp":"2026-07-01T10:02:00.000Z"}
+{"type":"assistant","message":{"content":"CI run completed successfully."},"timestamp":"2026-07-01T10:02:15.000Z"}

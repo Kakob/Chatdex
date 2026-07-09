@@ -4,6 +4,16 @@ Companion to `SPEC-agent-observability.md`. Phases are ordered so that every pha
 
 ---
 
+## Decisions log
+
+**2026-07-08:**
+1. **Cadence:** one phase per working session, strictly sequential. A phase is done only when its acceptance criteria pass (`npm run typecheck` + golden-trace suite).
+2. **DetectorConfig is user-editable** via a section on the existing Settings page (thresholds N/M, retry whitelist), with documented defaults. Changing config prompts a re-analysis (new `DetectorRun`s — findings from prior configs remain immutable). Built in Phase 7.
+3. **Findings sync is batched:** `Finding` and `DetectorRun` records are written in one Dexie transaction when a `DetectorRun` completes (`persistDetectorRun`), so the sync engine's hooks see one burst per analysis rather than a mid-run trickle. Corollary (built in Phase 2): the Web Worker only *computes* — it never writes, because Dexie hooks are per-instance and worker-side writes would be invisible to the main thread's sync engine. The worker posts results back and the main thread persists.
+4. **Golden-trace step indexing convention:** `stepRange` indices in `*.expected.json` are 0-based positions in the fixture's entry stream, counting every non-`system` JSONL entry (user, assistant, tool_use, tool_result). Phase 1 normalization must preserve this 1:1 mapping for flat-entry traces.
+
+---
+
 ## Phase 0 — Golden traces & test harness (do this FIRST)
 
 Detection code without labeled fixtures is unfalsifiable. Build the test bed before any detector.
@@ -45,7 +55,7 @@ Detection code without labeled fixtures is unfalsifiable. Build the test bed bef
 **Tasks:**
 1. `Detector` interface, `DetectorConfig`, registry.
 2. Pipeline orchestration: run all registered detectors over a `NormalizedSession`, produce `Finding[]` + `DetectorRun`.
-3. Storage: IndexedDB stores for `Finding` and `DetectorRun`; extend the encrypted sync layer to cover both.
+3. Storage: IndexedDB stores for `Finding` and `DetectorRun`; extend the encrypted sync layer to cover both. Sync is **batched at DetectorRun completion** (decisions log #3), not per-record hooks.
 4. Web Worker wrapper; message protocol (analyze session id → progress → results).
 5. Idempotency: re-running with same (session, versions, config) is a no-op.
 
@@ -87,6 +97,7 @@ Implement per SPEC §2.3: hunk diffing against the per-file timeline, acknowledg
 3. Detector health view (false-positive rate from labels).
 4. Per-session report block.
 5. "How detection works" page including the known-limits table from SPEC §6.
+6. Settings-page section for `DetectorConfig` (decisions log #2): editable thresholds and retry whitelist, documented defaults, "re-analyze with new config" action.
 
 **Acceptance:** dashboard renders correctly against a corpus of 20+ analyzed sessions (use your real corpus); numbers reconcile with raw finding counts.
 

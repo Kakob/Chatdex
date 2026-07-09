@@ -1,0 +1,11 @@
+{
+  "description": "Identical reversion shape, but the agent says 'reverting to the original limit' — acknowledged, downgraded to informational.",
+  "findings": [
+    {
+      "detector": "silent_reversion",
+      "severity": "info",
+      "stepRange": { "start": 1, "end": 6 },
+      "note": "Reversion detected but acknowledgment language ('reverting') present at step 5 — informational only."
+    }
+  ]
+}

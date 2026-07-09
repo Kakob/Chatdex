@@ -1,0 +1,11 @@
+{
+  "description": "Same npm test command fails 4x identically with no intervening state change.",
+  "findings": [
+    {
+      "detector": "loop",
+      "severity": "medium",
+      "stepRange": { "start": 1, "end": 11 },
+      "note": "Signature Bash{npm test} repeats 4x within 10 steps; no state-changing action between repeats."
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{"type":"user","message":{"content":"Update the API timeout to 30 seconds"},"timestamp":"2026-07-01T10:00:00.000Z","sessionId":"golden-verify-absent","cwd":"/home/user/project","gitBranch":"main"}
+{"type":"tool_use","tool_name":"Edit","tool_input":{"file_path":"/home/user/project/src/api.ts","old_string":"timeout: 10_000","new_string":"timeout: 30_000"},"timestamp":"2026-07-01T10:00:15.000Z"}
+{"type":"tool_result","tool_name":"Edit","result":"Edit applied","timestamp":"2026-07-01T10:00:30.000Z"}
+{"type":"assistant","message":{"content":"Done, I have updated the timeout."},"timestamp":"2026-07-01T10:00:45.000Z"}
+{"type":"user","message":{"content":"Great, now can you list the routes in the backend?"},"timestamp":"2026-07-01T10:01:00.000Z"}
+{"type":"tool_use","tool_name":"Grep","tool_input":{"pattern":"router\\.","path":"/home/user/project/backend"},"timestamp":"2026-07-01T10:01:15.000Z"}
+{"type":"tool_result","tool_name":"Grep","result":"12 matches in 4 files","timestamp":"2026-07-01T10:01:30.000Z"}
+{"type":"assistant","message":{"content":"Here are the backend routes: ..."},"timestamp":"2026-07-01T10:01:45.000Z"}

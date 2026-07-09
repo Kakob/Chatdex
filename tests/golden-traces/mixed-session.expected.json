@@ -1,0 +1,23 @@
+{
+  "description": "Realistic session with three findings: an exact-repeat loop, a silent reversion of the async migration, and an asserted-unverified cache edit. The npm test at step 16 shares the loop signature but is excluded by the state-change suppression (edit at step 14).",
+  "findings": [
+    {
+      "detector": "loop",
+      "severity": "medium",
+      "stepRange": { "start": 5, "end": 10 },
+      "note": "Bash{npm test} repeats 3x (steps 5, 7, 9) with identical failures and no intervening state change. Step 16 must NOT extend this finding."
+    },
+    {
+      "detector": "silent_reversion",
+      "severity": "medium",
+      "stepRange": { "start": 3, "end": 14 },
+      "note": "Edit at step 14 restores config.ts to its pre-step-3 state; agent text at step 18 ('cleaned up') does not acknowledge a revert."
+    },
+    {
+      "detector": "verification_absence",
+      "severity": "high",
+      "stepRange": { "start": 20, "end": 22 },
+      "note": "Cache TTL edit followed by a success assertion ('should work correctly now') and session end, with no verification-shaped action."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "A 3-step signature sequence (Read config -> npm run build -> Grep config) repeats twice consecutively.",
+  "findings": [
+    {
+      "detector": "loop",
+      "severity": "medium",
+      "stepRange": { "start": 1, "end": 12 },
+      "note": "Sequence of length 3 repeats 2x consecutively with identical signatures and no intervening state change."
+    }
+  ]
+}

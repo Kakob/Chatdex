@@ -1,0 +1,11 @@
+{
+  "description": "Edit, then the agent asserts success ('the tests should pass now') and the session ends with no verification.",
+  "findings": [
+    {
+      "detector": "verification_absence",
+      "severity": "high",
+      "stepRange": { "start": 1, "end": 3 },
+      "note": "Asserted-but-unverified: success assertion detected in agent text at step 3 with no verification-shaped action following."
+    }
+  ]
+}

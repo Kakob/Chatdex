@@ -1,0 +1,4 @@
+{
+  "description": "CI status polling to completion. Same signature 3x, but retry/polling-shaped: the suppression whitelist must prevent a finding.",
+  "findings": []
+}
