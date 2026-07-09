@@ -1,6 +1,6 @@
 # Chatdex — Agent Observability Layer: Specification
 
-**Status:** Draft v1 · **Owner:** Jacob · **Last updated:** 2026-07-08
+**Status:** Draft v1 + intervention amendment (§10) · **Owner:** Jacob · **Last updated:** 2026-07-09
 
 ---
 
@@ -8,7 +8,7 @@
 
 ### What Chatdex is today
 
-Chatdex ingests Claude Code session traces (JSONL), lets the user browse and search their conversations, and provides analytics over their corpus. All session data is local-first: stored in IndexedDB, optionally synced to Postgres as ciphertext encrypted client-side with AES-GCM (keys derived via Argon2id from the user's passphrase). The server never sees plaintext.
+Chatdex ingests Claude Code session traces (JSONL), lets the user browse and search their conversations, and provides analytics over their corpus. All session data is local-first: stored in IndexedDB, optionally synced to Postgres as ciphertext encrypted client-side with AES-GCM (the master key is unlocked via WebAuthn+PRF, with a recovery-code fallback — this spec does not name or constrain the key-wrapping mechanism beyond "client-side only"). The server never sees plaintext.
 
 ### What this spec adds
 
@@ -203,3 +203,91 @@ The through-line: rules first to establish explainable ground truth; ML only whe
 - User labeling works end-to-end and labels persist under encryption.
 - Dashboard shows findings-over-time for the user's real corpus.
 - Zero plaintext session or finding data reaches the server.
+
+---
+
+## 10. Amendment (2026-07-09): Intervention detection & attention-routing
+
+Source: `chatdex-intervention-update-v2.md` (Parts 2–3 merged here; Part 1 positioning stays in that doc until the copy phase ships). Implementation phases: `AGENT-OBSERVABILITY-IMPLEMENTATION_PLAN.md` phases I0–I6.
+
+**Framing:** Findings describe agent behavior; **interventions** describe user behavior. The product insight is their relationship — each Finding is *missed* or *responded*, each intervention *responsive* or *proactive*, and the gap between Finding and intervention is measurable cost. Interventions are never a "fourth failure mode"; they are a second event stream.
+
+### 10.1 Data model: `InterventionEvent`
+
+```
+InterventionEvent {
+  id: string                    // deterministic content hash of
+                                //   (session_id, message_index, type, detector_version, config_hash)
+                                //   for source=auto; random for source=user.
+                                //   Required for idempotent re-ingestion. config_hash is included
+                                //   so two runs at the same version with different DetectorConfig
+                                //   produce distinct events rather than silently overwriting.
+                                //   Caveat: message_index participates in the hash, so a parser
+                                //   change that shifts indices churns auto-event ids (accepted;
+                                //   see invariant I-3).
+  session_id: fk -> Session
+  message_index: int            // position in the transcript
+  timestamp: datetime           // from trace
+  type: enum {
+    hard_interrupt,             // user hit escape mid-generation
+    tool_rejection,             // user denied a tool permission request
+    corrective_reprompt,        // user message redirects/contradicts agent's prior action
+    manual_takeover,            // user edited files outside the agent
+    abandonment                 // session ends unresolved shortly after a Finding
+  }
+  source: enum { auto, user }
+  status: enum { active, confirmed, dismissed }   // user's disposition of auto events;
+                                                  //   user-created events start confirmed
+  confidence: float | null      // detector confidence; null for source=user
+  evidence: json                // detector-specific payload sufficient to re-render
+                                //   the event without re-parsing the trace (same rule as Findings)
+  detector_run_id: fk | null    // pins auto events to the DetectorRun that produced them;
+                                //   null for source=user
+  notes: text | null            // user-supplied context
+}
+```
+
+No stored relationships between the streams (no `linked_failure_id`). The Finding↔intervention join is computed at query time by session + message position + timestamp, against Findings from a specified DetectorRun (default: latest). This keeps interventions valid across detector re-runs, since Findings are immutable per detector version.
+
+### 10.2 Derived metrics (computed at query time, never stored)
+
+- **Intervention rate**: interventions per session / per N agent messages
+- **Response latency**: time and message count from Finding → first subsequent intervention
+- **Miss rate**: Findings with no intervention within window W
+- **Blind-spot rate**: interventions with no Finding within window W
+- **Takeover ratio**: manual_takeover count / total interventions
+
+**Window W** is a `DetectorConfig` value (default: 10 messages or 15 minutes, whichever first), so it is pinned in DetectorRun provenance and tunable without code changes.
+
+### 10.3 Invariants (load-bearing — tests land in phase I0 and run in every subsequent phase)
+
+- **I-1.** Intervention detection and analysis run entirely client-side. No code path sends decrypted session content to any third-party API. (Restates §4/§7; listed here because this amendment is where the temptation to violate them lives.)
+- **I-2.** An InterventionEvent never mutates the Findings stream. Read-only, query-time joins only.
+- **I-3.** Re-running detection never modifies `source=user` events, and never modifies `status`/`notes` on `source=auto` events. A detector version or config bump produces new auto events with new ids, which start `active`; prior dispositions remain stored on superseded rows (labeled data, never deleted) but do **not** carry forward — matching Findings behavior (`userLabel` resets on new DetectorRuns). Carry-forward by `(session_id, message_index, type)` is roadmap, not v1.
+- **I-4.** Intervention events derived from trace content are encrypted client-side with the existing AES-GCM pipeline. No plaintext trace content in Postgres.
+- **I-5.** Deterministic re-runs: identical trace + detector version + config → identical `source=auto` event set, ids included.
+- **I-6.** Every `source=auto` event has non-null `evidence` and `detector_run_id`, and is re-renderable in the UI from `evidence` alone.
+
+### 10.4 Intervention detectors (by phase; details and acceptance criteria in the implementation plan)
+
+- **I1 — Hard interrupts + tool rejections** (deterministic, fixture-driven marker matching, confidence 1.0, runs in the existing Web Worker).
+- **I2 — Finding↔intervention timing + abandonment** (pure query-time computation; classifies Findings missed/responded and interventions responsive/proactive; session summary card). Abandonment is the one intervention type derived from the join itself: valid only relative to the Findings DetectorRun it was computed against, regenerated when Findings re-run.
+- **I3 — Manual tagging UI + review disposition** (confirm/retype/dismiss lifecycle; ships before the classifier so the review-queue UI exists and real tagging builds the labeled corpus).
+- **I4 — Corrective re-prompts** (client-side lexical + structural heuristic classifier; weights/thresholds in DetectorConfig; precision ≥ 0.8 gate on a hand-labeled set of ≥ 50 real messages; recall reported, not gated). An opt-in LLM classification mode is explicitly out of scope and requires its own amendment (see §7).
+- **I5 — Manual takeover detection** (per-session `file_path → hash(last agent write)` map; mismatch on later reads → candidate; glob-excluded artifacts, low confidence for formatter-scale diffs, concurrent sessions documented as a v1 limitation).
+- **I6 — Positioning/copy updates** (last, so the product matches the claims when the words change).
+
+### 10.5 User-facing surface additions
+
+- One timeline, two visually distinct event streams: interventions render alongside Finding markers in the session browser; same tagging interaction pattern as Finding labeling.
+- Review queue for mid-confidence I4/I5 candidates ("Chatdex thinks you intervened here — did you?"). Dismissals are stored, never deleted — they are the labeled-data flywheel.
+- Session summary card ("3 findings, 2 caught, avg response 6 messages") — the first surface that speaks the attention-routing language.
+- Dashboard: attention-centric headline (miss rate + response latency trend over time), with per-detector Finding counts as drill-down rather than headline. The known-limits table in §6 gains rows for the intervention detectors.
+
+### 10.6 Success criteria for the amendment
+
+- All six invariants (I-1…I-6) covered by tests that run in every phase.
+- Golden-trace suite extended with intervention fixtures; all pass.
+- I4 precision gate met on the hand-labeled corpus.
+- Session summary card and dashboard attention metrics reconcile with raw event counts.
+- Zero plaintext intervention data reaches the server.

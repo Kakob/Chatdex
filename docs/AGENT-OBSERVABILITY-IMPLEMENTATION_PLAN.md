@@ -12,6 +12,11 @@ Companion to `SPEC-agent-observability.md`. Phases are ordered so that every pha
 3. **Findings sync is batched:** `Finding` and `DetectorRun` records are written in one Dexie transaction when a `DetectorRun` completes (`persistDetectorRun`), so the sync engine's hooks see one burst per analysis rather than a mid-run trickle. Corollary (built in Phase 2): the Web Worker only *computes* — it never writes, because Dexie hooks are per-instance and worker-side writes would be invisible to the main thread's sync engine. The worker posts results back and the main thread persists.
 4. **Golden-trace step indexing convention:** `stepRange` indices in `*.expected.json` are 0-based positions in the fixture's entry stream, counting every non-`system` JSONL entry (user, assistant, tool_use, tool_result). Phase 1 normalization must preserve this 1:1 mapping for flat-entry traces.
 
+**2026-07-09:**
+5. **Intervention amendment approved** (SPEC §10, source `chatdex-intervention-update-v2.md`). Phases I0–I6 appended below; same cadence (one phase per session, strictly sequential, acceptance criteria gate).
+6. **Auto-event ids are content hashes** of `(session_id, message_index, type, detector_version, config_hash)` — config hash included so same-version/different-config runs don't silently overwrite.
+7. **Dispositions reset on version/config bumps** (new ids → new rows starting `active`); superseded rows keep their dispositions as labeled data. Matches Findings' `userLabel` reset behavior. Carry-forward is roadmap.
+
 ---
 
 ## Phase 0 — Golden traces & test harness (do this FIRST)
@@ -120,6 +125,79 @@ This is where real sessions finally come in — as validation, not as test fixtu
    - **Confirmed findings** → your first real labeled data, and your first landing-page anecdotes.
 
 **Acceptance:** every finding on the real corpus has a label; false-positive rate per detector is computed and displayed on the detector-health view; any discovered false-positive pattern has a corresponding regression fixture.
+
+---
+
+## Intervention layer — phases I0–I6 (SPEC §10)
+
+Same rules as phases 0–8b: implement → typecheck + tests passing → commit; one phase per session. Invariant tests I-1…I-6 land in I0 and run in every subsequent phase. Prefix `I` avoids collision with the observability phase numbers.
+
+### Phase I0 — Schema + invariant tests
+
+1. `InterventionEvent` store in both paths: Dexie (`src/lib/db/`) and Postgres (Drizzle schema), covered by the encrypted sync layer with the same batched-write pattern as Findings (decisions log #3).
+2. Content-hash id generation per decisions log #6; DetectorRun linkage for auto events.
+3. All six invariant tests from SPEC §10.3, red-green where implementable (I-5 determinism, I-3 re-run protection, I-4 encryption round-trip).
+
+**Acceptance:** invariant tests pass; a hand-inserted event round-trips through encryption/sync; re-inserting the same auto event is a no-op.
+
+### Phase I1 — Interrupt + rejection detectors
+
+1. Fixture corpus: sanitized real traces containing known interrupts and tool rejections (Jacob provides; sanitize before committing to `tests/golden-traces/`). Marker matching is built from the corpus, not assumed strings.
+2. Both detectors implemented via the existing `Detector` registry, running in the Web Worker.
+3. Timeline rendering: intervention events appear in the session browser alongside Finding markers — one timeline, two visually distinct streams.
+
+**Acceptance:** on a fixture with K known interrupts/rejections, exactly K events at correct indices; zero false positives on a clean fixture; invariants I-5/I-6 pass.
+
+### Phase I2 — Joins, metrics, abandonment, summary card ★ reframe milestone
+
+1. Query-time Finding↔intervention join (window W from DetectorConfig); per-Finding missed/responded, per-intervention responsive/proactive.
+2. Latency, miss-rate, blind-spot-rate, takeover-ratio metrics.
+3. Abandonment tagging (join-derived; regenerated when Findings re-run — see SPEC §10.4).
+4. Session summary card: "3 findings, 2 caught, avg response 6 messages."
+
+**★ This is the phase where the attention-routing reframe becomes demoable.** Everything before it is still "failure detection." The summary card plus the I2 metrics are the first artifacts that answer "when did your attention matter?" — treat the card's legibility as a first-class acceptance concern, not a UI afterthought.
+
+**Acceptance:** correct latency on synthetic fixtures covering: Finding at session end, multiple Findings before one intervention, intervention before any Finding, W boundaries in both message-count and wall-clock dimensions.
+
+### Phase I3 — Manual tagging UI + review disposition
+
+1. Tag any message: select → type → optional note. Same interaction pattern as Finding labeling.
+2. Confirm / retype / dismiss on auto events (`status` lifecycle); review-queue shell.
+3. Dismissals stored, never deleted.
+
+**Flywheel note:** the dispositions collected here are the labeled corpus for I4's precision gate *and* the long-term moat (classifier tuning is roadmap, but the data collection is not). Don't cut schema corners — a dismissal without its event's full evidence is worthless as training signal.
+
+**Acceptance:** full status lifecycle tested; invariant I-3 verified with a re-detection test (re-run never clobbers status/notes).
+
+### Phase I4 — Corrective re-prompt heuristic
+
+1. Client-side lexical + structural scorer per SPEC §10.4 — no LLM calls (invariant I-1); weights and thresholds in DetectorConfig.
+2. High-confidence events → timeline as `active`; mid-band → review queue via I3 UI. Evidence includes matched patterns + score breakdown (invariant I-6).
+3. Hand-label ≥ 50 real user messages via I3 tagging (seed corpus: Jacob's own sessions).
+
+**Acceptance:** precision ≥ 0.8 on the labeled set; recall measured and reported, not gated.
+
+### Phase I5 — Manual takeover detection
+
+Per SPEC §10.4: per-session write-hash map, mismatch on later reads → candidate scaled by diff magnitude. Glob-excluded artifacts (DetectorConfig), formatter-scale diffs → low confidence → review queue, concurrent sessions documented in-app as a v1 limitation.
+
+**Acceptance:** detects a seeded takeover fixture; does not fire on a formatter-only fixture; limitation copy present in-app.
+
+### Phase I6 — Positioning, copy, dashboard inversion
+
+1. **Dashboard hierarchy inversion — mockup pass first, then build.** Today the dashboard leads with finding counts. Under the reframe, the headline is "where did your attention matter?" (miss rate + response latency trend over time — the longitudinal view only Chatdex has); per-detector finding counts become the drill-down. Sketch/agree on the hierarchy before writing copy.
+2. Copy changes per `chatdex-intervention-update-v2.md` Part 1 (benefit line, pitch, repo description, roadmap vision line).
+3. "How detection works" page gains the intervention detectors and their documented limits.
+
+**Acceptance:** dashboard renders the attention-centric hierarchy against the real corpus; numbers reconcile with raw event counts; no UI or doc anywhere describes interventions as a fourth failure mode.
+
+### Out of scope (roadmap; do not build)
+
+- Opt-in LLM classification mode (separate spec amendment with privacy treatment)
+- Cross-user / cross-domain aggregation and benchmarking
+- Heuristic weight tuning loop on dismissal data (data is collected; the loop is later)
+- Disposition carry-forward across detector version bumps
+- Multi-session concurrent-repo takeover attribution
 
 ---
 
