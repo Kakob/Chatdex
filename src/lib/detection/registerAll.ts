@@ -4,6 +4,7 @@
 
 import { registerDetector } from './registry';
 import { loopDetector } from './detectors/loop';
+import { verificationAbsenceDetector } from './detectors/verificationAbsence';
 
 let registered = false;
 
@@ -11,6 +12,6 @@ export function registerAllDetectors(): void {
   if (registered) return;
   registered = true;
   registerDetector(loopDetector);
-  // registerDetector(verificationAbsenceDetector); // Phase 4
+  registerDetector(verificationAbsenceDetector);
   // registerDetector(reversionDetector);         // Phase 5
 }
