@@ -586,3 +586,10 @@ Send/regenerate/continue share one `streamReply` core; disclosure gating
 generalized to all three actions. Not built: message editing, branching,
 per-message model display, provider switching mid-chat. **Not yet
 browser-exercised.**
+
+### U5 live verification (2026-08-09)
+
+Jacob smoke-tested U5.2 + U5.3 in the browser: project chat with the
+disclosure modal on first send, context panel showing the injected system
+prompt, model picker, Stop mid-stream, and Regenerate. Working. **Stage U5
+(native chat) closed — built, tested, and live-verified.**
