@@ -1,5 +1,6 @@
 import { AlertTriangle, Send, X } from 'lucide-react';
 import { SOURCE_META, SourceIcon } from '../common/sourceMeta';
+import type { AuthMode } from '../../lib/providers';
 import type { DisclosureSummary } from '../../lib/understanding/runDiscovery';
 
 // Invariant 6 consent surface: states which provider receives which sources
@@ -7,10 +8,12 @@ import type { DisclosureSummary } from '../../lib/understanding/runDiscovery';
 // transfers called out explicitly.
 export function DisclosureModal({
   disclosure,
+  authMode,
   onConfirm,
   onCancel,
 }: {
   disclosure: DisclosureSummary;
+  authMode: AuthMode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -30,9 +33,11 @@ export function DisclosureModal({
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
           Project discovery sends excerpts from {disclosure.totalConversations} conversation
-          {disclosure.totalConversations !== 1 ? 's' : ''} to {disclosure.providerLabel} using
-          your own API key, via Chatdex&apos;s transit-only relay (nothing is stored or logged
-          server-side).
+          {disclosure.totalConversations !== 1 ? 's' : ''} to {disclosure.providerLabel}
+          {authMode === 'subscription'
+            ? `, billed to your ${disclosure.providerLabel} subscription,`
+            : ' using your own API key,'}{' '}
+          via Chatdex&apos;s transit-only relay (nothing is stored or logged server-side).
         </p>
 
         <ul className="space-y-1.5 mb-4">

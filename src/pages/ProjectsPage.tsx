@@ -7,8 +7,8 @@ import {
   setProjectReviewState,
   setAssociationReviewState,
 } from '../lib/db/understanding';
-import { listConfiguredProviders, getProviderInfo } from '../lib/providers';
-import type { LLMProviderId } from '../lib/providers';
+import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
+import type { AuthMode, LLMProviderId } from '../lib/providers';
 import {
   buildDisclosure,
   runDiscoveryInBatches,
@@ -34,6 +34,7 @@ export function ProjectsPage() {
   const [pendingRun, setPendingRun] = useState<{
     disclosure: DisclosureSummary;
     conversations: StoredConversation[];
+    authMode: AuthMode;
   } | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
@@ -41,7 +42,7 @@ export function ProjectsPage() {
     const [projectRows, associations, configured] = await Promise.all([
       getAllUnderstandingProjects(),
       db.projectAssociations.toArray(),
-      listConfiguredProviders(),
+      listReadyProviders(),
     ]);
     const convIds = [...new Set(associations.map((a) => a.conversationId))];
     const convs = await db.conversations.where('id').anyOf(convIds).toArray();
@@ -76,7 +77,11 @@ export function ProjectsPage() {
       addToast('No conversations to analyze — import some first');
       return;
     }
-    setPendingRun({ disclosure: buildDisclosure(conversations, provider), conversations });
+    setPendingRun({
+      disclosure: buildDisclosure(conversations, provider),
+      conversations,
+      authMode: await getProviderAuthMode(provider),
+    });
   };
 
   const handleConfirmRun = async () => {
@@ -146,7 +151,7 @@ export function ProjectsPage() {
               to="/settings"
               className="text-sm text-violet-600 dark:text-violet-400 hover:underline"
             >
-              Add an LLM provider key in Settings to enable discovery
+              Set up an LLM provider in Settings to enable discovery
             </Link>
           ) : (
             <button
@@ -233,6 +238,7 @@ export function ProjectsPage() {
       {pendingRun && (
         <DisclosureModal
           disclosure={pendingRun.disclosure}
+          authMode={pendingRun.authMode}
           onConfirm={() => void handleConfirmRun()}
           onCancel={() => setPendingRun(null)}
         />

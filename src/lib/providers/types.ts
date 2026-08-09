@@ -5,6 +5,13 @@
 
 export type LLMProviderId = 'anthropic' | 'openai';
 
+/**
+ * How a provider is billed: 'api-key' relays with the user's own key;
+ * 'subscription' bridges through local CLI login state (Claude Code /
+ * `codex login`) and bills the user's consumer subscription.
+ */
+export type AuthMode = 'api-key' | 'subscription';
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -35,4 +42,11 @@ export interface ProviderInfo {
   defaultModel: string;
   /** Hint shown in the credential input, e.g. "sk-ant-…". */
   keyPlaceholder: string;
+  /** How to get subscription auth working, shown in settings. */
+  subscriptionHint: string;
+}
+
+export interface SubscriptionStatus {
+  anthropic: boolean;
+  openai: boolean;
 }

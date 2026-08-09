@@ -6,10 +6,25 @@
 import { getMetadata, setMetadata } from '../db/metadata';
 import { db } from '../db/schema';
 import { ALL_PROVIDERS } from './registry';
-import type { LLMProviderId } from './types';
+import type { AuthMode, LLMProviderId } from './types';
 
 function credentialKey(provider: LLMProviderId): string {
   return `llm.apiKey.${provider}`;
+}
+
+function authModeKey(provider: LLMProviderId): string {
+  return `llm.authMode.${provider}`;
+}
+
+export async function getProviderAuthMode(provider: LLMProviderId): Promise<AuthMode> {
+  return (await getMetadata<AuthMode>(authModeKey(provider))) ?? 'api-key';
+}
+
+export async function setProviderAuthMode(
+  provider: LLMProviderId,
+  mode: AuthMode
+): Promise<void> {
+  await setMetadata(authModeKey(provider), mode);
 }
 
 export async function setProviderKey(provider: LLMProviderId, apiKey: string): Promise<void> {

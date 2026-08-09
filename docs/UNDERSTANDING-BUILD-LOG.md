@@ -17,6 +17,7 @@ phase, plus operational notes that affect deployment.
 | U1.2 | 2026-08-09 | `f12f0fb` | Project-discovery engine: digest prompts, strict parse + hallucination guard, pending-review persistence |
 | Migration | 2026-08-09 | `82bdc52` | `sync_records.kind` varchar(32) applied to Neon by hand (drizzle-kit push would have truncated) |
 | U1.3 | 2026-08-09 | `cf9844b` | Projects page: review queue, discovery trigger, invariant-6 disclosure modal; provider-keys settings section |
+| Subscription bridge | 2026-08-09 | — | Bill synthesis to Claude / ChatGPT subscriptions via local CLI logins (Agent SDK / Codex SDK); per-provider auth-mode toggle |
 
 ---
 
@@ -40,6 +41,38 @@ database (Neon, per `backend/.env` DATABASE_URL) on 2026-08-09 via a direct
 drizzle-kit push proposed *truncating* `sync_records` (2,521 rows of synced
 ciphertext) to widen the varchar — a plain ALTER is metadata-only and loses
 nothing. Run type changes by hand and keep `schema.ts` in sync.
+
+### Subscription bridge (2026-08-09)
+
+Synthesis can now bill the user's consumer subscriptions instead of API keys,
+per provider, via `backend/src/llm/subscription.ts`:
+
+- **Anthropic** → Claude Agent SDK (`@anthropic-ai/claude-agent-sdk`), which
+  reuses the local Claude Code login (macOS keychain). This is the *only*
+  sanctioned subscription path — raw OAuth against `/v1/messages` is banned.
+  Usage shares the Claude plan's normal limits. Anthropic changed this billing
+  model three times in 2026; re-verify if behavior shifts.
+- **OpenAI** → Codex SDK (`@openai/codex-sdk`), which bundles the `codex`
+  binary as a platform dependency — no global install needed. Auth comes from
+  `~/.codex/auth.json`, i.e. the user must run `codex login` once with a
+  ChatGPT-subscription account. **Unverified end-to-end**: no Codex login
+  exists on this machine yet.
+
+Operational details:
+
+- **Env stripping:** `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `CODEX_API_KEY`
+  are removed from the spawned CLI envs — a key in the environment would
+  silently override the subscription login and switch billing to pay-per-token.
+- **Transit-only:** Agent SDK runs with `persistSession: false`,
+  `settingSources: []`, no tools, `cwd` = tmpdir. Codex runs with
+  `history.persistence = 'none'`, read-only sandbox, approvals never; Codex may
+  still write thread rollouts under `~/.codex/sessions`, which is the user's
+  own local CLI state (same as normal Codex usage), not server-side persistence.
+- **Model selection:** subscription mode omits `model` unless the caller sets
+  one, so each CLI's own default applies (Codex model names can't be verified
+  without a login). `maxTokens`/`temperature` are ignored on this path.
+- **zod upgraded 3→4 in `backend/`** (Agent SDK peer dependency). Route schemas
+  were compatible as-is.
 
 ### Gap: `npm run typecheck` does not cover the backend
 

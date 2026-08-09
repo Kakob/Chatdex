@@ -5,9 +5,11 @@ import {
   getProviderKey,
   clearProviderKey,
   listConfiguredProviders,
+  getProviderAuthMode,
+  setProviderAuthMode,
 } from './credentials';
 import { getProviderInfo, ALL_PROVIDERS, PROVIDERS } from './registry';
-import { complete } from './relayClient';
+import { complete, listReadyProviders } from './relayClient';
 
 beforeEach(async () => {
   await clearAllData();
@@ -96,5 +98,85 @@ describe('relay client', () => {
     await expect(
       complete('openai', { messages: [{ role: 'user', content: 'hi' }] })
     ).rejects.toThrow(/invalid_api_key.*401|502/);
+  });
+});
+
+describe('auth mode', () => {
+  it('defaults to api-key and round-trips per provider', async () => {
+    expect(await getProviderAuthMode('anthropic')).toBe('api-key');
+    await setProviderAuthMode('anthropic', 'subscription');
+    expect(await getProviderAuthMode('anthropic')).toBe('subscription');
+    expect(await getProviderAuthMode('openai')).toBe('api-key');
+  });
+
+  it('subscription-mode complete() posts without apiKey and without a stored key', async () => {
+    await setProviderAuthMode('anthropic', 'subscription');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ text: 'hello', model: 'subscription-default' }), {
+        status: 200,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await complete('anthropic', {
+      messages: [{ role: 'user', content: 'hi' }],
+    });
+
+    expect(result.text).toBe('hello');
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.authMode).toBe('subscription');
+    expect(body.apiKey).toBeUndefined();
+    expect(body.model).toBeUndefined();
+  });
+
+  it('api-key complete() still sends the mode field', async () => {
+    await setProviderKey('anthropic', 'sk-ant-test');
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ text: 'ok', model: 'claude-sonnet-4-6' }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await complete('anthropic', { messages: [{ role: 'user', content: 'hi' }] });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).authMode).toBe('api-key');
+  });
+});
+
+describe('listReadyProviders', () => {
+  it('includes api-key-mode providers only when a key is stored', async () => {
+    expect(await listReadyProviders()).toEqual([]);
+    await setProviderKey('openai', 'sk-test');
+    expect(await listReadyProviders()).toEqual(['openai']);
+  });
+
+  it('includes subscription-mode providers only when the CLI login is detected', async () => {
+    await setProviderAuthMode('anthropic', 'subscription');
+    await setProviderAuthMode('openai', 'subscription');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ anthropic: true, openai: false }), { status: 200 })
+      )
+    );
+    expect(await listReadyProviders()).toEqual(['anthropic']);
+  });
+
+  it('ignores a stored key for a provider switched to subscription mode', async () => {
+    await setProviderKey('anthropic', 'sk-ant-test');
+    await setProviderAuthMode('anthropic', 'subscription');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ anthropic: false, openai: false }), { status: 200 })
+      )
+    );
+    expect(await listReadyProviders()).toEqual([]);
+  });
+
+  it('treats an unreachable backend as no subscription providers ready', async () => {
+    await setProviderAuthMode('anthropic', 'subscription');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+    expect(await listReadyProviders()).toEqual([]);
   });
 });

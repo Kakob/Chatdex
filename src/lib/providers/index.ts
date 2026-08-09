@@ -1,4 +1,8 @@
 export * from './types';
 export * from './registry';
 export * from './credentials';
-export { complete } from './relayClient';
+export {
+  complete,
+  fetchSubscriptionStatus,
+  listReadyProviders,
+} from './relayClient';
