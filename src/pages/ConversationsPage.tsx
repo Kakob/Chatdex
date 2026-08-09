@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, Globe, Terminal, Filter, CheckSquare } from 'lucide-react';
+import { MessageSquare, Filter, CheckSquare } from 'lucide-react';
 import { ConversationList, ConversationView } from '../components/conversations';
 import { BatchTagBar } from '../components/conversations/BatchTagBar';
 import { TagBadge } from '../components/common/TagBadge';
+import { ALL_SOURCES, SOURCE_META } from '../components/common/sourceMeta';
 import { useConversations, useConversation, useConversationTags } from '../hooks';
 import { useFindingSummaries } from '../hooks/useFindingSummaries';
 import { useTagStore } from '../stores/tagStore';
@@ -179,28 +180,23 @@ export function ConversationsPage() {
               >
                 All
               </button>
-              <button
-                onClick={() => setSourceFilter('claude.ai')}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
-                  sourceFilter === 'claude.ai'
-                    ? 'bg-violet-600 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Globe size={14} />
-                Claude.ai
-              </button>
-              <button
-                onClick={() => setSourceFilter('claude-code')}
-                className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
-                  sourceFilter === 'claude-code'
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-              >
-                <Terminal size={14} />
-                Claude Code
-              </button>
+              {ALL_SOURCES.map((source) => {
+                const { label, Icon, activeButtonClass } = SOURCE_META[source];
+                return (
+                  <button
+                    key={source}
+                    onClick={() => setSourceFilter(source)}
+                    className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
+                      sourceFilter === source
+                        ? activeButtonClass
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <Icon size={14} />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

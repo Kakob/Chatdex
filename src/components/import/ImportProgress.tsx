@@ -1,4 +1,5 @@
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { SOURCE_META } from '../common/sourceMeta';
 import type { ImportProgress as ImportProgressType } from '../../lib/import';
 import type { ImportResult } from '../../lib/import';
 
@@ -55,7 +56,7 @@ export function ImportProgress({
               )}
               <p>{result.messagesAdded} messages imported</p>
               <p className="text-xs mt-2">
-                Source: {result.source === 'claude.ai' ? 'Claude.ai' : 'Claude Code'}
+                Source: {SOURCE_META[result.source].label}
               </p>
             </div>
             <button

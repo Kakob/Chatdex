@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Download, Copy, Globe, Terminal, X, Tag, Search, Radar, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, Copy, X, Tag, Search, Radar, Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TagBadge } from '../common/TagBadge';
 import { TagInput } from '../common/TagInput';
+import { SourceIcon } from '../common/sourceMeta';
 import { EvidencePanel } from '../detection/EvidencePanel';
 import { SessionReport } from '../detection/SessionReport';
 import { SEVERITY_BADGE, SEVERITY_LABEL, SEVERITY_ORDER } from '../detection/severity';
@@ -210,11 +211,7 @@ export function ConversationView({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            {conversation.source === 'claude.ai' ? (
-              <Globe size={16} className="text-violet-500" />
-            ) : (
-              <Terminal size={16} className="text-emerald-500" />
-            )}
+            <SourceIcon source={conversation.source} size={16} />
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
               {conversation.name}
             </h1>

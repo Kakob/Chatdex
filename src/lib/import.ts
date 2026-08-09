@@ -36,8 +36,10 @@ export async function importFiles(
     onProgress?.({ phase: 'storing', current, total });
   });
 
-  // Auto-run failure detection over freshly ingested sessions (SPEC §4).
-  await autoAnalyzeConversations(result.addedConversationIds);
+  // Auto-run failure detection over freshly ingested agent sessions (SPEC §4).
+  await autoAnalyzeConversations(
+    selectAutoAnalyzeIds(parsed.conversations, result.addedConversationIds)
+  );
 
   onProgress?.({
     phase: 'complete',
@@ -46,6 +48,17 @@ export async function importFiles(
   });
 
   return result;
+}
+
+// Detectors are tool-call oriented; only agent sessions get auto-analysis.
+export function selectAutoAnalyzeIds(
+  conversations: StoredConversation[],
+  addedIds: string[]
+): string[] {
+  const agentSessionIds = new Set(
+    conversations.filter((c) => c.source === 'claude-code').map((c) => c.id)
+  );
+  return addedIds.filter((id) => agentSessionIds.has(id));
 }
 
 async function storeData(

@@ -1,5 +1,6 @@
-import { Globe, Terminal, MessageSquare, Calendar } from 'lucide-react';
+import { MessageSquare, Calendar } from 'lucide-react';
 import { TagBadge } from '../common/TagBadge';
+import { SourceIcon } from '../common/sourceMeta';
 import { FindingChips } from '../detection/FindingChips';
 import type { StoredConversation } from '../../types';
 import type { ApiTag } from '../../lib/api';
@@ -74,11 +75,7 @@ export function ConversationCard({
         )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            {conversation.source === 'claude.ai' ? (
-              <Globe size={14} className="text-violet-500 flex-shrink-0" />
-            ) : (
-              <Terminal size={14} className="text-emerald-500 flex-shrink-0" />
-            )}
+            <SourceIcon source={conversation.source} className="flex-shrink-0" />
             <h3 className="font-medium text-gray-900 dark:text-white truncate">
               {conversation.name}
             </h3>

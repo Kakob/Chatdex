@@ -12,8 +12,7 @@ interface AppState {
   isLoading: boolean;
   conversationCount: number;
   messageCount: number;
-  lastSyncClaudeAI: Date | null;
-  lastSyncClaudeCode: Date | null;
+  lastSync: Partial<Record<DataSource, Date>>;
 
   // License
   isPro: boolean;
@@ -44,8 +43,7 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: true,
   conversationCount: 0,
   messageCount: 0,
-  lastSyncClaudeAI: null,
-  lastSyncClaudeCode: null,
+  lastSync: {},
 
   // Initial License State
   isPro: import.meta.env.VITE_DEV_PRO === 'true',
@@ -72,11 +70,7 @@ export const useAppStore = create<AppState>((set) => ({
     }),
 
   setLastSync: (source, date) =>
-    set(
-      source === 'claude.ai'
-        ? { lastSyncClaudeAI: date }
-        : { lastSyncClaudeCode: date }
-    ),
+    set((state) => ({ lastSync: { ...state.lastSync, [source]: date } })),
 
   setLicense: (key, isPro) => set({ licenseKey: key, isPro }),
 

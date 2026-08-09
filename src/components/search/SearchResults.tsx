@@ -1,5 +1,6 @@
-import { Globe, Terminal, MessageSquare, Calendar } from 'lucide-react';
+import { MessageSquare, Calendar } from 'lucide-react';
 import { HighlightedText } from './HighlightedText';
+import { SourceIcon } from '../common/sourceMeta';
 import type { SearchResult } from '../../lib/search';
 
 interface SearchResultsProps {
@@ -79,11 +80,7 @@ function SearchResultItem({
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          {conversation.source === 'claude.ai' ? (
-            <Globe size={16} className="text-violet-500 flex-shrink-0" />
-          ) : (
-            <Terminal size={16} className="text-emerald-500 flex-shrink-0" />
-          )}
+          <SourceIcon source={conversation.source} size={16} className="flex-shrink-0" />
           <h3 className="font-medium text-gray-900 dark:text-white truncate group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
             <HighlightedText
               text={conversation.name}

@@ -1,5 +1,5 @@
-import { Globe, Terminal } from 'lucide-react';
 import type { DataSource } from '../../types';
+import { ALL_SOURCES, SOURCE_META } from '../common/sourceMeta';
 
 interface SearchFiltersProps {
   source: DataSource | null;
@@ -16,8 +16,10 @@ type FilterOption = {
 
 const FILTER_OPTIONS: FilterOption[] = [
   { value: null, label: 'All' },
-  { value: 'claude.ai', label: 'Claude.ai', icon: <Globe size={14} /> },
-  { value: 'claude-code', label: 'Claude Code', icon: <Terminal size={14} /> },
+  ...ALL_SOURCES.map((source) => {
+    const { label, Icon } = SOURCE_META[source];
+    return { value: source, label, icon: <Icon size={14} /> };
+  }),
 ];
 
 export function SearchFilters({

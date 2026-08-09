@@ -1,6 +1,6 @@
-// Unified data model for both Claude.ai and Claude Code
+// Unified data model across conversation/session providers
 
-export type DataSource = 'claude.ai' | 'claude-code';
+export type DataSource = 'claude.ai' | 'claude-code' | 'chatgpt' | 'codex';
 
 // Content block types for structured message rendering
 export type ContentBlockType = 'text' | 'code' | 'thinking' | 'tool_use' | 'tool_result' | 'artifact' | 'unsupported';
@@ -36,6 +36,9 @@ export interface StoredConversation {
   projectPath?: string;
   gitBranch?: string;
   workingDirectory?: string;
+  // Provider-specific provenance retained at import (PRD §4): raw source
+  // references, pruned-branch counts, export metadata, etc.
+  providerMeta?: Record<string, unknown>;
 }
 
 export type MessageSender = 'user' | 'assistant' | 'system' | 'tool';
@@ -95,6 +98,8 @@ export interface AppMetadata {
 export type MetadataKey =
   | 'lastSync.claude.ai'
   | 'lastSync.claude-code'
+  | 'lastSync.chatgpt'
+  | 'lastSync.codex'
   | 'stats.totalConversations'
   | 'stats.totalMessages'
   | 'license.key'

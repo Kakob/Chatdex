@@ -43,7 +43,7 @@ import {
   deleteMetadata as dbDeleteMetadata,
   clearMetadata as dbClearMetadata,
 } from './db';
-import type { StoredConversation, StoredMessage, StoredActivity, EntityType } from '../types';
+import type { StoredConversation, StoredMessage, StoredActivity, EntityType, DataSource } from '../types';
 import type { AnchoredItem, Priority, ContentType } from './aipkms/types';
 
 // Errors
@@ -59,7 +59,7 @@ export class ApiError extends Error {
 // Wire-style shapes — kept stable for components consuming them.
 export interface ApiConversation {
   id: string;
-  source: 'claude.ai' | 'claude-code';
+  source: DataSource;
   name: string;
   summary: string | null;
   createdAt: string;
@@ -148,7 +148,7 @@ export interface ImportResult {
   conversationsAdded: number;
   conversationsSkipped: number;
   messagesAdded: number;
-  source: 'claude.ai' | 'claude-code';
+  source: DataSource;
 }
 
 export interface ApiTag {
@@ -276,7 +276,7 @@ async function toApiAnchor(a: AnchoredItem): Promise<ApiAnchor> {
 
 export const api = {
   async getConversations(options?: {
-    source?: 'claude.ai' | 'claude-code';
+    source?: DataSource;
     limit?: number;
     offset?: number;
   }): Promise<PaginatedResponse<ApiConversation>> {
@@ -302,7 +302,7 @@ export const api = {
     return msgs.map(toApiMessage);
   },
 
-  async deleteConversations(source?: 'claude.ai' | 'claude-code'): Promise<void> {
+  async deleteConversations(source?: DataSource): Promise<void> {
     if (source) {
       await dbDeleteConversationsBySource(source);
     } else {
@@ -424,7 +424,7 @@ export const api = {
   async importData(payload: {
     conversations: Array<{
       id: string;
-      source: 'claude.ai' | 'claude-code';
+      source: DataSource;
       name: string;
       summary?: string | null;
       createdAt: string;
@@ -451,7 +451,7 @@ export const api = {
       toolInput?: string;
       toolResult?: string;
     }>;
-    source: 'claude.ai' | 'claude-code';
+    source: DataSource;
   }): Promise<ImportResult> {
     let added = 0;
     let skipped = 0;
@@ -540,7 +540,7 @@ export const api = {
     );
   },
 
-  async clearDataBySource(source: 'claude.ai' | 'claude-code'): Promise<void> {
+  async clearDataBySource(source: DataSource): Promise<void> {
     await dbDeleteConversationsBySource(source);
   },
 };
