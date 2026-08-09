@@ -36,10 +36,22 @@ export interface CompletionResponse {
   usage?: CompletionUsage;
 }
 
+/** One selectable model in the chat model picker. */
+export interface ChatModelOption {
+  id: string;
+  label: string;
+}
+
 export interface ProviderInfo {
   id: LLMProviderId;
   label: string;
   defaultModel: string;
+  /**
+   * Curated picker options for native chat (U5.3). Not exhaustive — the
+   * picker also offers "Default" (provider/CLI default; empty model field)
+   * and a free-text custom entry for anything newer than this list.
+   */
+  chatModels: ChatModelOption[];
   /** Hint shown in the credential input, e.g. "sk-ant-…". */
   keyPlaceholder: string;
   /** How to get subscription auth working, shown in settings. */

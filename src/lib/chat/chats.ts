@@ -27,6 +27,11 @@ export interface ChatProviderMeta {
    * would carry project understanding.
    */
   contextDisclosedAt?: string;
+  /**
+   * User-picked model for this chat (U5.3). Absent ⇒ provider/CLI default.
+   * Distinct from `model`, which records what actually answered last.
+   */
+  modelOverride?: string;
   [key: string]: unknown;
 }
 
@@ -118,12 +123,18 @@ export async function appendChatMessage(
   conversationId: string,
   options: AppendChatMessageOptions
 ): Promise<StoredMessage> {
-  const now = new Date();
   const message = await db.transaction('rw', [db.conversations, db.messages], async () => {
     const conversation = await db.conversations.get(conversationId);
     if (!conversation || conversation.source !== 'chatdex') {
       throw new Error(`Chat conversation not found: ${conversationId}`);
     }
+    // Message order is the [conversationId+createdAt] index; two appends in
+    // the same millisecond would tie and sort by random id, garbling the
+    // history (including what gets sent back to the model). Keep timestamps
+    // strictly increasing per conversation.
+    const existing = await getMessagesForConversation(conversationId);
+    const lastAt = existing[existing.length - 1]?.createdAt.getTime() ?? 0;
+    const now = new Date(Math.max(Date.now(), lastAt + 1));
     const row: StoredMessage = {
       id: crypto.randomUUID(),
       conversationId,
@@ -154,6 +165,56 @@ export async function appendChatMessage(
   });
   await invalidateIndex();
   return message;
+}
+
+/** Set or clear (null) the chat's user-picked model (U5.3). */
+export async function setChatModelOverride(
+  conversationId: string,
+  model: string | null
+): Promise<void> {
+  await db.transaction('rw', [db.conversations], async () => {
+    const conversation = await db.conversations.get(conversationId);
+    if (!conversation || conversation.source !== 'chatdex') {
+      throw new Error(`Chat conversation not found: ${conversationId}`);
+    }
+    const meta = { ...(conversation.providerMeta ?? {}) };
+    if (model) meta.modelOverride = model;
+    else delete meta.modelOverride;
+    await db.conversations.put({ ...conversation, providerMeta: meta });
+  });
+}
+
+/**
+ * Remove the chat's last message if it is an assistant message (regenerate,
+ * U5.3), recomputing the conversation aggregates from what remains. Returns
+ * true when a message was removed.
+ */
+export async function deleteLastAssistantMessage(conversationId: string): Promise<boolean> {
+  const removed = await db.transaction('rw', [db.conversations, db.messages], async () => {
+    const conversation = await db.conversations.get(conversationId);
+    if (!conversation || conversation.source !== 'chatdex') {
+      throw new Error(`Chat conversation not found: ${conversationId}`);
+    }
+    const messages = await getMessagesForConversation(conversationId);
+    const last = messages[messages.length - 1];
+    if (!last || last.sender !== 'assistant') return false;
+
+    await db.messages.delete(last.id);
+    const remaining = messages.slice(0, -1);
+    const fullText = remaining.map((m) => m.text).join('\n\n');
+    await db.conversations.put({
+      ...conversation,
+      messageCount: remaining.length,
+      userMessageCount: remaining.filter((m) => m.sender === 'user').length,
+      assistantMessageCount: remaining.filter((m) => m.sender === 'assistant').length,
+      fullText,
+      estimatedTokens: estimateTokens(fullText),
+      updatedAt: new Date(),
+    });
+    return true;
+  });
+  if (removed) await invalidateIndex();
+  return removed;
 }
 
 /** Record that the user accepted the context-injection disclosure (U5.2). */

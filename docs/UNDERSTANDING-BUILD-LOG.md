@@ -544,3 +544,45 @@ model-visible evidence deep links (footnotes carry conversation names
 only). **Not yet browser-exercised** — Jacob: open a project chat, confirm
 the disclosure modal on first send, expand the context panel, and check
 the model actually answers from the injected understanding.
+
+### U5.3 — Chat UX (2026-08-09)
+
+The build plan sized this by "what actually hurts" — with only one live
+session to draw on, this pass covers the plan's three named items plus the
+one gap streaming exposed immediately (no way to stop a generation).
+
+- **Model picker** — `ProviderInfo` gains `chatModels` (curated:
+  Opus 5 / Sonnet 5 / Haiku 4.5; GPT-4o); anthropic `defaultModel` bumped
+  `claude-sonnet-4-6` → `claude-opus-5` (api-key mode only; subscription
+  mode still omits the model so the CLI default applies). Picker offers
+  Default (provider/CLI default) / curated / **Custom…** free-text (Codex
+  model ids aren't knowable in advance). Per-chat persistence via
+  `providerMeta.modelOverride` (`setChatModelOverride`, tested) — distinct
+  from `model`, which keeps recording what actually answered. Works on new
+  *and* open chats; provider stays fixed per chat.
+- **Per-project chat history** — rail scope toggle (This project / All
+  chats) appears on project-scoped chats, defaulting to the project's own
+  history (`listChats(projectId)` from U5.1).
+- **Regenerate / continue** — "Regenerate" under a trailing assistant
+  message deletes it (`deleteLastAssistantMessage`: aggregate recompute
+  from remaining rows, tested) and re-streams from history; "Generate
+  response" appears when the last message is a user message (failed
+  stream, cancelled disclosure) and streams without appending. Both reload
+  fresh context and are disclosure-gated like send (the modal's
+  `sendsDescription` adapts: "along with this chat").
+- **Stop** — Send becomes Stop while streaming; abort keeps the partial
+  text as the assistant message (it was already on screen) and toasts
+  "Generation stopped". Client abort propagates via `streamComplete`'s
+  AbortSignal → relay → provider fetch (api-key mode; subscription bridges
+  finish server-side, response discarded).
+- **Ordering bug fixed (latent since U5.1):** messages sort by
+  `[conversationId+createdAt]`; same-millisecond appends tied and sorted
+  by random uuid — garbling both the rendered thread and the history sent
+  to the model. `appendChatMessage` now keeps per-conversation timestamps
+  strictly increasing. (Surfaced as a test flake; the fix is why it can't
+  recur.)
+
+Send/regenerate/continue share one `streamReply` core; disclosure gating
+generalized to all three actions. Not built: message editing, branching,
+per-message model display, provider switching mid-chat. **Not yet
+browser-exercised.**

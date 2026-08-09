@@ -9,6 +9,8 @@ import {
   getChat,
   getChatMessages,
   markChatContextDisclosed,
+  setChatModelOverride,
+  deleteLastAssistantMessage,
   type ChatProviderMeta,
 } from './chats';
 
@@ -128,6 +130,42 @@ describe('markChatContextDisclosed', () => {
     await expect(markChatContextDisclosed('nope')).rejects.toThrow(
       'Chat conversation not found'
     );
+  });
+});
+
+describe('setChatModelOverride', () => {
+  it('sets and clears the override without touching other meta', async () => {
+    const conv = await createChat({ provider: 'anthropic', firstUserMessage: 'Hi' });
+    await setChatModelOverride(conv.id, 'claude-haiku-4-5');
+    let meta = (await getChat(conv.id))!.providerMeta as ChatProviderMeta;
+    expect(meta.modelOverride).toBe('claude-haiku-4-5');
+    expect(meta.provider).toBe('anthropic');
+
+    await setChatModelOverride(conv.id, null);
+    meta = (await getChat(conv.id))!.providerMeta as ChatProviderMeta;
+    expect(meta.modelOverride).toBeUndefined();
+  });
+});
+
+describe('deleteLastAssistantMessage', () => {
+  it('removes a trailing assistant message and recomputes aggregates', async () => {
+    const conv = await createChat({ provider: 'anthropic', firstUserMessage: 'Hi' });
+    await appendChatMessage(conv.id, { sender: 'assistant', text: 'Old answer' });
+
+    expect(await deleteLastAssistantMessage(conv.id)).toBe(true);
+
+    const stored = (await getChat(conv.id))!;
+    expect(stored.messageCount).toBe(1);
+    expect(stored.assistantMessageCount).toBe(0);
+    expect(stored.fullText).toBe('Hi');
+    const messages = await getChatMessages(conv.id);
+    expect(messages.map((m) => m.sender)).toEqual(['user']);
+  });
+
+  it('is a no-op when the last message is from the user', async () => {
+    const conv = await createChat({ provider: 'anthropic', firstUserMessage: 'Hi' });
+    expect(await deleteLastAssistantMessage(conv.id)).toBe(false);
+    expect((await getChat(conv.id))!.messageCount).toBe(1);
   });
 });
 
