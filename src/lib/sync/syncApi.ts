@@ -22,7 +22,11 @@ export type SyncKind =
   | 'daily_stats'
   | 'metadata'
   | 'finding'
-  | 'detector_run';
+  | 'detector_run'
+  | 'understanding_project'
+  | 'project_association'
+  | 'understanding_object'
+  | 'understanding_event';
 
 export interface PushRecord extends WireSealed {
   id: string;

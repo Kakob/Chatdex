@@ -31,6 +31,10 @@ import {
   envelopeMetadata,
   envelopeFinding,
   envelopeDetectorRun,
+  envelopeUnderstandingProject,
+  envelopeProjectAssociation,
+  envelopeUnderstandingObject,
+  envelopeUnderstandingEvent,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -42,6 +46,10 @@ import {
   rehydrateMetadata,
   rehydrateFinding,
   rehydrateDetectorRun,
+  rehydrateUnderstandingProject,
+  rehydrateProjectAssociation,
+  rehydrateUnderstandingObject,
+  rehydrateUnderstandingEvent,
   type SyncEnvelope,
 } from './serializer';
 
@@ -80,6 +88,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         await db.anchors.where('conversationId').equals(rec.id).delete();
         await db.findings.where('conversationId').equals(rec.id).delete();
         await db.detectorRuns.where('conversationId').equals(rec.id).delete();
+        // Associations dangle without their conversation; understanding
+        // objects/events survive — synthesis outlives any single source.
+        await db.projectAssociations.where('conversationId').equals(rec.id).delete();
         return;
       case 'message':
         await db.messages.delete(rec.id);
@@ -110,6 +121,19 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         return;
       case 'detector_run':
         await db.detectorRuns.delete(rec.id);
+        return;
+      case 'understanding_project':
+        await db.understandingProjects.delete(rec.id);
+        return;
+      case 'project_association':
+        await db.projectAssociations.delete(rec.id);
+        return;
+      case 'understanding_object':
+        await db.understandingObjects.delete(rec.id);
+        await db.understandingEvents.where('objectId').equals(rec.id).delete();
+        return;
+      case 'understanding_event':
+        await db.understandingEvents.delete(rec.id);
         return;
     }
   }
@@ -146,6 +170,18 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'detector_run':
       await db.detectorRuns.put(rehydrateDetectorRun(payload));
+      return;
+    case 'understanding_project':
+      await db.understandingProjects.put(rehydrateUnderstandingProject(payload));
+      return;
+    case 'project_association':
+      await db.projectAssociations.put(rehydrateProjectAssociation(payload));
+      return;
+    case 'understanding_object':
+      await db.understandingObjects.put(rehydrateUnderstandingObject(payload));
+      return;
+    case 'understanding_event':
+      await db.understandingEvents.put(rehydrateUnderstandingEvent(payload));
       return;
   }
 }
@@ -205,6 +241,22 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'detector_run': {
       const r = await db.detectorRuns.get(entry.id);
       return r ? envelopeDetectorRun(r) : null;
+    }
+    case 'understanding_project': {
+      const p = await db.understandingProjects.get(entry.id);
+      return p ? envelopeUnderstandingProject(p) : null;
+    }
+    case 'project_association': {
+      const a = await db.projectAssociations.get(entry.id);
+      return a ? envelopeProjectAssociation(a) : null;
+    }
+    case 'understanding_object': {
+      const o = await db.understandingObjects.get(entry.id);
+      return o ? envelopeUnderstandingObject(o) : null;
+    }
+    case 'understanding_event': {
+      const e = await db.understandingEvents.get(entry.id);
+      return e ? envelopeUnderstandingEvent(e) : null;
     }
   }
 }
@@ -330,6 +382,10 @@ class SyncEngine {
       ['metadata', db.metadata],
       ['finding', db.findings],
       ['detector_run', db.detectorRuns],
+      ['understanding_project', db.understandingProjects],
+      ['project_association', db.projectAssociations],
+      ['understanding_object', db.understandingObjects],
+      ['understanding_event', db.understandingEvents],
     ];
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
@@ -396,6 +452,22 @@ class SyncEngine {
     db.detectorRuns.hook('creating', upsert('detector_run'));
     db.detectorRuns.hook('updating', (_m, k) => upsert('detector_run')(k as string));
     db.detectorRuns.hook('deleting', remove('detector_run'));
+
+    db.understandingProjects.hook('creating', upsert('understanding_project'));
+    db.understandingProjects.hook('updating', (_m, k) => upsert('understanding_project')(k as string));
+    db.understandingProjects.hook('deleting', remove('understanding_project'));
+
+    db.projectAssociations.hook('creating', upsert('project_association'));
+    db.projectAssociations.hook('updating', (_m, k) => upsert('project_association')(k as string));
+    db.projectAssociations.hook('deleting', remove('project_association'));
+
+    db.understandingObjects.hook('creating', upsert('understanding_object'));
+    db.understandingObjects.hook('updating', (_m, k) => upsert('understanding_object')(k as string));
+    db.understandingObjects.hook('deleting', remove('understanding_object'));
+
+    db.understandingEvents.hook('creating', upsert('understanding_event'));
+    db.understandingEvents.hook('updating', (_m, k) => upsert('understanding_event')(k as string));
+    db.understandingEvents.hook('deleting', remove('understanding_event'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().

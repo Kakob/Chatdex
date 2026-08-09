@@ -13,6 +13,7 @@ export * from './dailyStats';
 export * from './metadata';
 export * from './findings';
 export * from './detectorRuns';
+export * from './understanding';
 
 import { db } from './schema';
 
@@ -31,6 +32,10 @@ export async function clearAllData(): Promise<void> {
       db.metadata,
       db.findings,
       db.detectorRuns,
+      db.understandingProjects,
+      db.projectAssociations,
+      db.understandingObjects,
+      db.understandingEvents,
     ],
     async () => {
       await db.conversations.clear();
@@ -44,6 +49,10 @@ export async function clearAllData(): Promise<void> {
       await db.metadata.clear();
       await db.findings.clear();
       await db.detectorRuns.clear();
+      await db.understandingProjects.clear();
+      await db.projectAssociations.clear();
+      await db.understandingObjects.clear();
+      await db.understandingEvents.clear();
     }
   );
 }

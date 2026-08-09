@@ -16,6 +16,10 @@ const KindSchema = z.enum([
   'metadata',
   'finding',
   'detector_run',
+  'understanding_project',
+  'project_association',
+  'understanding_object',
+  'understanding_event',
 ]);
 
 const PushRecordSchema = z.object({

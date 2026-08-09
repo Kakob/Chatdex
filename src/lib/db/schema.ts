@@ -12,6 +12,12 @@ import type {
   DailyStats,
 } from '../../types';
 import type { StoredFinding, StoredDetectorRun } from '../../types/detection';
+import type {
+  UnderstandingProject,
+  ProjectAssociation,
+  UnderstandingObject,
+  UnderstandingEvent,
+} from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
 
 export interface KnowledgeFolderRow {
@@ -32,6 +38,10 @@ export class ChatdexDB extends Dexie {
   metadata!: Table<AppMetadata, string>;
   findings!: Table<StoredFinding, string>;
   detectorRuns!: Table<StoredDetectorRun, string>;
+  understandingProjects!: Table<UnderstandingProject, string>;
+  projectAssociations!: Table<ProjectAssociation, string>;
+  understandingObjects!: Table<UnderstandingObject, string>;
+  understandingEvents!: Table<UnderstandingEvent, string>;
 
   constructor() {
     super('chatdex');
@@ -53,6 +63,15 @@ export class ChatdexDB extends Dexie {
       findings:
         '&id, conversationId, runId, detector, severity, userLabel, createdAt, [conversationId+createdAt]',
       detectorRuns: '&id, &runKey, conversationId, finishedAt',
+    });
+    // v3: shared-understanding entities (PRD-shared-understanding-workspace.md §6-§11).
+    this.version(3).stores({
+      understandingProjects: '&id, name, reviewState, updatedAt',
+      projectAssociations:
+        '&id, projectId, conversationId, reviewState, &[projectId+conversationId]',
+      understandingObjects:
+        '&id, projectId, type, status, reviewState, updatedAt, [projectId+status]',
+      understandingEvents: '&id, objectId, op, occurredAt, [objectId+occurredAt]',
     });
   }
 }

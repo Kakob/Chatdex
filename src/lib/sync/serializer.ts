@@ -8,6 +8,12 @@
 
 import type { StoredConversation, StoredMessage, StoredActivity, Tag, EntityTag, DailyStats, AppMetadata } from '../../types';
 import type { StoredFinding, StoredDetectorRun } from '../../types/detection';
+import type {
+  UnderstandingProject,
+  ProjectAssociation,
+  UnderstandingObject,
+  UnderstandingEvent,
+} from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
 import type { KnowledgeFolderRow } from '../db/schema';
 import type { SyncKind } from './syncApi';
@@ -189,4 +195,71 @@ export function envelopeDetectorRun(r: StoredDetectorRun): SyncEnvelope<'detecto
 export function rehydrateDetectorRun(payload: unknown): StoredDetectorRun {
   const p = payload as StoredDetectorRun & { startedAt: string; finishedAt: string };
   return { ...p, startedAt: isoToDate(p.startedAt), finishedAt: isoToDate(p.finishedAt) };
+}
+
+// --- shared-understanding entities (PRD-shared-understanding-workspace.md) ---
+
+export function envelopeUnderstandingProject(
+  p: UnderstandingProject
+): SyncEnvelope<'understanding_project'> {
+  return {
+    kind: 'understanding_project',
+    parentId: null,
+    updatedAt: p.updatedAt,
+    payload: { ...p, createdAt: dateToIso(p.createdAt), updatedAt: dateToIso(p.updatedAt) },
+  };
+}
+
+export function rehydrateUnderstandingProject(payload: unknown): UnderstandingProject {
+  const p = payload as UnderstandingProject & { createdAt: string; updatedAt: string };
+  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+}
+
+export function envelopeProjectAssociation(
+  a: ProjectAssociation
+): SyncEnvelope<'project_association'> {
+  return {
+    kind: 'project_association',
+    parentId: a.conversationId,
+    updatedAt: a.updatedAt,
+    payload: { ...a, createdAt: dateToIso(a.createdAt), updatedAt: dateToIso(a.updatedAt) },
+  };
+}
+
+export function rehydrateProjectAssociation(payload: unknown): ProjectAssociation {
+  const p = payload as ProjectAssociation & { createdAt: string; updatedAt: string };
+  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+}
+
+export function envelopeUnderstandingObject(
+  o: UnderstandingObject
+): SyncEnvelope<'understanding_object'> {
+  return {
+    kind: 'understanding_object',
+    parentId: o.projectId,
+    updatedAt: o.updatedAt,
+    payload: { ...o, createdAt: dateToIso(o.createdAt), updatedAt: dateToIso(o.updatedAt) },
+  };
+}
+
+export function rehydrateUnderstandingObject(payload: unknown): UnderstandingObject {
+  const p = payload as UnderstandingObject & { createdAt: string; updatedAt: string };
+  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+}
+
+export function envelopeUnderstandingEvent(
+  e: UnderstandingEvent
+): SyncEnvelope<'understanding_event'> {
+  return {
+    kind: 'understanding_event',
+    parentId: e.objectId,
+    // Events are append-only; createdAt is their only write moment.
+    updatedAt: e.createdAt,
+    payload: { ...e, occurredAt: dateToIso(e.occurredAt), createdAt: dateToIso(e.createdAt) },
+  };
+}
+
+export function rehydrateUnderstandingEvent(payload: unknown): UnderstandingEvent {
+  const p = payload as UnderstandingEvent & { occurredAt: string; createdAt: string };
+  return { ...p, occurredAt: isoToDate(p.occurredAt), createdAt: isoToDate(p.createdAt) };
 }
