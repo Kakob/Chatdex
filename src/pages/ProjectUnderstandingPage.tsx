@@ -11,6 +11,7 @@ import {
   Lightbulb,
   Loader2,
   Sparkles,
+  Waypoints,
 } from 'lucide-react';
 import {
   loadProjectUnderstanding,
@@ -29,6 +30,8 @@ import {
   OP_LABEL,
 } from '../lib/understanding/livingDocument';
 import { LivingDocumentView } from '../components/understanding/LivingDocumentView';
+import { ProjectMapView } from '../components/understanding/ProjectMapView';
+import { loadProjectMap, type ProjectMap } from '../lib/understanding/map';
 import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
 import { setObjectReviewState, setEventReviewState } from '../lib/db/understanding';
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
@@ -209,7 +212,8 @@ export function ProjectUnderstandingPage() {
   const addToast = useToastStore((s) => s.addToast);
 
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
-  const [view, setView] = useState<'panel' | 'document'>('panel');
+  const [view, setView] = useState<'panel' | 'document' | 'map'>('panel');
+  const [map, setMap] = useState<ProjectMap | null>(null);
   const [providers, setProviders] = useState<LLMProviderId[]>([]);
   const [provider, setProvider] = useState<LLMProviderId | null>(null);
   const [pendingRun, setPendingRun] = useState<{
@@ -235,6 +239,19 @@ export function ProjectUnderstandingPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Map data loads lazily on first Map view; `data` in the deps refreshes it
+  // after reviews (accept/reject changes chains and statuses).
+  useEffect(() => {
+    if (view !== 'map' || projectId === undefined) return;
+    let cancelled = false;
+    void loadProjectMap(projectId).then((loaded) => {
+      if (!cancelled) setMap(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [view, projectId, data]);
 
   const handleObjectReview = async (objectId: string, state: ReviewState) => {
     await setObjectReviewState(objectId, state);
@@ -361,6 +378,7 @@ export function ProjectUnderstandingPage() {
               [
                 ['panel', 'Panel', <LayoutList key="p" size={14} />],
                 ['document', 'Document', <FileText key="d" size={14} />],
+                ['map', 'Map', <Waypoints key="m" size={14} />],
               ] as const
             ).map(([value, label, icon]) => (
               <button
@@ -429,6 +447,14 @@ export function ProjectUnderstandingPage() {
           markdown={documentMarkdown}
           filenamePrefix={livingDocumentFilenamePrefix(project)}
         />
+      ) : view === 'map' ? (
+        map === null ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="animate-spin text-gray-400" size={24} />
+          </div>
+        ) : (
+          <ProjectMapView map={map} onOpenHistory={setHistoryObjectId} />
+        )
       ) : (
         <>
       {understanding.pendingChanges.length > 0 && (

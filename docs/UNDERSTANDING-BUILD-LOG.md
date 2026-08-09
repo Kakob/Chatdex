@@ -400,3 +400,48 @@ object card opens a slide-over reconstructing how that belief got there.
 
 Scope note: entry points are the panel's object cards (build-plan call).
 Recent-changes rows and pending-change cards don't open the drawer yet.
+
+### U4.4 — Map spike (2026-08-09)
+
+The build plan gated this on U4.1–U4.3 leaving real navigation questions;
+Jacob called the spike explicitly. Built deliberately small, honoring §13's
+warning: **no force-directed graph, no graph library, no new dependency.**
+
+- **What it is:** a third "Map" view on `/projects/:id` (unassigned too) —
+  a chain-lane timeline. The only true cross-object edge in the data model
+  is supersession, so each supersession chain gets one row reading left →
+  right as evolution; unchained objects sit in single-node rows,
+  most-recently-started chains on top. Node click opens the U4.3 history
+  drawer (map and drawer share the navigation loop).
+- **`src/lib/understanding/map.ts`** — `assembleProjectMap(objects,
+  events)` (pure, tested) + `loadProjectMap` loader. Inclusion mirrors the
+  panel (rejected excluded, pending shown). Edges: non-rejected
+  supersessions, deduped from→to with applied winning over pending; rows =
+  connected components; within-row order is topological (Kahn), first-seen
+  tiebreak, cycle-tolerant fallback.
+- **Rendering:** hand-rolled SVG (`ProjectMapView`) in an
+  `overflow-x-auto` card. Status = border color (violet current / gray
+  superseded / blue resolved); dashed border = pending object; solid arrow
+  = applied supersession; dashed amber arrow = pending proposal. Legend
+  under the map. Lazy-loaded on first Map view, refreshed after reviews.
+
+**§13 question review (the actual spike output):**
+
+| Question | Answered by |
+|---|---|
+| What projects am I working on? | U4.1 overview |
+| Major concepts within a project? | Panel sections |
+| Where did this idea originate? | U4.3 drawer (introduced + evidence) |
+| What changed recently? | Recent-changes streams |
+| Which questions remain unresolved? | Open-questions rollup |
+| Evidence for current direction? | Evidence links everywhere |
+| How did direction evolve, at a glance? | **This map** |
+| Which ideas recur across projects? | **Still unanswered** |
+
+Verdict on the remainder: cross-project recurrence is an evidence-overlap
+question (which conversations feed multiple projects, which objects cite
+shared sources) — a ranked *list* would answer it more directly than any
+graph; parked as a backlog candidate, not a U4 blocker. Whether the map
+itself earns permanence is Jacob's call after using it on real data; if it
+doesn't help, delete `map.ts` + `ProjectMapView` and the toggle entry — the
+spike touched nothing else. U4 (navigation) is otherwise complete.
