@@ -6,9 +6,9 @@ Project context for Claude Code. Read this before making changes.
 
 ## What Chatdex is
 
-Chatdex is a **local-first Claude Code session analyzer**. It ingests Claude Code JSONL traces, lets users browse/search their sessions, provides analytics, and (the current focus) detects **agent failure patterns**: loops, verification-absence, and silent reversions.
+Chatdex is a **local-first AI-conversation workspace**. It ingests conversation history from multiple providers (Claude.ai, Claude Code JSONL, ChatGPT), lets users browse/search/analyze it, detects **agent failure patterns** (loops, verification-absence, silent reversions), and is growing a **shared understanding workspace** that reconstructs projects and synthesizes current understanding from conversation history (`docs/PRD-shared-understanding-workspace.md`).
 
-**Positioning:** a longitudinal agent evaluation instrument — not just a trace viewer. Detection explainability and the privacy architecture are the differentiators. Never compromise either for convenience.
+**Positioning (updated 2026-08-09):** Chatdex is moving away from the client-side-only power-user framing toward robust LLM-provider interactions for synthesis. Detection explainability and encrypted-at-rest sync remain differentiators; the *detection layer* specifically stays fully client-side (see invariants).
 
 ## Current state vs. current work
 
@@ -24,11 +24,24 @@ If a request conflicts with the spec, say so and ask rather than silently diverg
 
 These are non-negotiable. Violating any of them is a bug even if the feature "works":
 
-1. **No plaintext leaves the client.** Session data, findings, and user labels sync to Postgres as ciphertext only. Never add a code path that sends decrypted session content, findings evidence, or derived text to any server, log, analytics endpoint, or third-party API.
-2. **Detection runs client-side**, in a Web Worker. Never move detection server-side.
+**Sync & storage:**
+
+1. **Sync is ciphertext-only.** Session data, findings, understanding objects, and user labels sync to Postgres as ciphertext. The sync pipeline (`src/lib/sync/`, `/api/sync/*`) must never carry or store plaintext server-side.
+
+**Detection layer (sequestered — the original client-side-only guarantee lives here, unchanged):**
+
+2. **Detection runs client-side**, in a Web Worker. Never move detection server-side, and never route detection through an LLM API. Detection results must never depend on network availability.
 3. **Findings are immutable per detector version.** Never mutate existing findings when a detector changes; bump the detector's semver and create new findings via a new `DetectorRun`.
 4. **Every finding must be explainable from its stored `evidence` alone.** If a detector can't populate evidence sufficient to re-render "why this fired," the detector is incomplete.
 5. **Detectors are pluggable.** New detectors implement the `Detector` interface and register in the registry; the pipeline, storage schema, and UI must not require per-detector changes.
+
+**AI synthesis boundary (amended 2026-08-09 — supersedes the former global "no plaintext leaves the client" rule):**
+
+6. **Synthesis may use user-authenticated LLM providers.** The understanding layer (project discovery, understanding synthesis — PRD stages U1+) may send conversation plaintext to LLM providers, under these conditions:
+   - **User-initiated and opt-in.** No conversation content goes to a provider without the user having explicitly enabled synthesis and supplied their own credentials.
+   - **Backend relay is transit-only.** The Chatdex backend may proxy provider calls (streaming, rate limiting), but must never persist or log request/response content. Relay handlers must not write conversation plaintext to the database, log lines, or error traces.
+   - **Cross-provider disclosure is explicit.** Sending one provider's history to a different provider (e.g., ChatGPT conversations to Anthropic) is a new disclosure; the UI must state which provider will receive which sources before the first such call.
+   - **Synthesis outputs are user data.** Understanding objects derived from LLM calls store like everything else: plaintext in IndexedDB, ciphertext in sync.
 
 ## Tech stack
 
@@ -129,7 +142,8 @@ db studio:                 npm run db:studio
 
 ## Things Claude Code should NOT do
 
-- Don't add server-side analysis, telemetry, or "just send it to an LLM API" shortcuts for detection. Client-side only.
+- Don't add server-side analysis, telemetry, or "just send it to an LLM API" shortcuts **for detection** — that layer is client-side only. (Synthesis is different: see invariant 6.)
+- Don't log or persist conversation plaintext in backend relay handlers — relay is transit-only.
 - Don't merge or reuse finding rows across detector versions.
 - Don't broaden detector heuristics to reduce false negatives without adding the corresponding suppression tests — false positives destroy user trust in this product faster than misses.
 - Don't invent new failure-pattern detectors beyond the spec'd three without asking.

@@ -79,6 +79,15 @@ CLAUDE.md's invariants say detection is client-side-only and "no plaintext leave
 
 This needs an explicit decision from Jacob and probably a CLAUDE.md/spec amendment before U1.2.
 
+> **Decision (2026-08-09): option (b), extended.** Jacob chose to sequester the
+> client-side-only guarantee to the detection layer and permit user-authenticated
+> LLM provider calls for synthesis — including **backend relay** (transit-only:
+> no plaintext persistence or logging server-side), reflecting a strategic move
+> away from the client-side-only power-user framing toward robust provider
+> interactions. CLAUDE.md invariants amended accordingly (see "AI synthesis
+> boundary", invariant 6): user-initiated/opt-in, transit-only relay, explicit
+> cross-provider disclosure. **U1.2 is unblocked.**
+
 ## 7. PRD assumptions vs. codebase conflicts
 
 1. **"Project" name collision:** PRD "projects" (reconstructed from conversations) ≠ `StoredConversation.projectPath` (Claude Code cwd, `unified.ts:36`) ≠ aipkms `Workspace` (`src/lib/aipkms/workspaces.ts`). Pick a distinct name (e.g. `UnderstandingProject`) or reuse/extend aipkms workspaces deliberately.
