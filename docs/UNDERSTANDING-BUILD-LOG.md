@@ -504,7 +504,7 @@ regenerate / per-project history filters (U5.3), reconcile-this-chat
 subscription-path chat, and confirm the transcript appears under Browse
 with the Chatdex chip and syncs.
 
-### U5.2 — Context injection (2026-08-09)
+### U5.2 — Context injection (2026-08-09, `6e707f1`)
 
 PRD §17: a project chat starts already knowing the project. The injected
 context is the U4.2 living-document projection in agent-context mode
