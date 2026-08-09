@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   Search,
   Clock,
@@ -11,6 +12,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { loadPendingReviewCounts } from '../../lib/understanding/pendingReviews';
 
 const navItems = [
   { to: '/search', icon: Search, label: 'Search' },
@@ -25,6 +27,20 @@ const navItems = [
 
 export function Sidebar() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const location = useLocation();
+  const [pendingReviews, setPendingReviews] = useState(0);
+
+  // Reviews awaiting attention (U6.2) — recounted on navigation, which is
+  // when the number can have changed (reviews, discovery, reconciliation).
+  useEffect(() => {
+    let cancelled = false;
+    void loadPendingReviewCounts().then((counts) => {
+      if (!cancelled) setPendingReviews(counts.total);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname]);
 
   if (!sidebarOpen) {
     return null;
@@ -47,6 +63,14 @@ export function Sidebar() {
           >
             <Icon size={18} />
             {label}
+            {to === '/projects' && pendingReviews > 0 && (
+              <span
+                className="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 tabular-nums"
+                title={`${pendingReviews} item${pendingReviews !== 1 ? 's' : ''} awaiting review`}
+              >
+                {pendingReviews > 99 ? '99+' : pendingReviews}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

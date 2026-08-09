@@ -27,6 +27,7 @@ import {
 } from '../lib/chat/chats';
 import { loadProjectChatContext, type ProjectChatContext } from '../lib/chat/context';
 import { getUnderstandingProject } from '../lib/db/understanding';
+import { countPendingForProject } from '../lib/understanding/pendingReviews';
 import { getReconcilableConversations, reconcileProject } from '../lib/understanding/reconcile';
 import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
@@ -212,6 +213,8 @@ export function ChatPage() {
   const [newChatModel, setNewChatModel] = useState<string | null>(null);
   const [railScope, setRailScope] = useState<'all' | 'project'>('all');
   const [reconciling, setReconciling] = useState(false);
+  const [projectPendingCount, setProjectPendingCount] = useState(0);
+  const [nudgeDismissed, setNudgeDismissed] = useState<Set<string>>(new Set());
   const [pendingReconcile, setPendingReconcile] = useState<{
     disclosure: DisclosureSummary;
     authMode: AuthMode;
@@ -268,6 +271,7 @@ export function ChatPage() {
     if (!chatProjectId) {
       setProjectName(null);
       setContext(null);
+      setProjectPendingCount(0);
       return;
     }
     let cancelled = false;
@@ -276,6 +280,9 @@ export function ChatPage() {
     });
     void loadProjectChatContext(chatProjectId).then((ctx) => {
       if (!cancelled) setContext(ctx);
+    });
+    void countPendingForProject(chatProjectId).then((n) => {
+      if (!cancelled) setProjectPendingCount(n);
     });
     return () => {
       cancelled = true;
@@ -528,8 +535,10 @@ export function ChatPage() {
       if (outcome.warnings.length > 0) {
         console.warn('Reconciliation warnings:', outcome.warnings);
       }
-      // Pick up the reconcile stamp so the button greys out until new messages.
+      // Pick up the reconcile stamp so the button greys out until new
+      // messages, and the chip's review badge so the proposals are visible.
       setActiveChat((await getChat(activeId)) ?? null);
+      setProjectPendingCount(await countPendingForProject(chatProjectId));
     } catch (err) {
       addToast(`Reconciliation failed: ${(err as Error).message}`, 'error');
     } finally {
@@ -544,6 +553,25 @@ export function ChatPage() {
     activeChat &&
       chatMeta?.reconciledAt &&
       new Date(chatMeta.reconciledAt) >= activeChat.updatedAt
+  );
+
+  // U6.2 nudge: suggest reconciling once the understanding has fallen this
+  // many messages behind the chat. Suggestion only — never automatic.
+  const NUDGE_AFTER_MESSAGES = 4;
+  const unreconciledCount = useMemo(() => {
+    if (!chatProjectId || !activeChat) return 0;
+    const stamp = chatMeta?.reconciledAt ? new Date(chatMeta.reconciledAt) : null;
+    return messages.filter((m) => !stamp || m.createdAt > stamp).length;
+  }, [messages, chatMeta?.reconciledAt, chatProjectId, activeChat]);
+  const showNudge = Boolean(
+    activeId &&
+      chatProjectId &&
+      providerReady &&
+      !sending &&
+      !reconciling &&
+      !chatUpToDate &&
+      unreconciledCount >= NUDGE_AFTER_MESSAGES &&
+      !nudgeDismissed.has(activeId)
   );
 
   return (
@@ -601,6 +629,16 @@ export function ChatPage() {
                 title="Open the project's understanding"
               >
                 <FolderKanban size={11} /> {projectName}
+                {projectPendingCount > 0 && (
+                  <span
+                    className="px-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 tabular-nums"
+                    title={`${projectPendingCount} proposal${
+                      projectPendingCount !== 1 ? 's' : ''
+                    } awaiting review`}
+                  >
+                    {projectPendingCount}
+                  </span>
+                )}
               </Link>
             )}
           </div>
@@ -727,6 +765,28 @@ export function ChatPage() {
             </div>
           )}
         </div>
+
+        {showNudge && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 text-sm text-violet-800 dark:text-violet-300">
+            <GitMerge size={14} className="shrink-0" />
+            <span className="flex-1 min-w-0">
+              {unreconciledCount} message{unreconciledCount !== 1 ? 's' : ''} in this chat that the
+              project&apos;s understanding hasn&apos;t seen yet.
+            </span>
+            <button
+              onClick={() => void handleReconcileClick()}
+              className="px-3 py-1 text-sm rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors shrink-0"
+            >
+              Reconcile
+            </button>
+            <button
+              onClick={() => setNudgeDismissed((prev) => new Set(prev).add(activeId!))}
+              className="px-2 py-1 text-sm text-violet-500 dark:text-violet-400 hover:underline shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="pt-3 border-t border-gray-200 dark:border-gray-800">
           {providers !== null && providers.length === 0 ? (

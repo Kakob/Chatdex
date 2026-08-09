@@ -630,3 +630,37 @@ chat end, pending-review badge counts, accept-all-low-risk. **Not yet
 browser-exercised** — Jacob: chat about a project, hit "Reconcile chat",
 accept a proposal on the project page, then send another message and
 confirm the context panel carries the accepted change.
+
+### U6.2 — Loop ergonomics (2026-08-09)
+
+The build plan listed three candidates and left sizing to observed
+friction; with the loop only hours old, this pass ships all three in their
+minimal forms — each is a small, deletable surface if real use proves it
+unnecessary.
+
+- **Pending-review badges** — `src/lib/understanding/pendingReviews.ts`:
+  pure `assemblePendingCounts` (tested) counting pending projects +
+  associations + objects + events with the overview's inclusion rules
+  (everything under a rejected project excluded — those rows are
+  unreachable, so counting them would make a badge that can never clear).
+  Surfaced twice: amber count on the sidebar's Projects entry (recounted
+  on navigation) and on the chat header's project chip
+  (`countPendingForProject`, refreshed after an in-chat reconcile — the
+  toast now has a visible target one click away).
+- **Reconcile nudge** — once a project chat accumulates 4+ messages the
+  reconcile stamp doesn't cover (`NUDGE_AFTER_MESSAGES`), a dismissible
+  banner above the composer offers Reconcile / Dismiss. Suggestion only,
+  never automatic — reconciliation still costs an LLM call and a
+  disclosure. Dismissal is per chat, session-scoped.
+- **Accept all support proposals** — in the U3.3 review strip, when ≥2
+  pending `supported` events exist. 'supported' is the one op that is
+  genuinely low-risk under PRD §11: accepting it records reinforcement and
+  evidence but performs no status transition and no content change. Every
+  other op (supersede, contradict, resolve…) stays one-by-one.
+
+**Stage U6 complete in code — and with it the PRD's full arc (U0→U6):**
+ingest → discover → review → reconcile → navigate → chat → close the
+loop. Not yet browser-exercised (U6.1 + U6.2 together): chat about a
+project past 4 messages → nudge appears → Reconcile → chip badge + sidebar
+badge light up → review strip (bulk-accept supports if present) → next
+send's context carries accepted changes.

@@ -268,6 +268,26 @@ export function ProjectUnderstandingPage() {
   const onEventReview = (eventId: string, state: 'accepted' | 'rejected') =>
     void handleEventReview(eventId, state);
 
+  // U6.2 accept-all-low-risk (PRD §11): 'supported' is the one op that
+  // changes nothing when accepted — it records reinforcement and evidence,
+  // no status transition, no content change. Everything else stays
+  // one-by-one.
+  const pendingSupports = data?.understanding.pendingChanges.filter(
+    (c) => c.event.op === 'supported'
+  );
+  const handleAcceptAllSupport = async () => {
+    if (!pendingSupports || pendingSupports.length === 0) return;
+    for (const change of pendingSupports) {
+      await setEventReviewState(change.event.id, 'accepted');
+    }
+    addToast(
+      `Accepted ${pendingSupports.length} support proposal${
+        pendingSupports.length !== 1 ? 's' : ''
+      }`
+    );
+    await load();
+  };
+
   const handleReconcileClick = async () => {
     if (!provider || !projectId) return;
     // Incremental by default; automatic full re-run when the cursor leaves
@@ -471,6 +491,15 @@ export function ProjectUnderstandingPage() {
           <h2 className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 mb-3">
             <Sparkles size={14} />
             Proposed changes ({understanding.pendingChanges.length})
+            {pendingSupports && pendingSupports.length >= 2 && (
+              <button
+                onClick={() => void handleAcceptAllSupport()}
+                className="ml-auto px-2.5 py-1 text-xs rounded-lg border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                title="Support proposals only add reinforcing evidence — accepting them changes no object's status or content"
+              >
+                Accept all {pendingSupports.length} support proposals
+              </button>
+            )}
           </h2>
           <div className="space-y-3">
             {understanding.pendingChanges.map((change) => (
