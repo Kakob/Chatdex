@@ -30,22 +30,44 @@ function EvidenceLinks({ item }: { item: UnderstandingItem }) {
       <span className="inline-flex items-center gap-1">
         <MessageSquare size={12} /> From:
       </span>
-      {item.evidence.map((ref) =>
-        ref.conversationName === null ? (
-          <span key={ref.conversationId} className="italic">
-            (deleted conversation)
+      {item.evidence.map((ref) => {
+        if (ref.conversationName === null) {
+          return (
+            <span key={ref.conversationId} className="italic">
+              (deleted conversation)
+            </span>
+          );
+        }
+        // PRD §9 chain: link straight to the first cited message when the
+        // evidence is message-anchored; extra citations get numbered links.
+        const messageIds = ref.messageIds ?? [];
+        const target = (messageId?: string) =>
+          messageId
+            ? `/conversations/${ref.conversationId}?scrollTo=${messageId}`
+            : `/conversations/${ref.conversationId}`;
+        return (
+          <span key={ref.conversationId} className="inline-flex items-center gap-1 min-w-0">
+            <Link
+              to={target(messageIds[0])}
+              title={ref.note}
+              className="text-violet-600 dark:text-violet-400 hover:underline truncate max-w-60"
+            >
+              {ref.conversationName}
+            </Link>
+            {messageIds.length > 1 &&
+              messageIds.slice(1).map((messageId, idx) => (
+                <Link
+                  key={messageId}
+                  to={target(messageId)}
+                  title={`Cited message ${idx + 2} of ${messageIds.length}`}
+                  className="text-violet-400 dark:text-violet-500 hover:underline"
+                >
+                  #{idx + 2}
+                </Link>
+              ))}
           </span>
-        ) : (
-          <Link
-            key={ref.conversationId}
-            to={`/conversations/${ref.conversationId}`}
-            title={ref.note}
-            className="text-violet-600 dark:text-violet-400 hover:underline truncate max-w-60"
-          >
-            {ref.conversationName}
-          </Link>
-        )
-      )}
+        );
+      })}
     </div>
   );
 }

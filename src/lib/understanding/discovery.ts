@@ -8,28 +8,41 @@
 // user's review (U1.3) decides what becomes canonical (PRD §11).
 //
 // Hallucination guard: only conversation IDs that were actually in the
-// analyzed batch are accepted as association targets or evidence. Anything
-// else the model invents is dropped and reported as a warning.
+// analyzed batch are accepted as association targets or evidence, and only
+// message indexes that appeared in a digest are accepted as message-level
+// evidence. Anything else the model invents is dropped and reported as a
+// warning.
+//
+// Message-level provenance (PRD §9, U2.2): digests carry individual messages
+// identified by their position `i` in the conversation — indexes, not ids,
+// so citations are cheap to transmit and trivially validated. Cited indexes
+// are translated back to real StoredMessage ids before persisting, giving
+// EvidenceRef.messageIds the panel can deep-link to.
 
 import { complete } from '../providers';
 import type { LLMProviderId, ChatMessage } from '../providers';
 import { db } from '../db/schema';
+import { getMessagesForConversation } from '../db/messages';
 import {
   putUnderstandingProject,
   putProjectAssociation,
   createUnderstandingObject,
 } from '../db/understanding';
 import { generateId } from '../utils/ids';
-import type { StoredConversation } from '../../types';
-import type { UnderstandingProject } from '../../types/understanding';
+import type { StoredConversation, StoredMessage } from '../../types';
+import type { UnderstandingProject, EvidenceRef } from '../../types/understanding';
 
 export interface DiscoveryConfig {
   provider: LLMProviderId;
   model?: string;
-  /** Max characters of conversation text included per digest. */
+  /** Max characters of conversation text included per digest (fallback when no messages are stored). */
   excerptLength?: number;
   /** Cap on understanding objects the model is asked for per batch (PRD §6: "deliberately small"). */
   maxObjects?: number;
+  /** Max messages included per conversation digest. */
+  maxDigestMessages?: number;
+  /** Max characters of text included per digest message. */
+  messageExcerptLength?: number;
 }
 
 export interface DiscoveryResult {
@@ -43,28 +56,71 @@ export interface DiscoveryResult {
 
 const DEFAULT_EXCERPT_LENGTH = 600;
 const DEFAULT_MAX_OBJECTS = 5;
+const DEFAULT_MAX_DIGEST_MESSAGES = 8;
+const DEFAULT_MESSAGE_EXCERPT_LENGTH = 200;
 
 // --- digest + prompt construction (exported for tests) ---
+
+/** One message in a digest. `i` is the position in the full stored message list. */
+export interface DigestMessage {
+  i: number;
+  role: string;
+  text: string;
+}
 
 export interface ConversationDigest {
   id: string;
   source: string;
   name: string;
   updatedAt: string;
-  excerpt: string;
+  /** Whole-conversation excerpt; only present when no messages are stored. */
+  excerpt?: string;
+  /** Sampled messages; preferred over excerpt when available. */
+  messages?: DigestMessage[];
+}
+
+/**
+ * Pick which messages represent a conversation in its digest: the opening
+ * messages establish the topic, the closing ones carry the latest state, so
+ * when over budget take the first 3 and fill the rest from the tail.
+ * Returned entries keep their original position as `i`.
+ */
+export function sampleDigestMessages(
+  messages: StoredMessage[],
+  max = DEFAULT_MAX_DIGEST_MESSAGES
+): Array<{ i: number; message: StoredMessage }> {
+  const indexed = messages.map((message, i) => ({ i, message }));
+  if (indexed.length <= max) return indexed;
+  const headCount = Math.min(3, max);
+  return [...indexed.slice(0, headCount), ...indexed.slice(indexed.length - (max - headCount))];
 }
 
 export function buildDigest(
   conv: StoredConversation,
-  excerptLength = DEFAULT_EXCERPT_LENGTH
+  excerptLength = DEFAULT_EXCERPT_LENGTH,
+  messages?: StoredMessage[],
+  config: { maxDigestMessages?: number; messageExcerptLength?: number } = {}
 ): ConversationDigest {
-  return {
+  const digest: ConversationDigest = {
     id: conv.id,
     source: conv.source,
     name: conv.name,
     updatedAt: conv.updatedAt.toISOString(),
-    excerpt: conv.fullText.replace(/\s+/g, ' ').slice(0, excerptLength),
   };
+  if (messages && messages.length > 0) {
+    const perMessage = config.messageExcerptLength ?? DEFAULT_MESSAGE_EXCERPT_LENGTH;
+    digest.messages = sampleDigestMessages(
+      messages,
+      config.maxDigestMessages ?? DEFAULT_MAX_DIGEST_MESSAGES
+    ).map(({ i, message }) => ({
+      i,
+      role: message.sender,
+      text: message.text.replace(/\s+/g, ' ').slice(0, perMessage),
+    }));
+  } else {
+    digest.excerpt = conv.fullText.replace(/\s+/g, ' ').slice(0, excerptLength);
+  }
+  return digest;
 }
 
 export function buildDiscoveryMessages(
@@ -83,14 +139,14 @@ export function buildDiscoveryMessages(
     '{',
     '  "projects": [{ "name": string, "description": string }],',
     '  "associations": [{ "conversationId": string, "projectName": string, "confidence": number, "reason": string }],',
-    '  "objects": [{ "projectName": string | null, "type": string, "title": string, "body": string, "conversationIds": string[] }]',
+    '  "objects": [{ "projectName": string | null, "type": string, "title": string, "body": string, "evidence": [{ "conversationId": string, "messageIndexes": number[] }] }]',
     '}',
     'Rules:',
     '- Reuse an existing project name when a conversation clearly belongs to it; only invent new projects when necessary.',
     '- A conversation may associate with multiple projects, one, or none. confidence is 0..1.',
     '- reason: one sentence explaining the association from the conversation content.',
-    `- objects: at most ${maxObjects}, only the highest-signal items (direction, decision, idea, question, goal). type is a short lowercase noun. conversationIds must cite the conversations the object is derived from.`,
-    '- Only reference conversationId values given in the input.',
+    `- objects: at most ${maxObjects}, only the highest-signal items (direction, decision, idea, question, goal). type is a short lowercase noun. evidence must cite the conversations the object is derived from; messageIndexes lists the "i" values of the specific messages that support it (empty array if the whole conversation does).`,
+    '- Only reference conversationId and message "i" values given in the input.',
     'Existing projects:',
     projectList,
   ].join('\n');
@@ -116,7 +172,7 @@ export interface ParsedDiscovery {
     type: string;
     title: string;
     body?: string;
-    conversationIds: string[];
+    evidence: Array<{ conversationId: string; messageIndexes: number[] }>;
   }>;
   warnings: string[];
 }
@@ -127,7 +183,9 @@ function asString(v: unknown): string | null {
 
 export function parseDiscoveryResponse(
   text: string,
-  knownConversationIds: Set<string>
+  knownConversationIds: Set<string>,
+  /** Per-conversation message indexes that were actually in the digests. */
+  knownMessageIndexes: Map<string, Set<number>> = new Map()
 ): ParsedDiscovery {
   // Models sometimes wrap JSON in markdown fences despite instructions.
   const stripped = text.replace(/^\s*```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
@@ -183,11 +241,30 @@ export function parseDiscoveryResponse(
       warnings.push('Dropped object missing type or title');
       continue;
     }
-    const cited = Array.isArray(rec.conversationIds)
-      ? rec.conversationIds.filter(
-          (id): id is string => typeof id === 'string' && knownConversationIds.has(id)
-        )
-      : [];
+
+    // Preferred shape: evidence entries with optional message indexes.
+    // Legacy shape (models occasionally regress to it): bare conversationIds.
+    const rawEvidence = Array.isArray(rec.evidence)
+      ? rec.evidence
+      : Array.isArray(rec.conversationIds)
+        ? rec.conversationIds.map((conversationId) => ({ conversationId, messageIndexes: [] }))
+        : [];
+
+    const cited: Array<{ conversationId: string; messageIndexes: number[] }> = [];
+    for (const e of rawEvidence) {
+      const entry = e as Record<string, unknown>;
+      const conversationId = asString(entry.conversationId);
+      if (!conversationId || !knownConversationIds.has(conversationId)) continue;
+      const validIndexes = knownMessageIndexes.get(conversationId);
+      const rawIndexes = Array.isArray(entry.messageIndexes) ? entry.messageIndexes : [];
+      const messageIndexes = rawIndexes.filter(
+        (i): i is number => Number.isInteger(i) && (validIndexes?.has(i as number) ?? false)
+      );
+      if (messageIndexes.length < rawIndexes.length) {
+        warnings.push(`Dropped invented message indexes on object "${title}"`);
+      }
+      cited.push({ conversationId, messageIndexes });
+    }
     if (cited.length === 0) {
       // PRD §9: an AI proposal without real evidence is unusable.
       warnings.push(`Dropped object "${title}" with no valid evidence conversations`);
@@ -198,7 +275,7 @@ export function parseDiscoveryResponse(
       type: type.toLowerCase(),
       title,
       body: asString(rec.body) ?? undefined,
-      conversationIds: cited,
+      evidence: cited,
     });
   }
 
@@ -215,13 +292,23 @@ export async function discoverProjects(
     throw new Error('No conversations to analyze');
   }
 
-  const digests = conversations.map((c) => buildDigest(c, config.excerptLength));
+  // Message-level digests when messages are stored; fullText excerpt fallback.
+  const messagesByConv = new Map<string, StoredMessage[]>();
+  for (const conv of conversations) {
+    messagesByConv.set(conv.id, await getMessagesForConversation(conv.id));
+  }
+  const digests = conversations.map((c) =>
+    buildDigest(c, config.excerptLength, messagesByConv.get(c.id), config)
+  );
   const existing = await db.understandingProjects.toArray();
   const messages = buildDiscoveryMessages(digests, existing, config.maxObjects);
 
   const response = await complete(config.provider, { model: config.model, messages });
   const knownIds = new Set(conversations.map((c) => c.id));
-  const parsed = parseDiscoveryResponse(response.text, knownIds);
+  const knownMessageIndexes = new Map(
+    digests.map((d) => [d.id, new Set((d.messages ?? []).map((m) => m.i))])
+  );
+  const parsed = parseDiscoveryResponse(response.text, knownIds, knownMessageIndexes);
 
   const byId = new Map(conversations.map((c) => [c.id, c]));
   const result: DiscoveryResult = {
@@ -293,17 +380,26 @@ export async function discoverProjects(
     const project = o.projectName ? await ensureProject(o.projectName) : null;
     // Anchor the object in the source timeline: the latest activity among its
     // evidence conversations (PRD §8 — understanding is temporal).
-    const occurredAt = o.conversationIds.reduce<Date>((latest, id) => {
-      const conv = byId.get(id);
+    const occurredAt = o.evidence.reduce<Date>((latest, e) => {
+      const conv = byId.get(e.conversationId);
       return conv && conv.updatedAt > latest ? conv.updatedAt : latest;
     }, new Date(0));
+    // Cited message indexes → real StoredMessage ids (position in the same
+    // ordered list the digest was built from).
+    const evidence: EvidenceRef[] = o.evidence.map((e) => {
+      const convMessages = messagesByConv.get(e.conversationId) ?? [];
+      const messageIds = e.messageIndexes
+        .map((i) => convMessages[i]?.id)
+        .filter((id): id is string => id !== undefined);
+      return { conversationId: e.conversationId, ...(messageIds.length ? { messageIds } : {}) };
+    });
     await createUnderstandingObject({
       projectId: project?.id ?? null,
       type: o.type,
       title: o.title,
       body: o.body,
       origin: 'ai',
-      evidence: o.conversationIds.map((conversationId) => ({ conversationId })),
+      evidence,
       occurredAt,
     });
     result.objectsCreated++;

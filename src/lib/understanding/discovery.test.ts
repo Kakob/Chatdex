@@ -3,13 +3,15 @@ import { db } from '../db/schema';
 import { clearAllData } from '../db';
 import {
   buildDigest,
+  sampleDigestMessages,
   buildDiscoveryMessages,
   parseDiscoveryResponse,
   discoverProjects,
 } from './discovery';
+import { bulkPutMessages } from '../db/messages';
 import { putUnderstandingProject } from '../db/understanding';
 import { getEventsForObject } from '../db/understanding';
-import type { StoredConversation } from '../../types';
+import type { StoredConversation, StoredMessage } from '../../types';
 
 vi.mock('../providers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../providers')>();
@@ -43,6 +45,22 @@ function makeConversation(overrides: Partial<StoredConversation> = {}): StoredCo
   };
 }
 
+function makeMessage(
+  conversationId: string,
+  text: string,
+  createdAt: Date,
+  overrides: Partial<StoredMessage> = {}
+): StoredMessage {
+  return {
+    id: crypto.randomUUID(),
+    conversationId,
+    sender: 'user',
+    text,
+    createdAt,
+    ...overrides,
+  };
+}
+
 function respond(payload: unknown): void {
   completeMock.mockResolvedValue({
     text: JSON.stringify(payload),
@@ -57,6 +75,36 @@ describe('buildDigest', () => {
     expect(digest.excerpt).toBe('a b c dxxx');
     expect(digest.id).toBe(conv.id);
     expect(digest.updatedAt).toBe(conv.updatedAt.toISOString());
+  });
+
+  it('prefers per-message entries over the excerpt when messages exist', () => {
+    const conv = makeConversation();
+    const now = new Date('2026-08-01T00:00:00Z');
+    const digest = buildDigest(conv, 600, [
+      makeMessage(conv.id, 'hello\n\n world', now),
+      makeMessage(conv.id, 'y'.repeat(500), now, { sender: 'assistant' }),
+    ]);
+    expect(digest.excerpt).toBeUndefined();
+    expect(digest.messages).toEqual([
+      { i: 0, role: 'user', text: 'hello world' },
+      { i: 1, role: 'assistant', text: 'y'.repeat(200) },
+    ]);
+  });
+});
+
+describe('sampleDigestMessages', () => {
+  const msgs = Array.from({ length: 10 }, (_, i) =>
+    makeMessage('c', `m${i}`, new Date(2026, 0, i + 1))
+  );
+
+  it('keeps everything when under the cap', () => {
+    expect(sampleDigestMessages(msgs, 12).map((s) => s.i)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+    ]);
+  });
+
+  it('takes the head and tail with original indexes when over the cap', () => {
+    expect(sampleDigestMessages(msgs, 5).map((s) => s.i)).toEqual([0, 1, 2, 8, 9]);
   });
 });
 
@@ -142,7 +190,7 @@ describe('parseDiscoveryResponse', () => {
     expect(parsed.associations[1].confidence).toBe(0.5);
   });
 
-  it('drops objects with no valid evidence conversations', () => {
+  it('drops objects with no valid evidence conversations (legacy conversationIds shape)', () => {
     const parsed = parseDiscoveryResponse(
       JSON.stringify({
         objects: [
@@ -163,9 +211,51 @@ describe('parseDiscoveryResponse', () => {
       projectName: null,
       type: 'idea',
       title: 'Good',
-      conversationIds: ['c1'],
+      evidence: [{ conversationId: 'c1', messageIndexes: [] }],
     });
     expect(parsed.warnings.filter((w) => w.includes('no valid evidence'))).toHaveLength(2);
+  });
+
+  it('keeps digest message indexes and drops invented ones (hallucination guard)', () => {
+    const parsed = parseDiscoveryResponse(
+      JSON.stringify({
+        objects: [
+          {
+            projectName: 'P',
+            type: 'decision',
+            title: 'Anchored',
+            evidence: [
+              { conversationId: 'c1', messageIndexes: [0, 7, 99] },
+              { conversationId: 'c2', messageIndexes: [] },
+            ],
+          },
+        ],
+      }),
+      known,
+      new Map([['c1', new Set([0, 7])]])
+    );
+    expect(parsed.objects[0].evidence).toEqual([
+      { conversationId: 'c1', messageIndexes: [0, 7] },
+      { conversationId: 'c2', messageIndexes: [] },
+    ]);
+    expect(parsed.warnings).toContain('Dropped invented message indexes on object "Anchored"');
+  });
+
+  it('drops message indexes for conversations that had no digest messages', () => {
+    const parsed = parseDiscoveryResponse(
+      JSON.stringify({
+        objects: [
+          {
+            projectName: 'P',
+            type: 'idea',
+            title: 'T',
+            evidence: [{ conversationId: 'c1', messageIndexes: [0] }],
+          },
+        ],
+      }),
+      known
+    );
+    expect(parsed.objects[0].evidence).toEqual([{ conversationId: 'c1', messageIndexes: [] }]);
   });
 
   it('drops objects missing type or title', () => {
@@ -294,6 +384,44 @@ describe('discoverProjects', () => {
     expect(second.associationsCreated).toBe(0);
     expect(second.associationsSkipped).toBe(1);
     expect(await db.projectAssociations.count()).toBe(1);
+  });
+
+  it('translates cited message indexes into stored message ids on evidence', async () => {
+    const conv = makeConversation();
+    const msgs = [
+      makeMessage(conv.id, 'first', new Date('2026-08-01T00:00:00Z')),
+      makeMessage(conv.id, 'second', new Date('2026-08-01T00:01:00Z')),
+      makeMessage(conv.id, 'third', new Date('2026-08-01T00:02:00Z')),
+    ];
+    await bulkPutMessages(msgs);
+    respond({
+      projects: [],
+      associations: [],
+      objects: [
+        {
+          projectName: null,
+          type: 'decision',
+          title: 'Anchored to messages',
+          evidence: [{ conversationId: conv.id, messageIndexes: [1, 2] }],
+        },
+      ],
+    });
+
+    await discoverProjects([conv], { provider: 'anthropic' });
+
+    // The digest sent to the provider should carry per-message entries.
+    const sent = completeMock.mock.calls[0][1].messages;
+    const payload = JSON.parse(sent[1].content) as {
+      conversations: Array<{ excerpt?: string; messages?: Array<{ i: number }> }>;
+    };
+    expect(payload.conversations[0].excerpt).toBeUndefined();
+    expect(payload.conversations[0].messages?.map((m) => m.i)).toEqual([0, 1, 2]);
+
+    const objects = await db.understandingObjects.toArray();
+    const events = await getEventsForObject(objects[0].id);
+    expect(events[0].evidence).toEqual([
+      { conversationId: conv.id, messageIds: [msgs[1].id, msgs[2].id] },
+    ]);
   });
 
   it('anchors occurredAt to the latest evidence conversation activity', async () => {

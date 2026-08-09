@@ -20,6 +20,7 @@ phase, plus operational notes that affect deployment.
 | Subscription bridge | 2026-08-09 | `856bd77` | Bill synthesis to Claude / ChatGPT subscriptions via local CLI logins (Agent SDK / Codex SDK); per-provider auth-mode toggle |
 | U2.1 | 2026-08-09 | `be2a55d` | Current Understanding panel (`/projects/:id`): direction / ideas & decisions / open questions / recent changes, evidence-linked |
 | Object review | 2026-08-09 | `ef246ef` | Accept/reject on understanding objects in the panel; `/projects/unassigned` surfaces no-project objects |
+| U2.2 | 2026-08-09 | _pending_ | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
 
 ---
 
@@ -121,8 +122,54 @@ Review writes through the existing `setObjectReviewState` helper, so the
   with a count when non-rejected unassigned objects exist.
 - Accepting keeps the card (badge disappears); rejecting removes the object
   from the panel everywhere, including recent changes — consistent with U2.1's
-  assembly rules. No un-reject surface yet; the row keeps its `rejected`
-  reviewState in Dexie.
+  assembly rules.
+
+### Gap: rejected understanding objects cannot be un-rejected
+
+Rejecting an object is final as far as the UI goes: the row keeps its
+`rejected` reviewState in Dexie (nothing is deleted), but no surface lists
+rejected objects or offers a way back to `pending`/`accepted`. A misclick on
+the reject button is currently unrecoverable without dev tools. Projects and
+associations have the same property, but their review cards at least stay
+visible after accept; objects disappear entirely. Fix candidates: an "undo"
+toast on reject, or a collapsed "Rejected" section on the panel.
+
+### U2.2 — Provenance navigation to exact messages (2026-08-09)
+
+Completes the PRD §9 chain: understanding object → evidence → conversation →
+exact relevant messages. The tail already existed
+(`/conversations/:id?scrollTo=<messageId>` scrolls to and flashes the
+message); what was missing was message-level evidence to feed it.
+
+- **Digests are now message-granular.** When a conversation has stored
+  messages, its digest carries individual entries `{i, role, text}` instead of
+  one fullText excerpt (`i` = position in the ordered message list). Sampling:
+  all messages when ≤ `maxDigestMessages` (default 8), else first 3 + latest 5
+  — openings establish the topic, endings carry current state. Per-message
+  text capped at `messageExcerptLength` (default 200 chars). Conversations
+  with no stored messages keep the old excerpt fallback. **Cost note:** a full
+  digest is now ~1.6k chars/conversation vs ~600 — roughly 2.7× input tokens
+  per discovery batch. Still prefer the Anthropic subscription path for big
+  runs (Codex adds ~14k tokens/call harness overhead on top).
+- **The model cites indexes, not ids.** Object evidence in the response schema
+  is now `[{conversationId, messageIndexes}]`; indexes are cheap to transmit
+  and trivially validated. The hallucination guard extends to messages: only
+  `i` values that were actually in that conversation's digest survive parsing
+  (invented ones are dropped with a warning). The legacy `conversationIds`
+  shape is still accepted as a fallback.
+- **Indexes → real ids at persist time.** Valid indexes are translated to
+  `StoredMessage.id`s against the same ordered list the digest was built
+  from, landing in `EvidenceRef.messageIds` — which the schema had from U1.1
+  but nothing populated until now.
+- **Panel links go to the message.** Evidence links in the Current
+  Understanding panel target `?scrollTo=<first cited message>`; additional
+  cited messages render as numbered `#2 #3` links. Conversation-level
+  evidence (no messageIds) links to the conversation as before.
+
+Existing understanding objects keep conversation-level evidence; re-running
+discovery produces message-anchored objects (idempotency note: re-runs dedupe
+projects/associations but objects are created fresh each run — same behavior
+as before, the review queue absorbs duplicates).
 
 ### Gap: `npm run typecheck` does not cover the backend
 
