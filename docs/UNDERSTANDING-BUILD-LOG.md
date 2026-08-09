@@ -55,8 +55,11 @@ per provider, via `backend/src/llm/subscription.ts`:
 - **OpenAI** → Codex SDK (`@openai/codex-sdk`), which bundles the `codex`
   binary as a platform dependency — no global install needed. Auth comes from
   `~/.codex/auth.json`, i.e. the user must run `codex login` once with a
-  ChatGPT-subscription account. **Unverified end-to-end**: no Codex login
-  exists on this machine yet.
+  ChatGPT-subscription account. Live-verified 2026-08-09 after login. Caveat:
+  the Codex CLI wraps every call in its agent harness prompt (~14k input
+  tokens observed for a one-line completion), which draws down the 5-hour
+  subscription window much faster than the Anthropic path (~zero overhead) —
+  prefer Anthropic for large discovery runs.
 
 Operational details:
 
