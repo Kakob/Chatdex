@@ -59,9 +59,15 @@ export async function completeViaAnthropicSubscription(
       if (message.subtype !== 'success') {
         throw new SubscriptionError(`Claude subscription completion failed: ${message.subtype}`);
       }
+      // modelUsage keys are the real model IDs the CLI resolved to; the one
+      // with the most output tokens is the main model (others are internal
+      // helpers like the haiku utility model).
+      const mainModel = Object.entries(message.modelUsage).sort(
+        (a, b) => b[1].outputTokens - a[1].outputTokens,
+      )[0]?.[0];
       return {
         text: message.result,
-        model: input.model ?? 'subscription-default',
+        model: input.model ?? mainModel ?? 'subscription-default',
         usage: {
           inputTokens: message.usage.input_tokens,
           outputTokens: message.usage.output_tokens,
