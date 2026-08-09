@@ -596,7 +596,7 @@ prompt, model picker, Stop mid-stream, and Regenerate. Working. **Stage U5
 
 ## Stage U6 — Closed-loop reconciliation
 
-### U6.1 — Chats feed reconciliation (2026-08-09)
+### U6.1 — Chats feed reconciliation (2026-08-09, `90be69b`)
 
 PRD §18: the loop closes. Chat → "Reconcile chat" → pending proposals in
 the U3.3 review strip → accepted changes appear in the context injected
