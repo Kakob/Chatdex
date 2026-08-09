@@ -18,6 +18,7 @@ phase, plus operational notes that affect deployment.
 | Migration | 2026-08-09 | `82bdc52` | `sync_records.kind` varchar(32) applied to Neon by hand (drizzle-kit push would have truncated) |
 | U1.3 | 2026-08-09 | `cf9844b` | Projects page: review queue, discovery trigger, invariant-6 disclosure modal; provider-keys settings section |
 | Subscription bridge | 2026-08-09 | `856bd77` | Bill synthesis to Claude / ChatGPT subscriptions via local CLI logins (Agent SDK / Codex SDK); per-provider auth-mode toggle |
+| U2.1 | 2026-08-09 | _pending_ | Current Understanding panel (`/projects/:id`): direction / ideas & decisions / open questions / recent changes, evidence-linked |
 
 ---
 
@@ -76,6 +77,33 @@ Operational details:
   without a login). `maxTokens`/`temperature` are ignored on this path.
 - **zod upgraded 3→4 in `backend/`** (Agent SDK peer dependency). Route schemas
   were compatible as-is.
+
+### U2.1 — Current Understanding panel (2026-08-09)
+
+Read-only per-project panel at `/projects/:id` (project names on `/projects`
+link into it). Assembly logic lives in
+`src/lib/understanding/currentUnderstanding.ts` (pure + unit-tested), the page
+is a thin renderer.
+
+Decisions:
+
+- **Section routing over the open ontology:** `direction` and `question` types
+  get dedicated sections; every other type (`decision`, `idea`, `goal`,
+  whatever discovery emits) renders in "Ideas & decisions" with its type as a
+  chip. No type whitelist — unknown types are displayed, not dropped.
+- **Sections show status-`current` objects only.** Superseded/resolved
+  lifecycle is visible through the "Recent changes" stream (all events for the
+  project's objects, source-timeline order, capped at 15). Until U3 emits
+  non-`introduced` events, that stream is effectively "recently introduced".
+- **Pending objects render with a "pending" badge rather than being hidden** —
+  discovery output is all pending, and an empty milestone panel would defeat
+  the point. Rejected objects are excluded everywhere. (There is still no
+  accept/reject UI for *objects* — U1.3 covered projects/associations only;
+  object review is a follow-up.)
+- **Evidence is unioned across each object's event stream**, deduped to one
+  link per conversation (messageIds merged, first note kept), rendered as
+  links to `/conversations/:id`. Deleted conversations show as
+  "(deleted conversation)" instead of dead links.
 
 ### Gap: `npm run typecheck` does not cover the backend
 

@@ -61,8 +61,13 @@ export function ProjectReviewCard({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <FolderKanban size={16} className="text-violet-500 shrink-0" />
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-              {project.name}
+            <h3 className="text-sm font-semibold truncate">
+              <Link
+                to={`/projects/${project.id}`}
+                className="text-gray-900 dark:text-white hover:text-violet-600 dark:hover:text-violet-400"
+              >
+                {project.name}
+              </Link>
             </h3>
             {project.origin === 'ai' && (
               <span
