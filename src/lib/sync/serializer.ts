@@ -206,13 +206,27 @@ export function envelopeUnderstandingProject(
     kind: 'understanding_project',
     parentId: null,
     updatedAt: p.updatedAt,
-    payload: { ...p, createdAt: dateToIso(p.createdAt), updatedAt: dateToIso(p.updatedAt) },
+    payload: {
+      ...p,
+      createdAt: dateToIso(p.createdAt),
+      updatedAt: dateToIso(p.updatedAt),
+      ...(p.lastReconciledAt ? { lastReconciledAt: dateToIso(p.lastReconciledAt) } : {}),
+    },
   };
 }
 
 export function rehydrateUnderstandingProject(payload: unknown): UnderstandingProject {
-  const p = payload as UnderstandingProject & { createdAt: string; updatedAt: string };
-  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+  const p = payload as UnderstandingProject & {
+    createdAt: string;
+    updatedAt: string;
+    lastReconciledAt?: string;
+  };
+  return {
+    ...p,
+    createdAt: isoToDate(p.createdAt),
+    updatedAt: isoToDate(p.updatedAt),
+    ...(p.lastReconciledAt ? { lastReconciledAt: isoToDate(p.lastReconciledAt) } : {}),
+  };
 }
 
 export function envelopeProjectAssociation(

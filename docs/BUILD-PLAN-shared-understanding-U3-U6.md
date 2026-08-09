@@ -44,7 +44,7 @@ one rather than presenting both as simultaneously current."*
 Done. `UnderstandingEvent` carries `origin`/`reviewState`; AI events apply
 their status effect only on acceptance.
 
-### U3.2 — Reconciliation engine
+### U3.2 — Reconciliation engine ✅ (see build log)
 
 `src/lib/understanding/reconcile.ts`, engine-only (no UI), mirroring how
 U1.2 preceded U1.3.
@@ -71,10 +71,9 @@ U1.2 preceded U1.3.
   `UnderstandingProject` (serializer spreads rows, so it syncs without
   migration). A re-run processes only conversations updated since then;
   stamped per successful run.
-- **Open decision for this phase:** whether reconciliation replaces the
-  object-extraction half of discovery (discovery keeps finding
-  projects/associations; reconciliation becomes the only object writer) or
-  they coexist. Leaning: coexist until U3.3 is usable, then revisit.
+- **Decision (Jacob, 2026-08-09): coexist for now.** Discovery keeps its
+  object extraction; reconciliation evolves what exists. Revisit once U3.3
+  is usable.
 
 Acceptance: golden-fixture test where an old direction + a newer contradicting
 conversation yields a pending `superseded` event on the old object and a

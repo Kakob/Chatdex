@@ -22,6 +22,7 @@ phase, plus operational notes that affect deployment.
 | Object review | 2026-08-09 | `ef246ef` | Accept/reject on understanding objects in the panel; `/projects/unassigned` surfaces no-project objects |
 | U2.2 | 2026-08-09 | `7cb3131` | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
 | U3.1 | 2026-08-09 | `c5aeaa1` | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
+| U3.2 | 2026-08-09 | _pending_ | Reconciliation engine: chronological batches vs presented current state; op whitelist + ref resolution; all proposals pending |
 
 ---
 
@@ -220,6 +221,44 @@ and would have made the reconciliation engine untrustworthy by construction.
   `updatedAt ?? createdAt` (events were pure-append before; review makes them
   mutable), and rehydration defaults pre-U3.1 payloads from other devices to
   accepted AI events.
+
+### U3.2 — Reconciliation engine (2026-08-09)
+
+`src/lib/understanding/reconcile.ts`, engine-only (UI is U3.3), per
+`BUILD-PLAN-shared-understanding-U3-U6.md`.
+
+- **Decision (Jacob, 2026-08-09): reconciliation and discovery's
+  object-extraction coexist for now** — discovery keeps proposing objects on
+  first contact; reconciliation evolves them. Revisit once U3.3 is usable.
+- **Shape:** `reconcileProject(projectId, config)` loads the project's
+  non-rejected associated conversations newer than its cursor, sorts
+  chronologically, and processes them in sequential batches (default 10 —
+  smaller than discovery's 25 because each call also carries the presented
+  object list). State reloads between batches, so an object introduced by
+  batch 1 is presented to (and can be superseded by) batch 2.
+- **Model contract:** current objects presented as `{id, type, title, body,
+  status}`; response is a `changes` list — `introduce` (with response-local
+  `ref` "n1"…) or `support/refine/supersede/contradict/resolve/reopen` (by
+  `objectId`, optional `supersededBy` naming an existing id or a ref from the
+  same response). The prompt explicitly prefers ops on existing objects over
+  near-duplicate introduces, and tells the model contradiction without a
+  clear winner is a legitimate state (PRD §24).
+- **Guards:** everything discovery has (conversation ids, message indexes →
+  translated to real message ids) plus: unknown ops dropped, ops targeting
+  unpresented object ids dropped, changes with no valid evidence dropped,
+  `maxChanges` cap (default 10) enforced with a warning, unresolvable
+  `supersededBy` dropped while keeping the event.
+- **Everything pending:** introduces go through `createUnderstandingObject`
+  (pending), other ops through `recordUnderstandingEvent` origin `'ai'` —
+  U3.1's gate means nothing changes status until reviewed. Golden test covers
+  the acceptance scenario: old direction + contradicting newer conversation →
+  pending replacement object + pending `superseded` event linked via
+  `supersededByObjectId`, old object untouched until accept.
+- **Cursor:** `UnderstandingProject.lastReconciledAt` (syncs via serializer;
+  explicit date handling added). Advances only after all batches succeed, to
+  the newest processed conversation's `updatedAt`. Known limitation (noted on
+  the field): conversations imported/associated later with older timestamps
+  are skipped until a full re-run — U3.3 should offer one.
 
 ### Gap: `npm run typecheck` does not cover the backend
 

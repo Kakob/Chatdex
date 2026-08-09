@@ -33,6 +33,13 @@ export interface UnderstandingProject {
   description?: string;
   origin: UnderstandingOrigin;
   reviewState: ReviewState;
+  /**
+   * Reconciliation cursor (U3.2): the latest conversation `updatedAt` a
+   * reconcile run has processed. Runs only consider conversations newer than
+   * this. Known limitation: a conversation imported or associated later with
+   * an older updatedAt is skipped until a full re-run.
+   */
+  lastReconciledAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
