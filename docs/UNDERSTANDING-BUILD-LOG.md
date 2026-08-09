@@ -366,3 +366,36 @@ information architecture). Pure assembly — no LLM calls.
 
 U3 note: Jacob live-ran "Update understanding" (reconciliation) on real data
 on 2026-08-09 — U3 is now smoke-tested; stage closed.
+
+### U4.3 — History drawer (2026-08-09)
+
+PRD §23's HISTORY half: the panel stays the HEAD view, and clicking any
+object card opens a slide-over reconstructing how that belief got there.
+
+- **`src/lib/understanding/history.ts`** — `assembleObjectHistory(objectId,
+  objects, events, conversationNames)` (pure, tested) + `loadObjectHistory`
+  Dexie loader. Loads the whole understanding store (small by construction)
+  because supersession chains may cross project boundaries.
+- **Audit-trail stream:** the object's full event list, oldest first
+  (source timeline, analysis time as tiebreak) — **rejected events
+  included**, rendered greyed with "rejected — not applied"; pending events
+  marked "pending review". Each row: date, op label, AI marker, detail,
+  replaced-by title, per-event evidence links (same `mergeEvidence` path as
+  the panel).
+- **Status replay:** rows that applied (accepted/edited, U3.1 gate) and
+  carry a status-effecting op show the status they set (`→ superseded` etc.)
+  via the now-exported `OP_STATUS` map from `db/understanding.ts` — the
+  timeline reads as a replay of the object's lifecycle.
+- **Supersession chain navigation:** "Replaces:" (direct predecessors) and
+  "Replaced by:" (hop-by-hop forward chain ending at the newest holder of
+  the belief). Only applied supersessions build the chain — pending
+  proposals stay in the stream. Cycle-guarded; clicking a chain entry
+  re-targets the drawer in place, so old ↔ new navigation is two clicks.
+- **UI wiring:** `HistoryDrawer` (Escape/backdrop close), object cards get
+  cursor/hover affordance + keyboard activation; `EvidenceLinks` extracted
+  from the page into `components/understanding/EvidenceLinks.tsx` (now
+  swallows click propagation so links inside clickable cards don't open the
+  drawer).
+
+Scope note: entry points are the panel's object cards (build-plan call).
+Recent-changes rows and pending-change cards don't open the drawer yet.

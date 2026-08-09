@@ -134,7 +134,7 @@ export async function createUnderstandingObject(
 }
 
 /** Status implied by each op; ops absent here leave status unchanged. */
-const OP_STATUS: Partial<Record<UnderstandingOp, UnderstandingObject['status']>> = {
+export const OP_STATUS: Partial<Record<UnderstandingOp, UnderstandingObject['status']>> = {
   introduced: 'current',
   superseded: 'superseded',
   resolved: 'resolved',

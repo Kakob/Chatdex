@@ -10,7 +10,6 @@ import {
   LayoutList,
   Lightbulb,
   Loader2,
-  MessageSquare,
   Sparkles,
 } from 'lucide-react';
 import {
@@ -19,7 +18,6 @@ import {
   type UnderstandingItem,
   type RecentChange,
   type PendingChange,
-  type EvidenceLink,
 } from '../lib/understanding/currentUnderstanding';
 import {
   getReconcilableConversations,
@@ -36,6 +34,8 @@ import { setObjectReviewState, setEventReviewState } from '../lib/db/understandi
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
 import type { AuthMode, LLMProviderId } from '../lib/providers';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
+import { EvidenceLinks } from '../components/understanding/EvidenceLinks';
+import { HistoryDrawer } from '../components/understanding/HistoryDrawer';
 import { ReviewButtons } from '../components/understanding/ReviewButtons';
 import { useToastStore } from '../stores/toastStore';
 import type { StoredConversation } from '../types';
@@ -44,67 +44,29 @@ import type { ReviewState } from '../types/understanding';
 /** Route id for the bucket of objects with no project (projectId null). */
 export const UNASSIGNED_ROUTE_ID = 'unassigned';
 
-function EvidenceLinks({ evidence }: { evidence: EvidenceLink[] }) {
-  if (evidence.length === 0) return null;
-  return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
-      <span className="inline-flex items-center gap-1">
-        <MessageSquare size={12} /> From:
-      </span>
-      {evidence.map((ref) => {
-        if (ref.conversationName === null) {
-          return (
-            <span key={ref.conversationId} className="italic">
-              (deleted conversation)
-            </span>
-          );
-        }
-        // PRD §9 chain: link straight to the first cited message when the
-        // evidence is message-anchored; extra citations get numbered links.
-        const messageIds = ref.messageIds ?? [];
-        const target = (messageId?: string) =>
-          messageId
-            ? `/conversations/${ref.conversationId}?scrollTo=${messageId}`
-            : `/conversations/${ref.conversationId}`;
-        return (
-          <span key={ref.conversationId} className="inline-flex items-center gap-1 min-w-0">
-            <Link
-              to={target(messageIds[0])}
-              title={ref.note}
-              className="text-violet-600 dark:text-violet-400 hover:underline truncate max-w-60"
-            >
-              {ref.conversationName}
-            </Link>
-            {messageIds.length > 1 &&
-              messageIds.slice(1).map((messageId, idx) => (
-                <Link
-                  key={messageId}
-                  to={target(messageId)}
-                  title={`Cited message ${idx + 2} of ${messageIds.length}`}
-                  className="text-violet-400 dark:text-violet-500 hover:underline"
-                >
-                  #{idx + 2}
-                </Link>
-              ))}
-          </span>
-        );
-      })}
-    </div>
-  );
-}
-
 function ObjectCard({
   item,
   showType,
   onReview,
+  onOpenHistory,
 }: {
   item: UnderstandingItem;
   showType?: boolean;
   onReview: (objectId: string, state: ReviewState) => void;
+  onOpenHistory: (objectId: string) => void;
 }) {
   const { object } = item;
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenHistory(object.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onOpenHistory(object.id);
+      }}
+      title="View history"
+      className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 cursor-pointer hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -129,7 +91,9 @@ function ObjectCard({
           <EvidenceLinks evidence={item.evidence} />
         </div>
         {object.reviewState === 'pending' && (
-          <ReviewButtons small onReview={(state) => onReview(object.id, state)} />
+          <span onClick={(e) => e.stopPropagation()}>
+            <ReviewButtons small onReview={(state) => onReview(object.id, state)} />
+          </span>
         )}
       </div>
     </div>
@@ -142,12 +106,14 @@ function Section({
   items,
   showType,
   onReview,
+  onOpenHistory,
 }: {
   icon: React.ReactNode;
   title: string;
   items: UnderstandingItem[];
   showType?: boolean;
   onReview: (objectId: string, state: ReviewState) => void;
+  onOpenHistory: (objectId: string) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -158,7 +124,13 @@ function Section({
       </h2>
       <div className="space-y-3">
         {items.map((item) => (
-          <ObjectCard key={item.object.id} item={item} showType={showType} onReview={onReview} />
+          <ObjectCard
+            key={item.object.id}
+            item={item}
+            showType={showType}
+            onReview={onReview}
+            onOpenHistory={onOpenHistory}
+          />
         ))}
       </div>
     </section>
@@ -247,6 +219,7 @@ export function ProjectUnderstandingPage() {
     ignoreCursor: boolean;
   } | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [historyObjectId, setHistoryObjectId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (projectId === undefined) return Promise.resolve();
@@ -489,6 +462,7 @@ export function ProjectUnderstandingPage() {
             title="Current direction"
             items={understanding.direction}
             onReview={onObjectReview}
+            onOpenHistory={setHistoryObjectId}
           />
           <Section
             icon={<Lightbulb size={14} />}
@@ -496,12 +470,14 @@ export function ProjectUnderstandingPage() {
             items={understanding.ideasAndDecisions}
             showType
             onReview={onObjectReview}
+            onOpenHistory={setHistoryObjectId}
           />
           <Section
             icon={<HelpCircle size={14} />}
             title="Open questions"
             items={understanding.openQuestions}
             onReview={onObjectReview}
+            onOpenHistory={setHistoryObjectId}
           />
           {understanding.recentChanges.length > 0 && (
             <section>
@@ -519,6 +495,14 @@ export function ProjectUnderstandingPage() {
         </div>
       )}
         </>
+      )}
+
+      {historyObjectId && (
+        <HistoryDrawer
+          key={historyObjectId}
+          objectId={historyObjectId}
+          onClose={() => setHistoryObjectId(null)}
+        />
       )}
 
       {pendingRun && (
