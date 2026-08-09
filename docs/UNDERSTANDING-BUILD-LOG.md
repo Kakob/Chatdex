@@ -631,7 +631,7 @@ browser-exercised** — Jacob: chat about a project, hit "Reconcile chat",
 accept a proposal on the project page, then send another message and
 confirm the context panel carries the accepted change.
 
-### U6.2 — Loop ergonomics (2026-08-09)
+### U6.2 — Loop ergonomics (2026-08-09, `aeb25e2`)
 
 The build plan listed three candidates and left sizing to observed
 friction; with the loop only hours old, this pass ships all three in their
