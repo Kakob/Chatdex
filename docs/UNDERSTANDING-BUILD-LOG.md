@@ -23,7 +23,7 @@ phase, plus operational notes that affect deployment.
 | U2.2 | 2026-08-09 | `7cb3131` | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
 | U3.1 | 2026-08-09 | `c5aeaa1` | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
 | U3.2 | 2026-08-09 | `10f2d16` | Reconciliation engine: chronological batches vs presented current state; op whitelist + ref resolution; all proposals pending |
-| U3.3 | 2026-08-09 | _pending_ | Reconciliation UI: "Update understanding" trigger + disclosure, proposed-changes review strip, pending badges, auto full re-run |
+| U3.3 | 2026-08-09 | `0266e97` | Reconciliation UI: "Update understanding" trigger + disclosure, proposed-changes review strip, pending badges, auto full re-run |
 
 ---
 
