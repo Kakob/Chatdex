@@ -19,6 +19,7 @@ phase, plus operational notes that affect deployment.
 | U1.3 | 2026-08-09 | `cf9844b` | Projects page: review queue, discovery trigger, invariant-6 disclosure modal; provider-keys settings section |
 | Subscription bridge | 2026-08-09 | `856bd77` | Bill synthesis to Claude / ChatGPT subscriptions via local CLI logins (Agent SDK / Codex SDK); per-provider auth-mode toggle |
 | U2.1 | 2026-08-09 | `be2a55d` | Current Understanding panel (`/projects/:id`): direction / ideas & decisions / open questions / recent changes, evidence-linked |
+| Object review | 2026-08-09 | _pending_ | Accept/reject on understanding objects in the panel; `/projects/unassigned` surfaces no-project objects |
 
 ---
 
@@ -97,13 +98,31 @@ Decisions:
   non-`introduced` events, that stream is effectively "recently introduced".
 - **Pending objects render with a "pending" badge rather than being hidden** —
   discovery output is all pending, and an empty milestone panel would defeat
-  the point. Rejected objects are excluded everywhere. (There is still no
-  accept/reject UI for *objects* — U1.3 covered projects/associations only;
-  object review is a follow-up.)
+  the point. Rejected objects are excluded everywhere. (There was no
+  accept/reject UI for *objects* in this phase — U1.3 covered
+  projects/associations only; added in the object-review follow-up below.)
 - **Evidence is unioned across each object's event stream**, deduped to one
   link per conversation (messageIds merged, first note kept), rendered as
   links to `/conversations/:id`. Deleted conversations show as
   "(deleted conversation)" instead of dead links.
+
+### Object review UI (2026-08-09)
+
+Completes the review loop U1.3 started: understanding *objects* now get
+accept/reject controls, shown on pending cards in the Current Understanding
+panel (shared `ReviewButtons` component, extracted from `ProjectReviewCard`).
+Review writes through the existing `setObjectReviewState` helper, so the
+`updatedAt` bump flows into sync like project/association reviews.
+
+- **Unassigned bucket:** discovery can file objects under no project
+  (`projectId: null`); those were unreachable in any UI, so they could never
+  be reviewed. `/projects/unassigned` now renders the same panel over that
+  bucket (`loadProjectUnderstanding(null)`), and the Projects page links to it
+  with a count when non-rejected unassigned objects exist.
+- Accepting keeps the card (badge disappears); rejecting removes the object
+  from the panel everywhere, including recent changes — consistent with U2.1's
+  assembly rules. No un-reject surface yet; the row keeps its `rejected`
+  reviewState in Dexie.
 
 ### Gap: `npm run typecheck` does not cover the backend
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -16,6 +16,12 @@ import {
   type UnderstandingItem,
   type RecentChange,
 } from '../lib/understanding/currentUnderstanding';
+import { setObjectReviewState } from '../lib/db/understanding';
+import { ReviewButtons } from '../components/understanding/ReviewButtons';
+import type { ReviewState } from '../types/understanding';
+
+/** Route id for the bucket of objects with no project (projectId null). */
+export const UNASSIGNED_ROUTE_ID = 'unassigned';
 
 function EvidenceLinks({ item }: { item: UnderstandingItem }) {
   if (item.evidence.length === 0) return null;
@@ -44,11 +50,19 @@ function EvidenceLinks({ item }: { item: UnderstandingItem }) {
   );
 }
 
-function ObjectCard({ item, showType }: { item: UnderstandingItem; showType?: boolean }) {
+function ObjectCard({
+  item,
+  showType,
+  onReview,
+}: {
+  item: UnderstandingItem;
+  showType?: boolean;
+  onReview: (objectId: string, state: ReviewState) => void;
+}) {
   const { object } = item;
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <div className="flex items-start gap-2">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {showType && (
@@ -71,6 +85,9 @@ function ObjectCard({ item, showType }: { item: UnderstandingItem; showType?: bo
           )}
           <EvidenceLinks item={item} />
         </div>
+        {object.reviewState === 'pending' && (
+          <ReviewButtons small onReview={(state) => onReview(object.id, state)} />
+        )}
       </div>
     </div>
   );
@@ -81,11 +98,13 @@ function Section({
   title,
   items,
   showType,
+  onReview,
 }: {
   icon: React.ReactNode;
   title: string;
   items: UnderstandingItem[];
   showType?: boolean;
+  onReview: (objectId: string, state: ReviewState) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -96,7 +115,7 @@ function Section({
       </h2>
       <div className="space-y-3">
         {items.map((item) => (
-          <ObjectCard key={item.object.id} item={item} showType={showType} />
+          <ObjectCard key={item.object.id} item={item} showType={showType} onReview={onReview} />
         ))}
       </div>
     </section>
@@ -135,12 +154,24 @@ function RecentChangeRow({ change }: { change: RecentChange }) {
 
 export function ProjectUnderstandingPage() {
   const { id } = useParams<{ id: string }>();
+  const projectId = id === UNASSIGNED_ROUTE_ID ? null : id;
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
 
+  const load = useCallback(() => {
+    if (projectId === undefined) return Promise.resolve();
+    return loadProjectUnderstanding(projectId).then(setData);
+  }, [projectId]);
+
   useEffect(() => {
-    if (!id) return;
-    void loadProjectUnderstanding(id).then(setData);
-  }, [id]);
+    void load();
+  }, [load]);
+
+  const handleReview = async (objectId: string, state: ReviewState) => {
+    await setObjectReviewState(objectId, state);
+    await load();
+  };
+  const onReview = (objectId: string, state: ReviewState) =>
+    void handleReview(objectId, state);
 
   if (data === undefined) {
     return (
@@ -162,6 +193,9 @@ export function ProjectUnderstandingPage() {
   }
 
   const { project, understanding } = data;
+  const subtitle = project
+    ? project.description
+    : 'Understanding that discovery could not attribute to a specific project';
   const isEmpty =
     understanding.direction.length === 0 &&
     understanding.ideasAndDecisions.length === 0 &&
@@ -178,19 +212,21 @@ export function ProjectUnderstandingPage() {
       </Link>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">{project.name}</h1>
-        {project.description && (
-          <p className="mt-1 text-gray-600 dark:text-gray-400">{project.description}</p>
-        )}
+        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+          {project ? project.name : 'Not tied to a project'}
+        </h1>
+        {subtitle && <p className="mt-1 text-gray-600 dark:text-gray-400">{subtitle}</p>}
       </div>
 
       {isEmpty ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <Compass size={48} className="mx-auto mb-4 opacity-50" />
-          <p>No understanding synthesized for this project yet</p>
-          <p className="text-sm mt-2">
-            Run discovery from the Projects page to extract direction, decisions, and questions
-          </p>
+          <p>No understanding synthesized {project ? 'for this project' : 'here'} yet</p>
+          {project && (
+            <p className="text-sm mt-2">
+              Run discovery from the Projects page to extract direction, decisions, and questions
+            </p>
+          )}
         </div>
       ) : (
         <div className="space-y-8">
@@ -198,17 +234,20 @@ export function ProjectUnderstandingPage() {
             icon={<Compass size={14} />}
             title="Current direction"
             items={understanding.direction}
+            onReview={onReview}
           />
           <Section
             icon={<Lightbulb size={14} />}
             title="Ideas & decisions"
             items={understanding.ideasAndDecisions}
             showType
+            onReview={onReview}
           />
           <Section
             icon={<HelpCircle size={14} />}
             title="Open questions"
             items={understanding.openQuestions}
+            onReview={onReview}
           />
           {understanding.recentChanges.length > 0 && (
             <section>

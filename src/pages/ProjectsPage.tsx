@@ -27,6 +27,7 @@ export function ProjectsPage() {
   const [associationsByProject, setAssociationsByProject] = useState<
     Map<string, AssociationRow[]>
   >(new Map());
+  const [unassignedCount, setUnassignedCount] = useState(0);
   const [providers, setProviders] = useState<LLMProviderId[]>([]);
   const [provider, setProvider] = useState<LLMProviderId | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,6 +62,11 @@ export function ProjectsPage() {
 
     setProjects(projectRows.filter((p) => p.reviewState !== 'rejected'));
     setAssociationsByProject(grouped);
+    setUnassignedCount(
+      await db.understandingObjects
+        .filter((o) => o.projectId === null && o.reviewState !== 'rejected')
+        .count()
+    );
     setProviders(configured);
     setProvider((prev) => prev ?? configured[0] ?? null);
     setIsLoading(false);
@@ -231,6 +237,15 @@ export function ProjectsPage() {
                 ))}
               </div>
             </section>
+          )}
+          {unassignedCount > 0 && (
+            <Link
+              to="/projects/unassigned"
+              className="block text-sm text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400"
+            >
+              {unassignedCount} understanding object{unassignedCount !== 1 ? 's' : ''} not tied
+              to a project →
+            </Link>
           )}
         </div>
       )}

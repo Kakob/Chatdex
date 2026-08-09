@@ -141,17 +141,21 @@ export function assembleCurrentUnderstanding(
 }
 
 export interface ProjectUnderstanding {
-  project: UnderstandingProject;
+  /** null for the "unassigned" bucket (objects with no project, PRD §6). */
+  project: UnderstandingProject | null;
   understanding: CurrentUnderstanding;
 }
 
-/** Load everything the panel needs for one project. null = unknown project. */
+/**
+ * Load everything the panel needs for one project, or — with projectId null —
+ * for the unassigned bucket. Returns null only for an unknown project id.
+ */
 export async function loadProjectUnderstanding(
-  projectId: string,
+  projectId: string | null,
   options: AssembleOptions = {}
 ): Promise<ProjectUnderstanding | null> {
-  const project = await getUnderstandingProject(projectId);
-  if (!project) return null;
+  const project = projectId === null ? null : await getUnderstandingProject(projectId);
+  if (projectId !== null && !project) return null;
 
   const objects = await getObjectsForProject(projectId);
   const events = await db.understandingEvents
@@ -166,7 +170,7 @@ export async function loadProjectUnderstanding(
   const conversationNames = new Map(conversations.map((c) => [c.id, c.name]));
 
   return {
-    project,
+    project: project ?? null,
     understanding: assembleCurrentUnderstanding(objects, events, conversationNames, options),
   };
 }

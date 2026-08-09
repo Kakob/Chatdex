@@ -1,5 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { assembleCurrentUnderstanding, mergeEvidence } from './currentUnderstanding';
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  assembleCurrentUnderstanding,
+  mergeEvidence,
+  loadProjectUnderstanding,
+} from './currentUnderstanding';
+import { clearAllData } from '../db';
+import {
+  putUnderstandingProject,
+  createUnderstandingObject,
+  setObjectReviewState,
+} from '../db/understanding';
 import type {
   UnderstandingObject,
   UnderstandingEvent,
@@ -134,7 +144,7 @@ describe('assembleCurrentUnderstanding', () => {
     expect(u.recentChanges).toHaveLength(3);
   });
 
-  it('unions evidence across an object\'s events', () => {
+  it("unions evidence across an object's events", () => {
     const o = obj({ id: 'a' });
     const events = [
       evt('a', { evidence: [{ conversationId: 'c1' }] as EvidenceRef[] }),
@@ -148,6 +158,60 @@ describe('assembleCurrentUnderstanding', () => {
     expect(u.ideasAndDecisions[0].evidence.map((e) => e.conversationId).sort()).toEqual([
       'c1',
       'c2',
+    ]);
+  });
+});
+
+describe('loadProjectUnderstanding', () => {
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  const makeObject = (projectId: string | null, title: string) =>
+    createUnderstandingObject({
+      projectId,
+      type: 'idea',
+      title,
+      origin: 'ai',
+      evidence: [{ conversationId: 'c1' }],
+      occurredAt: new Date('2026-08-01T00:00:00Z'),
+    });
+
+  it('returns null for an unknown project id', async () => {
+    expect(await loadProjectUnderstanding('nope')).toBeNull();
+  });
+
+  it('loads a project with its objects', async () => {
+    const now = new Date('2026-08-01T00:00:00Z');
+    await putUnderstandingProject({
+      id: 'p1',
+      name: 'Chatdex',
+      origin: 'ai',
+      reviewState: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    });
+    await makeObject('p1', 'In project');
+    await makeObject(null, 'Unassigned');
+
+    const loaded = await loadProjectUnderstanding('p1');
+    expect(loaded?.project?.name).toBe('Chatdex');
+    expect(loaded?.understanding.ideasAndDecisions.map((i) => i.object.title)).toEqual([
+      'In project',
+    ]);
+  });
+
+  it('loads the unassigned bucket for projectId null', async () => {
+    await makeObject(null, 'Unassigned');
+    await makeObject(null, 'Rejected later');
+    const rejected = await makeObject(null, 'Rejected');
+    await setObjectReviewState(rejected.id, 'rejected');
+
+    const loaded = await loadProjectUnderstanding(null);
+    expect(loaded?.project).toBeNull();
+    expect(loaded?.understanding.ideasAndDecisions.map((i) => i.object.title).sort()).toEqual([
+      'Rejected later',
+      'Unassigned',
     ]);
   });
 });
