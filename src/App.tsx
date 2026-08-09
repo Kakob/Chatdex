@@ -6,6 +6,7 @@ import {
   TimelinePage,
   ConversationsPage,
   KnowledgePage,
+  ProjectsPage,
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
@@ -23,6 +24,7 @@ export function App() {
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:id" element={<ConversationsPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
+          <Route path="projects" element={<ProjectsPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="how-detection-works" element={<HowDetectionWorksPage />} />

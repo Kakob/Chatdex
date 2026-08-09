@@ -5,6 +5,7 @@ import {
   BarChart3,
   MessageSquare,
   Anchor,
+  FolderKanban,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ const navItems = [
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/conversations', icon: MessageSquare, label: 'Browse' },
   { to: '/knowledge', icon: Anchor, label: 'Knowledge' },
+  { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 

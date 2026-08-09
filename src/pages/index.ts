@@ -4,5 +4,6 @@ export { TimelinePage } from './TimelinePage';
 export { ConversationsPage } from './ConversationsPage';
 export { ImportPage } from './ImportPage';
 export { KnowledgePage } from './KnowledgePage';
+export { ProjectsPage } from './ProjectsPage';
 export { SettingsPage } from './SettingsPage';
 export { HowDetectionWorksPage } from './HowDetectionWorksPage';
