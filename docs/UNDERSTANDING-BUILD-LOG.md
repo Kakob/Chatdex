@@ -20,7 +20,7 @@ phase, plus operational notes that affect deployment.
 
 ## Operational notes
 
-### ⚠ Pending migration: `sync_records.kind` widened (from `adf84aa`)
+### ✓ Migration applied 2026-08-09: `sync_records.kind` widened (from `adf84aa`)
 
 U1.1's four new sync kinds exposed two backend gaps that frontend checks
 could not catch:
@@ -30,15 +30,14 @@ could not catch:
 2. `varchar('kind', { length: 20 })` was too short — `'understanding_project'`
    is 21 characters, so pushing any understanding row would fail at insert.
 
-Both fixed in `adf84aa` (`kind` is now `varchar(32)`), **but the live database
-column is not altered until someone runs:**
+Both fixed in `adf84aa` (`kind` is now `varchar(32)`). Applied to the live
+database (Neon, per `backend/.env` DATABASE_URL) on 2026-08-09 via a direct
+`ALTER TABLE sync_records ALTER COLUMN kind TYPE varchar(32)`.
 
-```
-npm run docker:up     # if Postgres isn't running
-npm run db:push
-```
-
-Until then, syncing understanding entities against a real backend will fail.
+**⚠ Do not use `npm run db:push` for column-type changes on this table.**
+drizzle-kit push proposed *truncating* `sync_records` (2,521 rows of synced
+ciphertext) to widen the varchar — a plain ALTER is metadata-only and loses
+nothing. Run type changes by hand and keep `schema.ts` in sync.
 
 ### Gap: `npm run typecheck` does not cover the backend
 
