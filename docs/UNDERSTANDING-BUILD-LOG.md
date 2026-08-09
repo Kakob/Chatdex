@@ -21,7 +21,7 @@ phase, plus operational notes that affect deployment.
 | U2.1 | 2026-08-09 | `be2a55d` | Current Understanding panel (`/projects/:id`): direction / ideas & decisions / open questions / recent changes, evidence-linked |
 | Object review | 2026-08-09 | `ef246ef` | Accept/reject on understanding objects in the panel; `/projects/unassigned` surfaces no-project objects |
 | U2.2 | 2026-08-09 | `7cb3131` | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
-| U3.1 | 2026-08-09 | _pending_ | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
+| U3.1 | 2026-08-09 | `c5aeaa1` | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
 
 ---
 
