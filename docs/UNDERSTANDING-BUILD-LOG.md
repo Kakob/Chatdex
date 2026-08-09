@@ -25,6 +25,7 @@ phase, plus operational notes that affect deployment.
 | U3.2 | 2026-08-09 | `10f2d16` | Reconciliation engine: chronological batches vs presented current state; op whitelist + ref resolution; all proposals pending |
 | U3.3 | 2026-08-09 | `0266e97` | Reconciliation UI: "Update understanding" trigger + disclosure, proposed-changes review strip, pending badges, auto full re-run |
 | U4.2 | 2026-08-09 | `d085de1` | Living understanding document: deterministic markdown projection with footnote provenance; Panel/Document toggle, copy + .md export |
+| U4.1 | 2026-08-09 | `4851906` | Understanding overview on /projects: per-project stats, open-questions rollup, global recent-changes stream |
 
 ---
 
