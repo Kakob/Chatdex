@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Compass,
+  GitMerge,
   HelpCircle,
   History,
   Lightbulb,
@@ -15,22 +16,44 @@ import {
   type ProjectUnderstanding,
   type UnderstandingItem,
   type RecentChange,
+  type PendingChange,
+  type EvidenceLink,
 } from '../lib/understanding/currentUnderstanding';
-import { setObjectReviewState } from '../lib/db/understanding';
+import {
+  getReconcilableConversations,
+  reconcileProject,
+} from '../lib/understanding/reconcile';
+import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
+import { setObjectReviewState, setEventReviewState } from '../lib/db/understanding';
+import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
+import type { AuthMode, LLMProviderId } from '../lib/providers';
+import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { ReviewButtons } from '../components/understanding/ReviewButtons';
+import { useToastStore } from '../stores/toastStore';
+import type { StoredConversation } from '../types';
 import type { ReviewState } from '../types/understanding';
 
 /** Route id for the bucket of objects with no project (projectId null). */
 export const UNASSIGNED_ROUTE_ID = 'unassigned';
 
-function EvidenceLinks({ item }: { item: UnderstandingItem }) {
-  if (item.evidence.length === 0) return null;
+const OP_LABEL: Record<string, string> = {
+  introduced: 'Introduced',
+  supported: 'Supported',
+  refined: 'Refined',
+  superseded: 'Superseded',
+  contradicted: 'Contradicted',
+  reopened: 'Reopened',
+  resolved: 'Resolved',
+};
+
+function EvidenceLinks({ evidence }: { evidence: EvidenceLink[] }) {
+  if (evidence.length === 0) return null;
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
       <span className="inline-flex items-center gap-1">
         <MessageSquare size={12} /> From:
       </span>
-      {item.evidence.map((ref) => {
+      {evidence.map((ref) => {
         if (ref.conversationName === null) {
           return (
             <span key={ref.conversationId} className="italic">
@@ -105,7 +128,7 @@ function ObjectCard({
           {object.body && (
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{object.body}</p>
           )}
-          <EvidenceLinks item={item} />
+          <EvidenceLinks evidence={item.evidence} />
         </div>
         {object.reviewState === 'pending' && (
           <ReviewButtons small onReview={(state) => onReview(object.id, state)} />
@@ -144,15 +167,42 @@ function Section({
   );
 }
 
-const OP_LABEL: Record<string, string> = {
-  introduced: 'Introduced',
-  supported: 'Supported',
-  refined: 'Refined',
-  superseded: 'Superseded',
-  contradicted: 'Contradicted',
-  reopened: 'Reopened',
-  resolved: 'Resolved',
-};
+function PendingChangeCard({
+  change,
+  onReview,
+}: {
+  change: PendingChange;
+  onReview: (eventId: string, state: 'accepted' | 'rejected') => void;
+}) {
+  const { event } = change;
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-amber-200 dark:border-amber-900/50 p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="px-1.5 py-0.5 text-xs rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300">
+              {OP_LABEL[event.op] ?? event.op}
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white">
+              {change.objectTitle}
+            </span>
+            <span className="text-xs text-gray-400">{change.objectType}</span>
+          </div>
+          {event.detail && (
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{event.detail}</p>
+          )}
+          {change.supersededByTitle && (
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              → Replaced by: <span className="font-medium">{change.supersededByTitle}</span>
+            </p>
+          )}
+          <EvidenceLinks evidence={change.evidence} />
+        </div>
+        <ReviewButtons small onReview={(state) => onReview(event.id, state === 'accepted' ? 'accepted' : 'rejected')} />
+      </div>
+    </div>
+  );
+}
 
 function RecentChangeRow({ change }: { change: RecentChange }) {
   const { event } = change;
@@ -166,8 +216,17 @@ function RecentChangeRow({ change }: { change: RecentChange }) {
           {OP_LABEL[event.op] ?? event.op}:
         </span>{' '}
         <span className="text-gray-800 dark:text-gray-200">{change.objectTitle}</span>
+        {change.supersededByTitle && (
+          <span className="text-gray-500 dark:text-gray-400">
+            {' '}
+            → {change.supersededByTitle}
+          </span>
+        )}
         {event.detail && (
           <span className="text-gray-500 dark:text-gray-400"> — {event.detail}</span>
+        )}
+        {event.reviewState === 'pending' && (
+          <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">(pending)</span>
         )}
       </div>
     </li>
@@ -177,23 +236,97 @@ function RecentChangeRow({ change }: { change: RecentChange }) {
 export function ProjectUnderstandingPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id === UNASSIGNED_ROUTE_ID ? null : id;
+  const addToast = useToastStore((s) => s.addToast);
+
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
+  const [providers, setProviders] = useState<LLMProviderId[]>([]);
+  const [provider, setProvider] = useState<LLMProviderId | null>(null);
+  const [pendingRun, setPendingRun] = useState<{
+    disclosure: DisclosureSummary;
+    conversations: StoredConversation[];
+    authMode: AuthMode;
+    ignoreCursor: boolean;
+  } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(() => {
     if (projectId === undefined) return Promise.resolve();
-    return loadProjectUnderstanding(projectId).then(setData);
+    return Promise.all([loadProjectUnderstanding(projectId), listReadyProviders()]).then(
+      ([loaded, configured]) => {
+        setData(loaded);
+        setProviders(configured);
+        setProvider((prev) => prev ?? configured[0] ?? null);
+      }
+    );
   }, [projectId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const handleReview = async (objectId: string, state: ReviewState) => {
+  const handleObjectReview = async (objectId: string, state: ReviewState) => {
     await setObjectReviewState(objectId, state);
     await load();
   };
-  const onReview = (objectId: string, state: ReviewState) =>
-    void handleReview(objectId, state);
+  const onObjectReview = (objectId: string, state: ReviewState) =>
+    void handleObjectReview(objectId, state);
+
+  const handleEventReview = async (eventId: string, state: 'accepted' | 'rejected') => {
+    await setEventReviewState(eventId, state);
+    await load();
+  };
+  const onEventReview = (eventId: string, state: 'accepted' | 'rejected') =>
+    void handleEventReview(eventId, state);
+
+  const handleReconcileClick = async () => {
+    if (!provider || !projectId) return;
+    // Incremental by default; automatic full re-run when the cursor leaves
+    // nothing new — the disclosure modal shows exactly what will be sent.
+    let ignoreCursor = false;
+    let conversations = await getReconcilableConversations(projectId);
+    if (conversations.length === 0) {
+      conversations = await getReconcilableConversations(projectId, true);
+      ignoreCursor = true;
+    }
+    if (conversations.length === 0) {
+      addToast('No conversations associated with this project yet');
+      return;
+    }
+    setPendingRun({
+      disclosure: buildDisclosure(conversations, provider),
+      conversations,
+      authMode: await getProviderAuthMode(provider),
+      ignoreCursor,
+    });
+  };
+
+  const handleConfirmReconcile = async () => {
+    if (!pendingRun || !provider || !projectId) return;
+    const { ignoreCursor } = pendingRun;
+    setPendingRun(null);
+    setProgress({ done: 0, total: 1 });
+    try {
+      const outcome = await reconcileProject(
+        projectId,
+        { provider, ignoreCursor },
+        { onProgress: (done, total) => setProgress({ done, total }) }
+      );
+      addToast(
+        `Reconciliation: ${outcome.objectsIntroduced} new object${
+          outcome.objectsIntroduced !== 1 ? 's' : ''
+        }, ${outcome.eventsProposed} proposed change${outcome.eventsProposed !== 1 ? 's' : ''}` +
+          (outcome.warnings.length > 0 ? ` (${outcome.warnings.length} warnings)` : '')
+      );
+      if (outcome.warnings.length > 0) {
+        console.warn('Reconciliation warnings:', outcome.warnings);
+      }
+    } catch (err) {
+      addToast(`Reconciliation failed: ${(err as Error).message}`, 'error');
+    } finally {
+      setProgress(null);
+      await load();
+    }
+  };
 
   if (data === undefined) {
     return (
@@ -233,12 +366,72 @@ export function ProjectUnderstandingPage() {
         <ArrowLeft size={14} /> Projects
       </Link>
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-          {project ? project.name : 'Not tied to a project'}
-        </h1>
-        {subtitle && <p className="mt-1 text-gray-600 dark:text-gray-400">{subtitle}</p>}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
+            {project ? project.name : 'Not tied to a project'}
+          </h1>
+          {subtitle && <p className="mt-1 text-gray-600 dark:text-gray-400">{subtitle}</p>}
+        </div>
+
+        {project && (
+          <div className="flex items-center gap-2">
+            {providers.length > 1 && (
+              <select
+                value={provider ?? ''}
+                onChange={(e) => setProvider(e.target.value as LLMProviderId)}
+                className="px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+              >
+                {providers.map((p) => (
+                  <option key={p} value={p}>
+                    {getProviderInfo(p).label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {providers.length === 0 ? (
+              <Link
+                to="/settings"
+                className="text-sm text-violet-600 dark:text-violet-400 hover:underline"
+              >
+                Set up an LLM provider in Settings to enable updates
+              </Link>
+            ) : (
+              <button
+                onClick={() => void handleReconcileClick()}
+                disabled={progress !== null}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {progress ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Batch {Math.min(progress.done + 1, progress.total)} of {progress.total}...
+                  </>
+                ) : (
+                  <>
+                    <GitMerge size={14} />
+                    Update understanding
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      {understanding.pendingChanges.length > 0 && (
+        <section className="mb-8">
+          <h2 className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 mb-3">
+            <Sparkles size={14} />
+            Proposed changes ({understanding.pendingChanges.length})
+          </h2>
+          <div className="space-y-3">
+            {understanding.pendingChanges.map((change) => (
+              <PendingChangeCard key={change.event.id} change={change} onReview={onEventReview} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {isEmpty ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
@@ -256,20 +449,20 @@ export function ProjectUnderstandingPage() {
             icon={<Compass size={14} />}
             title="Current direction"
             items={understanding.direction}
-            onReview={onReview}
+            onReview={onObjectReview}
           />
           <Section
             icon={<Lightbulb size={14} />}
             title="Ideas & decisions"
             items={understanding.ideasAndDecisions}
             showType
-            onReview={onReview}
+            onReview={onObjectReview}
           />
           <Section
             icon={<HelpCircle size={14} />}
             title="Open questions"
             items={understanding.openQuestions}
-            onReview={onReview}
+            onReview={onObjectReview}
           />
           {understanding.recentChanges.length > 0 && (
             <section>
@@ -285,6 +478,20 @@ export function ProjectUnderstandingPage() {
             </section>
           )}
         </div>
+      )}
+
+      {pendingRun && (
+        <DisclosureModal
+          disclosure={pendingRun.disclosure}
+          authMode={pendingRun.authMode}
+          actionLabel={
+            pendingRun.ignoreCursor
+              ? 'Understanding reconciliation (full re-run)'
+              : 'Understanding reconciliation'
+          }
+          onConfirm={() => void handleConfirmReconcile()}
+          onCancel={() => setPendingRun(null)}
+        />
       )}
     </div>
   );

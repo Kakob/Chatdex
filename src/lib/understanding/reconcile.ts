@@ -45,6 +45,12 @@ export interface ReconcileConfig {
   excerptLength?: number;
   maxDigestMessages?: number;
   messageExcerptLength?: number;
+  /**
+   * Full re-run: process all associated conversations regardless of the
+   * cursor. Escape hatch for the cursor's known limitation (conversations
+   * imported/associated later with older timestamps).
+   */
+  ignoreCursor?: boolean;
 }
 
 export interface ReconcileResult {
@@ -275,6 +281,30 @@ export interface ReconcileRunOptions {
 }
 
 /**
+ * The conversations a reconcile run over this project would process:
+ * non-rejected associations, newer than the cursor (unless ignoring it),
+ * chronological. Exported so the UI can disclose exactly this set.
+ */
+export async function getReconcilableConversations(
+  projectId: string,
+  ignoreCursor = false
+): Promise<StoredConversation[]> {
+  const project = await getUnderstandingProject(projectId);
+  if (!project) {
+    throw new Error(`Cannot reconcile: project ${projectId} not found`);
+  }
+  const associations = (await getAssociationsForProject(projectId)).filter(
+    (a) => a.reviewState !== 'rejected'
+  );
+  const convIds = [...new Set(associations.map((a) => a.conversationId))];
+  return (await db.conversations.where('id').anyOf(convIds).toArray())
+    .filter(
+      (c) => ignoreCursor || !project.lastReconciledAt || c.updatedAt > project.lastReconciledAt
+    )
+    .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
+}
+
+/**
  * Reconcile one project: process its associated conversations newer than the
  * project's cursor, in chronological batches, against current understanding.
  * On success the cursor advances to the newest processed conversation.
@@ -288,14 +318,7 @@ export async function reconcileProject(
   if (!project) {
     throw new Error(`Cannot reconcile: project ${projectId} not found`);
   }
-
-  const associations = (await getAssociationsForProject(projectId)).filter(
-    (a) => a.reviewState !== 'rejected'
-  );
-  const convIds = [...new Set(associations.map((a) => a.conversationId))];
-  const conversations = (await db.conversations.where('id').anyOf(convIds).toArray())
-    .filter((c) => !project.lastReconciledAt || c.updatedAt > project.lastReconciledAt)
-    .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
+  const conversations = await getReconcilableConversations(projectId, config.ignoreCursor);
 
   const result: ReconcileResult = {
     conversationsProcessed: 0,

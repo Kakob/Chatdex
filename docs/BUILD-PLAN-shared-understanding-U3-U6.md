@@ -79,7 +79,7 @@ Acceptance: golden-fixture test where an old direction + a newer contradicting
 conversation yields a pending `superseded` event on the old object and a
 pending replacement object, correctly linked, with message-level evidence.
 
-### U3.3 — Reconciliation UI
+### U3.3 — Reconciliation UI ✅ (see build log)
 
 - Per-project **"Update understanding"** trigger on the panel (disclosure
   modal, chronological batching, progress — reuse the U1.3 run pattern).

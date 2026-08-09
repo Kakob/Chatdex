@@ -38,6 +38,13 @@ export interface RecentChange {
   event: UnderstandingEvent;
   objectTitle: string;
   objectType: string;
+  /** Title of the replacing object, when the event names one. */
+  supersededByTitle?: string;
+}
+
+/** A pending AI-proposed event awaiting review (U3.3), with resolved links. */
+export interface PendingChange extends RecentChange {
+  evidence: EvidenceLink[];
 }
 
 export interface CurrentUnderstanding {
@@ -45,6 +52,8 @@ export interface CurrentUnderstanding {
   ideasAndDecisions: UnderstandingItem[];
   openQuestions: UnderstandingItem[];
   recentChanges: RecentChange[];
+  /** Reconciliation proposals: pending events, newest first, uncapped. */
+  pendingChanges: PendingChange[];
 }
 
 export interface AssembleOptions {
@@ -125,14 +134,32 @@ export function assembleCurrentUnderstanding(
   const current = included.filter((o) => o.status === 'current').map(toItem).sort(byRecency);
 
   const objectById = new Map(included.map((o) => [o.id, o]));
-  const recentChanges: RecentChange[] = liveEvents
+  const toChange = (event: UnderstandingEvent): RecentChange => {
+    const object = objectById.get(event.objectId)!;
+    const replacement = event.supersededByObjectId
+      ? objectById.get(event.supersededByObjectId)
+      : undefined;
+    return {
+      event,
+      objectTitle: object.title,
+      objectType: object.type,
+      ...(replacement ? { supersededByTitle: replacement.title } : {}),
+    };
+  };
+
+  const projectEvents = liveEvents
     .filter((e) => includedIds.has(e.objectId))
-    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
-    .slice(0, recentLimit)
-    .map((event) => {
-      const object = objectById.get(event.objectId)!;
-      return { event, objectTitle: object.title, objectType: object.type };
-    });
+    .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime());
+
+  const recentChanges = projectEvents.slice(0, recentLimit).map(toChange);
+  // Pending proposals get their own uncapped strip — review must see all of
+  // them, not the recentLimit window.
+  const pendingChanges: PendingChange[] = projectEvents
+    .filter((e) => e.reviewState === 'pending')
+    .map((event) => ({
+      ...toChange(event),
+      evidence: mergeEvidence([event], conversationNames),
+    }));
 
   return {
     direction: current.filter((i) => i.object.type === 'direction'),
@@ -141,6 +168,7 @@ export function assembleCurrentUnderstanding(
       (i) => i.object.type !== 'direction' && i.object.type !== 'question'
     ),
     recentChanges,
+    pendingChanges,
   };
 }
 

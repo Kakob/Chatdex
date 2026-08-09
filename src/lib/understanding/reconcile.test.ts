@@ -244,6 +244,25 @@ describe('reconcileProject', () => {
     expect(completeMock).not.toHaveBeenCalled();
   });
 
+  it('ignoreCursor processes everything for a full re-run', async () => {
+    await seedProject();
+    const conv = makeConversation({ updatedAt: new Date('2026-08-01T00:00:00Z') });
+    await db.conversations.put(conv);
+    await associate('proj-1', conv.id);
+    const project = await getUnderstandingProject('proj-1');
+    await putUnderstandingProject({
+      ...project!,
+      lastReconciledAt: new Date('2026-08-02T00:00:00Z'),
+    });
+    respond({ changes: [] });
+
+    const result = await reconcileProject('proj-1', {
+      provider: 'anthropic',
+      ignoreCursor: true,
+    });
+    expect(result.conversationsProcessed).toBe(1);
+  });
+
   it('golden scenario: supersession links old direction to introduced replacement, all pending', async () => {
     await seedProject();
     const old = await createUnderstandingObject({

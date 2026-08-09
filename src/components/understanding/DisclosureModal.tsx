@@ -11,11 +11,14 @@ export function DisclosureModal({
   authMode,
   onConfirm,
   onCancel,
+  actionLabel = 'Project discovery',
 }: {
   disclosure: DisclosureSummary;
   authMode: AuthMode;
   onConfirm: () => void;
   onCancel: () => void;
+  /** What the run is called in the copy, e.g. "Understanding reconciliation". */
+  actionLabel?: string;
 }) {
   const crossProvider = disclosure.crossProviderSources;
 
@@ -32,7 +35,7 @@ export function DisclosureModal({
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Project discovery sends excerpts from {disclosure.totalConversations} conversation
+          {actionLabel} sends excerpts from {disclosure.totalConversations} conversation
           {disclosure.totalConversations !== 1 ? 's' : ''} to {disclosure.providerLabel}
           {authMode === 'subscription'
             ? `, billed to your ${disclosure.providerLabel} subscription,`

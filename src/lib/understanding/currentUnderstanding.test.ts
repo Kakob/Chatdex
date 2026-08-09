@@ -158,6 +158,33 @@ describe('assembleCurrentUnderstanding', () => {
     expect(u.recentChanges.map((c) => c.event.op)).toEqual(['refined', 'introduced']);
   });
 
+  it('collects pending events into pendingChanges with evidence and replacement titles', () => {
+    const objects = [
+      obj({ id: 'old', type: 'direction', title: 'Old way' }),
+      obj({ id: 'new', type: 'direction', title: 'New way' }),
+    ];
+    const events = [
+      evt('old'),
+      evt('new'),
+      evt('old', {
+        op: 'superseded',
+        reviewState: 'pending',
+        supersededByObjectId: 'new',
+        evidence: [{ conversationId: 'c2' }],
+        occurredAt: new Date('2026-08-07T00:00:00Z'),
+      }),
+    ];
+    const u = assembleCurrentUnderstanding(objects, events, names);
+    expect(u.pendingChanges).toHaveLength(1);
+    expect(u.pendingChanges[0]).toMatchObject({
+      objectTitle: 'Old way',
+      supersededByTitle: 'New way',
+    });
+    expect(u.pendingChanges[0].evidence[0].conversationName).toBe('Second conversation');
+    // Accepted events don't appear in the pending strip.
+    expect(u.recentChanges).toHaveLength(3);
+  });
+
   it('caps recent changes at recentLimit', () => {
     const o = obj({ id: 'a' });
     const events = Array.from({ length: 5 }, (_, i) =>

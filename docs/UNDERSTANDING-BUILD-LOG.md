@@ -23,6 +23,7 @@ phase, plus operational notes that affect deployment.
 | U2.2 | 2026-08-09 | `7cb3131` | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
 | U3.1 | 2026-08-09 | `c5aeaa1` | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
 | U3.2 | 2026-08-09 | `10f2d16` | Reconciliation engine: chronological batches vs presented current state; op whitelist + ref resolution; all proposals pending |
+| U3.3 | 2026-08-09 | _pending_ | Reconciliation UI: "Update understanding" trigger + disclosure, proposed-changes review strip, pending badges, auto full re-run |
 
 ---
 
@@ -259,6 +260,35 @@ and would have made the reconciliation engine untrustworthy by construction.
   the newest processed conversation's `updatedAt`. Known limitation (noted on
   the field): conversations imported/associated later with older timestamps
   are skipped until a full re-run — U3.3 should offer one.
+
+### U3.3 — Reconciliation UI (2026-08-09)
+
+Completes stage U3: the engine is now reachable, and its proposals are
+reviewable where they land.
+
+- **"Update understanding"** button on `/projects/:id` (project view only —
+  reconciliation is per-project, the unassigned bucket has no trigger).
+  Provider select when several are ready, disclosure modal before anything is
+  sent (modal copy parameterized via `actionLabel` — it said "Project
+  discovery" unconditionally), batch progress, outcome toast.
+- **Cursor UX:** incremental by default via `getReconcilableConversations`
+  (exported from the engine so the disclosure lists exactly what a run will
+  send). When the cursor leaves nothing new, the run automatically falls back
+  to a **full re-run** (`ignoreCursor` config, added this phase) — disclosed
+  as such in the modal title, so cost is never a surprise. This is the escape
+  hatch for the cursor's late-import limitation.
+- **Proposed-changes strip** at the top of the panel: amber cards, one per
+  pending event — op chip, target object, detail, "→ Replaced by" when the
+  supersession names its replacement, evidence links (message-anchored), and
+  accept/reject wired to `setEventReviewState`. Assembly gained
+  `pendingChanges` (uncapped — review must see everything, not the
+  recent-changes window) with resolved evidence + replacement titles.
+- **Recent changes** rows now show `(pending)` markers and supersession
+  targets (`old → new`).
+
+Stage U3 acceptance (PRD: old direction vs new never both current) is
+implemented end-to-end but not yet exercised on real data — Jacob should run
+"Update understanding" on a real project and review the proposals.
 
 ### Gap: `npm run typecheck` does not cover the backend
 
