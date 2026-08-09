@@ -26,6 +26,7 @@ phase, plus operational notes that affect deployment.
 | U3.3 | 2026-08-09 | `0266e97` | Reconciliation UI: "Update understanding" trigger + disclosure, proposed-changes review strip, pending badges, auto full re-run |
 | U4.2 | 2026-08-09 | `d085de1` | Living understanding document: deterministic markdown projection with footnote provenance; Panel/Document toggle, copy + .md export |
 | U4.1 | 2026-08-09 | `4851906` | Understanding overview on /projects: per-project stats, open-questions rollup, global recent-changes stream |
+| U4.3 | 2026-08-09 | `aec1e8f` | History drawer: per-object audit-trail stream (rejected included), status replay, supersession-chain navigation |
 
 ---
 
