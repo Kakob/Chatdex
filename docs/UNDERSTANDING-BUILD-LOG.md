@@ -545,7 +545,7 @@ only). **Not yet browser-exercised** — Jacob: open a project chat, confirm
 the disclosure modal on first send, expand the context panel, and check
 the model actually answers from the injected understanding.
 
-### U5.3 — Chat UX (2026-08-09)
+### U5.3 — Chat UX (2026-08-09, `6ea5e9a`)
 
 The build plan sized this by "what actually hurts" — with only one live
 session to draw on, this pass covers the plan's three named items plus the
