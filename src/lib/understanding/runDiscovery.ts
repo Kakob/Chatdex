@@ -10,13 +10,26 @@ import { getProviderInfo } from '../providers';
 import type { LLMProviderId } from '../providers';
 import type { StoredConversation, DataSource } from '../../types';
 
-/** Which LLM provider each conversation source natively belongs to. */
-const NATIVE_PROVIDER: Record<DataSource, LLMProviderId> = {
+/**
+ * Which LLM provider each conversation source natively belongs to. Chatdex
+ * chats have no fixed native provider — it's whichever provider conducted the
+ * chat, recorded per conversation in providerMeta.
+ */
+const NATIVE_PROVIDER: Record<Exclude<DataSource, 'chatdex'>, LLMProviderId> = {
   'claude.ai': 'anthropic',
   'claude-code': 'anthropic',
   chatgpt: 'openai',
   codex: 'openai',
 };
+
+/** Undefined ⇒ unknown origin, disclosed as cross-provider to be safe. */
+function nativeProvider(conv: StoredConversation): LLMProviderId | undefined {
+  if (conv.source === 'chatdex') {
+    const p = conv.providerMeta?.provider;
+    return p === 'anthropic' || p === 'openai' ? p : undefined;
+  }
+  return NATIVE_PROVIDER[conv.source];
+}
 
 export interface DisclosureSummary {
   provider: LLMProviderId;
@@ -32,8 +45,10 @@ export function buildDisclosure(
   provider: LLMProviderId
 ): DisclosureSummary {
   const counts = new Map<DataSource, number>();
+  const crossProvider = new Set<DataSource>();
   for (const c of conversations) {
     counts.set(c.source, (counts.get(c.source) ?? 0) + 1);
+    if (nativeProvider(c) !== provider) crossProvider.add(c.source);
   }
   const bySource = [...counts.entries()]
     .map(([source, count]) => ({ source, count }))
@@ -44,7 +59,7 @@ export function buildDisclosure(
     totalConversations: conversations.length,
     bySource,
     crossProviderSources: bySource
-      .filter(({ source }) => NATIVE_PROVIDER[source] !== provider)
+      .filter(({ source }) => crossProvider.has(source))
       .map(({ source }) => source),
   };
 }

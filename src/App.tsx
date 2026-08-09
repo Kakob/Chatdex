@@ -5,6 +5,7 @@ import {
   AnalyticsPage,
   TimelinePage,
   ConversationsPage,
+  ChatPage,
   KnowledgePage,
   ProjectsPage,
   ProjectUnderstandingPage,
@@ -24,6 +25,9 @@ export function App() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="conversations" element={<ConversationsPage />} />
           <Route path="conversations/:id" element={<ConversationsPage />} />
+          {/* One route with an optional param: navigating /chat → /chat/:id
+              must not remount the page mid-stream. */}
+          <Route path="chat/:id?" element={<ChatPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectUnderstandingPage />} />

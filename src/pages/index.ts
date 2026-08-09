@@ -2,6 +2,7 @@ export { SearchPage } from './SearchPage';
 export { AnalyticsPage } from './AnalyticsPage';
 export { TimelinePage } from './TimelinePage';
 export { ConversationsPage } from './ConversationsPage';
+export { ChatPage } from './ChatPage';
 export { ImportPage } from './ImportPage';
 export { KnowledgePage } from './KnowledgePage';
 export { ProjectsPage } from './ProjectsPage';

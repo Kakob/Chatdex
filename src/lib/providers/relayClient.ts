@@ -6,6 +6,7 @@
 import { getAuthToken } from '../auth/session';
 import { getProviderAuthMode, getProviderKey } from './credentials';
 import { ALL_PROVIDERS, getProviderInfo } from './registry';
+import { SSEParser } from './sse';
 import type {
   LLMProviderId,
   CompletionRequest,
@@ -23,10 +24,10 @@ function authHeaders(): Headers {
   return headers;
 }
 
-export async function complete(
+async function buildRelayBody(
   provider: LLMProviderId,
   request: CompletionRequest
-): Promise<CompletionResponse> {
+): Promise<Record<string, unknown>> {
   const authMode = await getProviderAuthMode(provider);
 
   let apiKey: string | undefined;
@@ -44,18 +45,25 @@ export async function complete(
     model = request.model;
   }
 
+  return {
+    provider,
+    authMode,
+    ...(apiKey ? { apiKey } : {}),
+    ...(model ? { model } : {}),
+    messages: request.messages,
+    maxTokens: request.maxTokens,
+    temperature: request.temperature,
+  };
+}
+
+export async function complete(
+  provider: LLMProviderId,
+  request: CompletionRequest
+): Promise<CompletionResponse> {
   const res = await fetch(`${BACKEND_URL}/api/llm/complete`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({
-      provider,
-      authMode,
-      ...(apiKey ? { apiKey } : {}),
-      ...(model ? { model } : {}),
-      messages: request.messages,
-      maxTokens: request.maxTokens,
-      temperature: request.temperature,
-    }),
+    body: JSON.stringify(await buildRelayBody(provider, request)),
   });
 
   if (!res.ok) {
@@ -72,6 +80,82 @@ export async function complete(
   }
 
   return (await res.json()) as CompletionResponse;
+}
+
+type StreamEvent =
+  | { type: 'delta'; text: string }
+  | ({ type: 'done' } & CompletionResponse)
+  | { type: 'error'; error: string; providerStatus?: number };
+
+export interface StreamCallbacks {
+  /** Display-only fragments; the resolved CompletionResponse is authoritative. */
+  onDelta: (text: string) => void;
+  signal?: AbortSignal;
+}
+
+/**
+ * Streaming variant of complete(), via /api/llm/stream (SSE). Resolves with
+ * the final completion once the relay sends its `done` event.
+ */
+export async function streamComplete(
+  provider: LLMProviderId,
+  request: CompletionRequest,
+  callbacks: StreamCallbacks
+): Promise<CompletionResponse> {
+  const res = await fetch(`${BACKEND_URL}/api/llm/stream`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(await buildRelayBody(provider, request)),
+    signal: callbacks.signal,
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error(`LLM relay stream failed: ${res.status}`);
+  }
+
+  const parser = new SSEParser();
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let done: CompletionResponse | null = null;
+
+  const handle = (payload: string): void => {
+    let event: StreamEvent;
+    try {
+      event = JSON.parse(payload) as StreamEvent;
+    } catch {
+      return;
+    }
+    if (event.type === 'delta') {
+      callbacks.onDelta(event.text);
+    } else if (event.type === 'done') {
+      done = { text: event.text, model: event.model, usage: event.usage };
+    } else if (event.type === 'error') {
+      throw new Error(
+        `LLM relay stream failed — ${event.error}${
+          event.providerStatus ? ` (provider ${event.providerStatus})` : ''
+        }`
+      );
+    }
+  };
+
+  try {
+    for (;;) {
+      const { done: streamDone, value } = await reader.read();
+      if (streamDone) break;
+      for (const payload of parser.push(decoder.decode(value, { stream: true }))) {
+        handle(payload);
+      }
+    }
+    const trailing = parser.flush();
+    if (trailing !== null) handle(trailing);
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (!done) {
+    throw new Error('LLM relay stream ended without a completion');
+  }
+  return done;
 }
 
 /** Whether local CLI login state exists for each provider's subscription. */

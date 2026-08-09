@@ -10,6 +10,7 @@ import {
   LayoutList,
   Lightbulb,
   Loader2,
+  MessageCircle,
   Sparkles,
   Waypoints,
 } from 'lucide-react';
@@ -398,6 +399,14 @@ export function ProjectUnderstandingPage() {
 
           {project && (
             <>
+            <Link
+              to={`/chat?project=${project.id}`}
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
+              title="Start a chat linked to this project"
+            >
+              <MessageCircle size={14} />
+              Chat
+            </Link>
             {providers.length > 1 && (
               <select
                 value={provider ?? ''}

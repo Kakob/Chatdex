@@ -446,3 +446,60 @@ graph; parked as a backlog candidate, not a U4 blocker. Whether the map
 itself earns permanence is Jacob's call after using it on real data; if it
 doesn't help, delete `map.ts` + `ProjectMapView` and the toggle entry — the
 spike touched nothing else. U4 (navigation) is otherwise complete.
+
+## Stage U5 — Chatdex-native AI chat
+
+### U5.1 — Chat surface + storage (2026-08-09)
+
+PRD §16/§18 groundwork: a native chat surface whose transcripts are ordinary
+Chatdex sources. No context injection yet — that's U5.2; a U5.1 chat starts
+blank, so no conversation history crosses a provider boundary and no
+disclosure modal is needed (invariant 6's opt-in is the user typing into the
+provider they picked).
+
+- **Chats are sources.** New `DataSource` `'chatdex'` (rose `MessageCircle`
+  in `SOURCE_META`). Each chat is a `StoredConversation` + `StoredMessage`
+  rows, so browse/search/export/sync apply with zero extra plumbing (sync
+  hooks fire on the same tables). `providerMeta` records `{provider, model,
+  projectId?}` — model is filled lazily from the first completion in
+  subscription mode (the CLI resolves it).
+- **`src/lib/chat/chats.ts`** — `createChat` (conversation + first user
+  message + accepted user-origin `ProjectAssociation` at confidence 1 when
+  started from a project, in one Dexie transaction), `appendChatMessage`
+  (keeps messageCount/userMessageCount/assistantMessageCount/fullText/
+  estimatedTokens/updatedAt consistent with the import pipeline's rows),
+  `listChats`, `getChat`. Search index invalidated on write. Tested (9).
+- **Streaming relay** — `POST /api/llm/stream` (SSE: `delta` fragments,
+  authoritative `done` completion, content-free `error`), same zod schema
+  and transit-only rules as `/complete`. All four paths stream: api-key
+  Anthropic/OpenAI via provider SSE (`stream: true`, usage captured),
+  subscription Anthropic via Agent SDK `includePartialMessages`
+  (text_delta events, top-level only), subscription OpenAI via Codex
+  `runStreamed` (agent_message item growth → suffix deltas). Client
+  disconnect aborts api-key upstream fetches; PassThrough guarded against
+  post-disconnect writes. Shared helpers extracted to `backend/src/llm/
+  sse.ts` — the backend's **first vitest file** (6 tests; `test:all` was
+  exiting 1 on "no test files" before this).
+- **Frontend client** — `streamComplete()` in `relayClient.ts` +
+  incremental `SSEParser` (`src/lib/providers/sse.ts`, CRLF- and
+  chunk-boundary-safe, tested). Deltas are display-only; the `done` payload
+  is what gets persisted.
+- **`/chat` page** — single route `chat/:id?` (optional param so
+  /chat → /chat/:id navigation can't remount mid-stream): chat list rail,
+  bubble thread, Enter-to-send composer, provider select for new chats
+  (ready providers only); an existing chat is pinned to the provider that
+  started it. Per-project entry: "Chat" button on `/projects/:id` →
+  `/chat?project=<id>` with project chip; the association makes the chat
+  part of that project's future reconciliation set (U6.1 will just work).
+  Assistant text persists only on completion — a failed stream keeps the
+  user message and toasts.
+- **Disclosure plumbing kept honest:** `NATIVE_PROVIDER` in
+  `runDiscovery.ts` became per-conversation `nativeProvider()` — a chatdex
+  chat's native provider is read from its `providerMeta`, unknown ⇒
+  disclosed as cross-provider.
+
+Not built (deliberate): context injection (U5.2), model picker /
+regenerate / per-project history filters (U5.3), reconcile-this-chat
+(U6.1). **Not yet browser-exercised** — Jacob should open /chat, run one
+subscription-path chat, and confirm the transcript appears under Browse
+with the Chatdex chip and syncs.

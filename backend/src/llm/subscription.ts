@@ -31,8 +31,15 @@ export interface SubscriptionCompletion {
 /** Error whose message is guaranteed content-free and safe to relay. */
 export class SubscriptionError extends Error {}
 
+/**
+ * Called with each text fragment as the model produces it. Fragments are
+ * display-only hints — the returned completion's `text` is authoritative.
+ */
+export type DeltaHandler = (text: string) => void;
+
 export async function completeViaAnthropicSubscription(
   input: SubscriptionCompletionInput,
+  onDelta?: DeltaHandler,
 ): Promise<SubscriptionCompletion> {
   // An API key in the env would take priority over the subscription login and
   // silently switch billing to pay-per-token — strip it.
@@ -51,10 +58,17 @@ export async function completeViaAnthropicSubscription(
       settingSources: [],
       cwd: os.tmpdir(),
       env,
+      ...(onDelta ? { includePartialMessages: true } : {}),
     },
   });
 
   for await (const message of stream) {
+    if (onDelta && message.type === 'stream_event' && message.parent_tool_use_id === null) {
+      const event = message.event;
+      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+        onDelta(event.delta.text);
+      }
+    }
     if (message.type === 'result') {
       if (message.subtype !== 'success') {
         throw new SubscriptionError(`Claude subscription completion failed: ${message.subtype}`);
@@ -80,6 +94,7 @@ export async function completeViaAnthropicSubscription(
 
 export async function completeViaOpenAISubscription(
   input: SubscriptionCompletionInput,
+  onDelta?: DeltaHandler,
 ): Promise<SubscriptionCompletion> {
   // Codex `env` replaces the subprocess env entirely; pass everything through
   // except API keys, which would override the ChatGPT-subscription login.
@@ -104,13 +119,58 @@ export async function completeViaOpenAISubscription(
 
   // The Codex SDK has no dedicated system-prompt option.
   const promptText = input.system ? `${input.system}\n\n${input.prompt}` : input.prompt;
-  const turn = await thread.run(promptText);
+
+  if (!onDelta) {
+    const turn = await thread.run(promptText);
+    return {
+      text: turn.finalResponse,
+      model: input.model ?? 'subscription-default',
+      usage: turn.usage
+        ? { inputTokens: turn.usage.input_tokens, outputTokens: turn.usage.output_tokens }
+        : undefined,
+    };
+  }
+
+  // Streamed variant: agent_message items carry the full text-so-far on each
+  // update, so the delta is the suffix past what was already emitted.
+  const { events } = await thread.runStreamed(promptText);
+  const itemText = new Map<string, string>();
+  let finalText = '';
+  let usage: SubscriptionCompletion['usage'];
+  for await (const event of events) {
+    if (
+      (event.type === 'item.started' ||
+        event.type === 'item.updated' ||
+        event.type === 'item.completed') &&
+      event.item.type === 'agent_message'
+    ) {
+      const id = event.item.id;
+      const previous = itemText.get(id) ?? '';
+      const current = event.item.text;
+      if (current.startsWith(previous)) {
+        if (current.length > previous.length) onDelta(current.slice(previous.length));
+      } else if (current !== previous) {
+        // Rewritten rather than appended — emit whole item; client renders
+        // deltas as display hints only, final text below is authoritative.
+        onDelta(current);
+      }
+      itemText.set(id, current);
+      // Mirrors Turn.finalResponse: the last agent message is the response.
+      finalText = current;
+    } else if (event.type === 'turn.completed') {
+      usage = {
+        inputTokens: event.usage.input_tokens,
+        outputTokens: event.usage.output_tokens,
+      };
+    } else if (event.type === 'turn.failed' || event.type === 'error') {
+      // Fixed string only — SDK error messages are not guaranteed content-free.
+      throw new SubscriptionError('Codex subscription completion failed');
+    }
+  }
   return {
-    text: turn.finalResponse,
+    text: finalText,
     model: input.model ?? 'subscription-default',
-    usage: turn.usage
-      ? { inputTokens: turn.usage.input_tokens, outputTokens: turn.usage.output_tokens }
-      : undefined,
+    usage,
   };
 }
 

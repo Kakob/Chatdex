@@ -1,6 +1,8 @@
 // Unified data model across conversation/session providers
 
-export type DataSource = 'claude.ai' | 'claude-code' | 'chatgpt' | 'codex';
+// 'chatdex' = native chats held inside Chatdex itself (PRD §18: chats are
+// sources — they get browse/search/export/sync like any imported provider).
+export type DataSource = 'claude.ai' | 'claude-code' | 'chatgpt' | 'codex' | 'chatdex';
 
 // Content block types for structured message rendering
 export type ContentBlockType = 'text' | 'code' | 'thinking' | 'tool_use' | 'tool_result' | 'artifact' | 'unsupported';

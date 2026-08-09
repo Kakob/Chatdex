@@ -1,4 +1,4 @@
-import { Globe, Terminal, MessagesSquare, Bot, type LucideIcon } from 'lucide-react';
+import { Globe, Terminal, MessagesSquare, Bot, MessageCircle, type LucideIcon } from 'lucide-react';
 import type { DataSource } from '../../types';
 
 export interface SourceMeta {
@@ -32,6 +32,12 @@ export const SOURCE_META: Record<DataSource, SourceMeta> = {
     Icon: Bot,
     iconClass: 'text-sky-500',
     activeButtonClass: 'bg-sky-600 text-white',
+  },
+  chatdex: {
+    label: 'Chatdex',
+    Icon: MessageCircle,
+    iconClass: 'text-rose-500',
+    activeButtonClass: 'bg-rose-600 text-white',
   },
 };
 
