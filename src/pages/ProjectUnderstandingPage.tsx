@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Compass,
+  FileText,
   GitMerge,
   HelpCircle,
   History,
+  LayoutList,
   Lightbulb,
   Loader2,
   MessageSquare,
@@ -23,6 +25,12 @@ import {
   getReconcilableConversations,
   reconcileProject,
 } from '../lib/understanding/reconcile';
+import {
+  renderLivingDocument,
+  livingDocumentFilenamePrefix,
+  OP_LABEL,
+} from '../lib/understanding/livingDocument';
+import { LivingDocumentView } from '../components/understanding/LivingDocumentView';
 import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
 import { setObjectReviewState, setEventReviewState } from '../lib/db/understanding';
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
@@ -35,16 +43,6 @@ import type { ReviewState } from '../types/understanding';
 
 /** Route id for the bucket of objects with no project (projectId null). */
 export const UNASSIGNED_ROUTE_ID = 'unassigned';
-
-const OP_LABEL: Record<string, string> = {
-  introduced: 'Introduced',
-  supported: 'Supported',
-  refined: 'Refined',
-  superseded: 'Superseded',
-  contradicted: 'Contradicted',
-  reopened: 'Reopened',
-  resolved: 'Resolved',
-};
 
 function EvidenceLinks({ evidence }: { evidence: EvidenceLink[] }) {
   if (evidence.length === 0) return null;
@@ -239,6 +237,7 @@ export function ProjectUnderstandingPage() {
   const addToast = useToastStore((s) => s.addToast);
 
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
+  const [view, setView] = useState<'panel' | 'document'>('panel');
   const [providers, setProviders] = useState<LLMProviderId[]>([]);
   const [provider, setProvider] = useState<LLMProviderId | null>(null);
   const [pendingRun, setPendingRun] = useState<{
@@ -328,6 +327,15 @@ export function ProjectUnderstandingPage() {
     }
   };
 
+  // Regenerated on every load — the document is a projection, never stored.
+  const documentMarkdown = useMemo(
+    () =>
+      data
+        ? renderLivingDocument(data.project, data.understanding, { generatedAt: new Date() })
+        : '',
+    [data]
+  );
+
   if (data === undefined) {
     return (
       <div className="flex justify-center py-16">
@@ -374,8 +382,31 @@ export function ProjectUnderstandingPage() {
           {subtitle && <p className="mt-1 text-gray-600 dark:text-gray-400">{subtitle}</p>}
         </div>
 
-        {project && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
+            {(
+              [
+                ['panel', 'Panel', <LayoutList key="p" size={14} />],
+                ['document', 'Document', <FileText key="d" size={14} />],
+              ] as const
+            ).map(([value, label, icon]) => (
+              <button
+                key={value}
+                onClick={() => setView(value)}
+                className={`flex items-center gap-1.5 px-3 py-2 transition-colors ${
+                  view === value
+                    ? 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                    : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {project && (
+            <>
             {providers.length > 1 && (
               <select
                 value={provider ?? ''}
@@ -415,10 +446,18 @@ export function ProjectUnderstandingPage() {
                 )}
               </button>
             )}
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
+      {view === 'document' ? (
+        <LivingDocumentView
+          markdown={documentMarkdown}
+          filenamePrefix={livingDocumentFilenamePrefix(project)}
+        />
+      ) : (
+        <>
       {understanding.pendingChanges.length > 0 && (
         <section className="mb-8">
           <h2 className="flex items-center gap-2 text-sm font-medium text-amber-600 dark:text-amber-400 mb-3">
@@ -478,6 +517,8 @@ export function ProjectUnderstandingPage() {
             </section>
           )}
         </div>
+      )}
+        </>
       )}
 
       {pendingRun && (

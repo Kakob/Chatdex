@@ -297,3 +297,41 @@ above were invisible to it and were only caught by running
 `cd backend && npx tsc --noEmit` manually. Until the root `typecheck` script
 includes the backend (or CI does), any change touching `backend/src/` should
 run that command explicitly before being declared done.
+
+### U4.2 — Living understanding document (2026-08-09)
+
+PRD §14: a readable projection of current understanding, generated from the
+underlying objects — never manually maintained. Built before U4.1/U4.3 (build
+plan order) because the same projection is the U5.2 agent-context seed.
+
+- **`src/lib/understanding/livingDocument.ts`** — `renderLivingDocument(project,
+  understanding, options)`: pure, deterministic markdown projection over the
+  already-assembled `CurrentUnderstanding`. **No LLM call** — the objects were
+  synthesized upstream; this only renders them. Identical input → identical
+  string: dates render as UTC ISO days, and the generation stamp is
+  caller-supplied (`generatedAt` option), never read from the clock.
+- **Structure:** header (name, description, "projection — regenerate, don't
+  edit" note) → Current Direction → one section per open-ontology type from
+  the ideas-and-decisions bucket (naive pluralizer: `decision` → Decisions,
+  unknown types still get a heading) → Open Questions → Recent Changes
+  (ISO date, op label, `old → new` supersession, `*(pending)*` markers).
+- **Provenance as markdown footnotes:** one footnote per cited conversation
+  across the whole document, numbered in first-citation order and reused on
+  repeat citations; label is the conversation name plus the first evidence
+  note as a quote; deleted conversations render as `(deleted conversation)`.
+  Plain-markdown on purpose — readable in-app, exported, and as model context.
+- **`includePending` option** (default true, annotated `*(pending review)*`).
+  When false — the U5.2 context mode — pending objects are dropped from
+  sections *and* from Recent Changes: their 'introduced' events are always
+  accepted (U3.1 gates existence via object reviewState), so filtering by
+  event state alone would still name the excluded object.
+- **UI:** Panel/Document toggle on `/projects/:id` (works for the unassigned
+  bucket too). Document view (`LivingDocumentView`) renders the markdown
+  source formatted, with Copy and Download-.md (existing `downloadExport`
+  pattern, `understanding-<slug>-<date>.md`). No markdown-renderer dependency
+  added — source view is deliberate: what you see is exactly what travels.
+- `OP_LABEL` moved out of the page into `livingDocument.ts` (both surfaces
+  use it).
+
+Not built (deliberately, PRD §14 "do not build all of these yet"): alternate
+projections (spec, architecture doc, briefing), LLM-polish pass.
