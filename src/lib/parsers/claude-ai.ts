@@ -52,10 +52,13 @@ export async function parseClaudeAIZip(file: File): Promise<ParsedClaudeAI> {
     );
   }
 
-  return parseClaudeAIJSON(content);
+  return parseClaudeAIJSON(content, file.name);
 }
 
-export async function parseClaudeAIJSON(content: string): Promise<ParsedClaudeAI> {
+export async function parseClaudeAIJSON(
+  content: string,
+  sourceFilename?: string
+): Promise<ParsedClaudeAI> {
   const data = JSON.parse(content);
 
   console.log('[Parser] Data type:', typeof data, 'isArray:', Array.isArray(data));
@@ -96,7 +99,7 @@ export async function parseClaudeAIJSON(content: string): Promise<ParsedClaudeAI
 
   for (const conv of conversationsArray) {
     try {
-      const { conversation, convMessages } = parseConversation(conv, now);
+      const { conversation, convMessages } = parseConversation(conv, now, sourceFilename);
       conversations.push(conversation);
       messages.push(...convMessages);
     } catch (err) {
@@ -114,7 +117,8 @@ export async function parseClaudeAIJSON(content: string): Promise<ParsedClaudeAI
 
 function parseConversation(
   conv: ClaudeAIConversation,
-  importedAt: Date
+  importedAt: Date,
+  sourceFilename?: string
 ): { conversation: StoredConversation; convMessages: StoredMessage[] } {
   const convMessages: StoredMessage[] = [];
   const textParts: string[] = [conv.name || ''];
@@ -164,6 +168,7 @@ function parseConversation(
     assistantMessageCount,
     estimatedTokens: estimateTokens(fullText),
     fullText,
+    providerMeta: sourceFilename ? { sourceFilename } : undefined,
   };
 
   return { conversation, convMessages };

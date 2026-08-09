@@ -199,6 +199,7 @@ function parseEntries(
     projectPath,
     gitBranch,
     workingDirectory,
+    providerMeta: { sourceFilename: filename },
   };
 
   return {

@@ -99,12 +99,12 @@ export async function parseFile(file: File): Promise<ParsedData> {
 
   if (isZipFile(file)) {
     const content = await extractConversationsJSON(file);
-    return parseByContent(content);
+    return parseByContent(content, file.name);
   }
 
   if (isJSONFile(file)) {
     const content = await file.text();
-    return parseByContent(content);
+    return parseByContent(content, file.name);
   }
 
   throw new Error(
@@ -112,15 +112,15 @@ export async function parseFile(file: File): Promise<ParsedData> {
   );
 }
 
-async function parseByContent(content: string): Promise<ParsedData> {
+async function parseByContent(content: string, sourceFilename: string): Promise<ParsedData> {
   const sniffed = sniffJSONContent(content);
   if (sniffed === 'chatgpt') {
-    const result = await parseChatGPTJSON(content);
+    const result = await parseChatGPTJSON(content, sourceFilename);
     return { ...result, source: 'chatgpt' };
   }
   // 'claude-ai' or 'unknown': fall through to the Claude.ai parser so its
   // detailed error messages surface for truly invalid inputs.
-  const result = await parseClaudeAIJSON(content);
+  const result = await parseClaudeAIJSON(content, sourceFilename);
   return { ...result, source: 'claude.ai' };
 }
 

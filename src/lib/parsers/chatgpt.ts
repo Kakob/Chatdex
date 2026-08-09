@@ -103,10 +103,13 @@ export async function parseChatGPTZip(file: File): Promise<ParsedChatGPT> {
     );
   }
 
-  return parseChatGPTJSON(content);
+  return parseChatGPTJSON(content, file.name);
 }
 
-export async function parseChatGPTJSON(content: string): Promise<ParsedChatGPT> {
+export async function parseChatGPTJSON(
+  content: string,
+  sourceFilename?: string
+): Promise<ParsedChatGPT> {
   const data = JSON.parse(content);
   const rawConversations = extractConversationArray(data);
 
@@ -116,7 +119,7 @@ export async function parseChatGPTJSON(content: string): Promise<ParsedChatGPT> 
 
   for (const raw of rawConversations) {
     try {
-      const parsed = parseConversation(raw, importedAt);
+      const parsed = parseConversation(raw, importedAt, sourceFilename);
       if (parsed) {
         conversations.push(parsed.conversation);
         messages.push(...parsed.messages);
@@ -149,7 +152,8 @@ function extractConversationArray(data: unknown): ChatGPTConversation[] {
 
 function parseConversation(
   raw: ChatGPTConversation,
-  importedAt: Date
+  importedAt: Date,
+  sourceFilename?: string
 ): { conversation: StoredConversation; messages: StoredMessage[] } | null {
   const mapping = raw.mapping;
   if (!mapping || typeof mapping !== 'object') return null;
@@ -231,6 +235,7 @@ function parseConversation(
       canonicalNodeCount: canonicalNodeIds.length,
       totalMappingNodes,
       prunedBranches,
+      ...(sourceFilename ? { sourceFilename } : {}),
     },
   };
 

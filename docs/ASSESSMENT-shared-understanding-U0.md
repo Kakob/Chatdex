@@ -39,6 +39,8 @@ Official export ZIP contains `conversations.json` where each conversation is a *
 
 **Unknown — flagged, not guessed.** No `~/.codex` directory exists on this machine, so real session files could not be inspected. Codex CLI writes JSONL session/rollout files under `~/.codex/sessions/`, but the schema is not formally documented and has changed across releases. **Recommendation:** defer Codex to a later U0 sub-phase gated on obtaining a real sample file; do not write a parser against an assumed schema. PRD §21 permits this — U0's success criterion names only Claude + ChatGPT.
 
+> **U0.3 spike outcome (2026-08-08): blocked, deferred.** Re-verified — no `~/.codex` on this machine. The Codex parser is deferred until a real sample exists. To unblock: run Codex CLI once on any task, then point Chatdex development at the resulting `~/.codex/sessions/**/*.jsonl` file (sanitize before committing any fixture derived from it). The `DataSource` union, UI surfaces, and import pipeline already accept `'codex'`, so the remaining work is one parser + one format-detection predicate.
+
 ## 5. Reuse vs. Claude-specific assumptions
 
 **Reusable as-is:**
