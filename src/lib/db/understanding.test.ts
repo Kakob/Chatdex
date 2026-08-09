@@ -12,6 +12,7 @@ import {
   deleteAssociationsForConversation,
   createUnderstandingObject,
   recordUnderstandingEvent,
+  setEventReviewState,
   getUnderstandingObject,
   getObjectsForProject,
   getEventsForObject,
@@ -178,6 +179,7 @@ describe('understanding objects + events', () => {
       op: 'superseded',
       supersededByObjectId: 'obj-next',
       evidence: [{ conversationId: 'conv-2' }],
+      origin: 'user',
       occurredAt: new Date('2026-06-01T00:00:00Z'),
     });
     expect((await getUnderstandingObject(obj.id))?.status).toBe('superseded');
@@ -186,6 +188,7 @@ describe('understanding objects + events', () => {
       objectId: obj.id,
       op: 'reopened',
       evidence: [{ conversationId: 'conv-3' }],
+      origin: 'user',
       occurredAt: new Date('2026-07-01T00:00:00Z'),
     });
     expect((await getUnderstandingObject(obj.id))?.status).toBe('current');
@@ -207,9 +210,96 @@ describe('understanding objects + events', () => {
       objectId: obj.id,
       op: 'supported',
       evidence: [{ conversationId: 'conv-2' }],
+      origin: 'user',
       occurredAt: new Date('2026-04-01T00:00:00Z'),
     });
     expect((await getUnderstandingObject(obj.id))?.status).toBe('current');
+  });
+
+  it('AI-origin events land pending and do not touch status until accepted (U3.1)', async () => {
+    const obj = await createUnderstandingObject({
+      projectId: 'proj-1',
+      type: 'direction',
+      title: 'Conversation analyzer',
+      origin: 'ai',
+      evidence,
+      occurredAt,
+    });
+    const event = await recordUnderstandingEvent({
+      objectId: obj.id,
+      op: 'superseded',
+      evidence: [{ conversationId: 'conv-2' }],
+      origin: 'ai',
+      occurredAt: new Date('2026-06-01T00:00:00Z'),
+    });
+    expect(event.reviewState).toBe('pending');
+    expect((await getUnderstandingObject(obj.id))?.status).toBe('current');
+
+    await setEventReviewState(event.id, 'accepted');
+    expect((await getUnderstandingObject(obj.id))?.status).toBe('superseded');
+    const stored = (await getEventsForObject(obj.id)).find((e) => e.id === event.id);
+    expect(stored?.reviewState).toBe('accepted');
+    expect(stored?.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it('rejecting a pending event leaves the object untouched', async () => {
+    const obj = await createUnderstandingObject({
+      projectId: 'proj-1',
+      type: 'question',
+      title: 'Which sync backend?',
+      origin: 'ai',
+      evidence,
+      occurredAt,
+    });
+    const event = await recordUnderstandingEvent({
+      objectId: obj.id,
+      op: 'resolved',
+      evidence: [{ conversationId: 'conv-2' }],
+      origin: 'ai',
+      occurredAt,
+    });
+    await setEventReviewState(event.id, 'rejected');
+    expect((await getUnderstandingObject(obj.id))?.status).toBe('current');
+  });
+
+  it('review is one-shot: re-reviewing a non-pending event throws', async () => {
+    const obj = await createUnderstandingObject({
+      projectId: 'proj-1',
+      type: 'idea',
+      title: 'X',
+      origin: 'ai',
+      evidence,
+      occurredAt,
+    });
+    const event = await recordUnderstandingEvent({
+      objectId: obj.id,
+      op: 'supported',
+      evidence: [{ conversationId: 'conv-2' }],
+      origin: 'ai',
+      occurredAt,
+    });
+    await setEventReviewState(event.id, 'accepted');
+    await expect(setEventReviewState(event.id, 'rejected')).rejects.toThrow(/re-review/);
+  });
+
+  it('AI-origin events without evidence are rejected', async () => {
+    const obj = await createUnderstandingObject({
+      projectId: 'proj-1',
+      type: 'idea',
+      title: 'X',
+      origin: 'ai',
+      evidence,
+      occurredAt,
+    });
+    await expect(
+      recordUnderstandingEvent({
+        objectId: obj.id,
+        op: 'supported',
+        evidence: [],
+        origin: 'ai',
+        occurredAt,
+      })
+    ).rejects.toThrow(/evidence/);
   });
 
   it('rejects events for unknown objects', async () => {
@@ -218,6 +308,7 @@ describe('understanding objects + events', () => {
         objectId: 'nope',
         op: 'supported',
         evidence: [],
+        origin: 'user',
         occurredAt,
       })
     ).rejects.toThrow(/not found/);
@@ -252,6 +343,7 @@ describe('understanding objects + events', () => {
       objectId: a.id,
       op: 'superseded',
       evidence: [{ conversationId: 'conv-2' }],
+      origin: 'user',
       occurredAt: new Date('2026-06-01T00:00:00Z'),
     });
 

@@ -21,6 +21,7 @@ phase, plus operational notes that affect deployment.
 | U2.1 | 2026-08-09 | `be2a55d` | Current Understanding panel (`/projects/:id`): direction / ideas & decisions / open questions / recent changes, evidence-linked |
 | Object review | 2026-08-09 | `ef246ef` | Accept/reject on understanding objects in the panel; `/projects/unassigned` surfaces no-project objects |
 | U2.2 | 2026-08-09 | `7cb3131` | Message-level provenance: digests carry indexed messages, evidence gains `messageIds`, panel deep-links to cited messages |
+| U3.1 | 2026-08-09 | _pending_ | Event review gate: AI events land pending, status applies on accept; Dexie v4 backfill; sync LWW on review moment |
 
 ---
 
@@ -174,6 +175,47 @@ Worth knowing before the next discovery run:
   message-anchored objects. Re-runs dedupe projects/associations but create
   objects fresh each time (same behavior as before) — the review queue absorbs
   the duplicates.
+
+### U3 phase plan (2026-08-09)
+
+Stage U3 (PRD §8/§10: temporal reconciliation) split like U1 was — invariants
+first, engine second, UI third:
+
+- **U3.1 (this entry):** event review gate — groundwork so reconciliation can
+  write without bypassing human review.
+- **U3.2:** reconciliation engine — process a project's conversations
+  chronologically against its current understanding; the model proposes ops
+  (introduce / support / refine / supersede / contradict / resolve / reopen)
+  citing object ids + message-level evidence, guarded like discovery.
+- **U3.3:** UI — per-project "update understanding" trigger; pending-event
+  review (accept/reject proposed changes) in the panel; recent-changes rows
+  show review state.
+
+### U3.1 — Event review gate (2026-08-09)
+
+Before U3.1, `recordUnderstandingEvent` applied an op's status effect
+immediately — an AI-proposed supersession would have silently flipped a
+current direction to `superseded` with no review. That contradicts PRD §11
+and would have made the reconciliation engine untrustworthy by construction.
+
+- **`UnderstandingEvent` gains `origin` + `reviewState`** (and optional
+  `updatedAt`, stamped on review). User-origin events are accepted and applied
+  immediately; AI-origin events land `pending` and change nothing until
+  `setEventReviewState` accepts them. AI events require evidence, mirroring
+  the object-creation invariant. `introduced` events are always `accepted` —
+  the object's own reviewState already gates its existence.
+- **Review is one-shot** (pending → accepted/rejected). Re-reviewing throws:
+  reverting an applied status would require replaying the object's whole
+  event stream — deferred until something actually needs it. Rejected events
+  stay in Dexie as audit trail but assert nothing: the panel assembly excludes
+  them from evidence and recent changes (pending events do render — they're
+  proposals, and U3.3 will let you act on them from the panel).
+- **Migration:** Dexie v4 upgrade backfills existing events (all discovery
+  `introduced` rows, already applied) as `origin: 'ai'`, `reviewState:
+  'accepted'`. No index changes. Sync-side, event envelopes now key LWW on
+  `updatedAt ?? createdAt` (events were pure-append before; review makes them
+  mutable), and rehydration defaults pre-U3.1 payloads from other devices to
+  accepted AI events.
 
 ### Gap: `npm run typecheck` does not cover the backend
 

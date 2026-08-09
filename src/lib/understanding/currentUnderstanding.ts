@@ -98,8 +98,12 @@ export function assembleCurrentUnderstanding(
 
   const included = objects.filter((o) => o.reviewState !== 'rejected');
   const includedIds = new Set(included.map((o) => o.id));
+  // Rejected events are kept in Dexie as audit trail but assert nothing:
+  // they contribute no evidence and don't appear in recent changes. Pending
+  // events do render — they're proposals awaiting review, not noise.
+  const liveEvents = events.filter((e) => e.reviewState !== 'rejected');
   const eventsByObject = new Map<string, UnderstandingEvent[]>();
-  for (const event of events) {
+  for (const event of liveEvents) {
     if (!includedIds.has(event.objectId)) continue;
     const list = eventsByObject.get(event.objectId) ?? [];
     list.push(event);
@@ -121,7 +125,7 @@ export function assembleCurrentUnderstanding(
   const current = included.filter((o) => o.status === 'current').map(toItem).sort(byRecency);
 
   const objectById = new Map(included.map((o) => [o.id, o]));
-  const recentChanges: RecentChange[] = events
+  const recentChanges: RecentChange[] = liveEvents
     .filter((e) => includedIds.has(e.objectId))
     .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
     .slice(0, recentLimit)

@@ -96,6 +96,8 @@ describe('understanding sync serializers', () => {
         { conversationId: 'conv-1', messageIds: ['m1', 'm2'], note: 'pivot discussion' },
         { conversationId: 'conv-2' },
       ],
+      origin: 'ai',
+      reviewState: 'pending',
       occurredAt: createdAt,
       createdAt: updatedAt,
     };
@@ -104,5 +106,37 @@ describe('understanding sync serializers', () => {
     expect(env.parentId).toBe('uo-1');
     expect(env.updatedAt).toEqual(e.createdAt);
     expect(throughWire(env.payload, rehydrateUnderstandingEvent)).toEqual(e);
+  });
+
+  it('LWW keys reviewed events on their review moment', () => {
+    const e: UnderstandingEvent = {
+      id: 'ue-2',
+      objectId: 'uo-1',
+      op: 'supported',
+      evidence: [{ conversationId: 'conv-1' }],
+      origin: 'ai',
+      reviewState: 'accepted',
+      occurredAt: createdAt,
+      createdAt,
+      updatedAt,
+    };
+    const env = envelopeUnderstandingEvent(e);
+    expect(env.updatedAt).toEqual(updatedAt);
+    expect(throughWire(env.payload, rehydrateUnderstandingEvent)).toEqual(e);
+  });
+
+  it('rehydrates pre-U3.1 event payloads as accepted AI events', () => {
+    const legacy = {
+      id: 'ue-old',
+      objectId: 'uo-1',
+      op: 'introduced',
+      evidence: [{ conversationId: 'conv-1' }],
+      occurredAt: createdAt.toISOString(),
+      createdAt: createdAt.toISOString(),
+    };
+    const rehydrated = rehydrateUnderstandingEvent(JSON.parse(JSON.stringify(legacy)));
+    expect(rehydrated.origin).toBe('ai');
+    expect(rehydrated.reviewState).toBe('accepted');
+    expect(rehydrated.updatedAt).toBeUndefined();
   });
 });

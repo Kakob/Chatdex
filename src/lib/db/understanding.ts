@@ -119,6 +119,10 @@ export async function createUnderstandingObject(
     objectId: object.id,
     op: 'introduced',
     evidence: input.evidence,
+    origin: input.origin,
+    // The object's own reviewState gates its existence; the introduced event
+    // asserts nothing beyond that, so it never needs separate review.
+    reviewState: 'accepted',
     occurredAt: input.occurredAt,
     createdAt: now,
   };
@@ -143,17 +147,29 @@ export interface RecordUnderstandingEventInput {
   detail?: string;
   supersededByObjectId?: string;
   evidence: EvidenceRef[];
+  origin: UnderstandingOrigin;
   occurredAt: Date;
 }
 
 /**
- * Append an event to an existing object and update its denormalized status.
- * Events are append-only — there is no update/delete helper by design.
+ * Append an event to an existing object. Events are append-only — there is no
+ * update/delete helper by design.
+ *
+ * Review gate (PRD §11, U3.1): user-origin events are accepted and applied
+ * (denormalized status updated) immediately; AI-origin events land 'pending'
+ * and change nothing until setEventReviewState accepts them. AI-origin events
+ * require evidence, mirroring the object-creation invariant.
  */
 export async function recordUnderstandingEvent(
   input: RecordUnderstandingEventInput
 ): Promise<UnderstandingEvent> {
+  if (input.origin === 'ai' && input.evidence.length === 0) {
+    throw new Error(
+      'AI-origin understanding events require at least one evidence reference (PRD §9)'
+    );
+  }
   const now = new Date();
+  const reviewState: ReviewState = input.origin === 'ai' ? 'pending' : 'accepted';
   const event: UnderstandingEvent = {
     id: generateId(),
     objectId: input.objectId,
@@ -161,6 +177,8 @@ export async function recordUnderstandingEvent(
     detail: input.detail,
     supersededByObjectId: input.supersededByObjectId,
     evidence: input.evidence,
+    origin: input.origin,
+    reviewState,
     occurredAt: input.occurredAt,
     createdAt: now,
   };
@@ -170,13 +188,45 @@ export async function recordUnderstandingEvent(
       throw new Error(`Cannot record event: understanding object ${input.objectId} not found`);
     }
     await db.understandingEvents.put(event);
-    const status = OP_STATUS[input.op];
+    const status = reviewState === 'accepted' ? OP_STATUS[input.op] : undefined;
     await db.understandingObjects.update(input.objectId, {
       ...(status ? { status } : {}),
       updatedAt: now,
     });
   });
   return event;
+}
+
+/**
+ * Review a pending event. Accepting applies the op's status effect to the
+ * object; rejecting leaves the object untouched (the event row is kept for
+ * the audit trail). One-shot: re-reviewing a non-pending event would require
+ * replaying the object's whole event stream to derive status, so it throws.
+ */
+export async function setEventReviewState(
+  id: string,
+  state: Exclude<ReviewState, 'pending'>
+): Promise<void> {
+  const now = new Date();
+  await db.transaction('rw', [db.understandingObjects, db.understandingEvents], async () => {
+    const event = await db.understandingEvents.get(id);
+    if (!event) {
+      throw new Error(`Cannot review event ${id}: not found`);
+    }
+    if (event.reviewState !== 'pending') {
+      throw new Error(
+        `Cannot review event ${id}: already ${event.reviewState} (re-review is not supported)`
+      );
+    }
+    await db.understandingEvents.update(id, { reviewState: state, updatedAt: now });
+    if (state === 'accepted' || state === 'edited') {
+      const status = OP_STATUS[event.op];
+      await db.understandingObjects.update(event.objectId, {
+        ...(status ? { status } : {}),
+        updatedAt: now,
+      });
+    }
+  });
 }
 
 export async function getUnderstandingObject(

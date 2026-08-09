@@ -253,13 +253,32 @@ export function envelopeUnderstandingEvent(
   return {
     kind: 'understanding_event',
     parentId: e.objectId,
-    // Events are append-only; createdAt is their only write moment.
-    updatedAt: e.createdAt,
-    payload: { ...e, occurredAt: dateToIso(e.occurredAt), createdAt: dateToIso(e.createdAt) },
+    // Events are append-only except for review (U3.1); LWW keys on the
+    // review moment when there is one, else the write moment.
+    updatedAt: e.updatedAt ?? e.createdAt,
+    payload: {
+      ...e,
+      occurredAt: dateToIso(e.occurredAt),
+      createdAt: dateToIso(e.createdAt),
+      ...(e.updatedAt ? { updatedAt: dateToIso(e.updatedAt) } : {}),
+    },
   };
 }
 
 export function rehydrateUnderstandingEvent(payload: unknown): UnderstandingEvent {
-  const p = payload as UnderstandingEvent & { occurredAt: string; createdAt: string };
-  return { ...p, occurredAt: isoToDate(p.occurredAt), createdAt: isoToDate(p.createdAt) };
+  const p = payload as UnderstandingEvent & {
+    occurredAt: string;
+    createdAt: string;
+    updatedAt?: string;
+  };
+  return {
+    ...p,
+    // Payloads written before U3.1 predate event review; those events were
+    // all applied at creation, so they rehydrate as accepted AI events.
+    origin: p.origin ?? 'ai',
+    reviewState: p.reviewState ?? 'accepted',
+    occurredAt: isoToDate(p.occurredAt),
+    createdAt: isoToDate(p.createdAt),
+    ...(p.updatedAt ? { updatedAt: isoToDate(p.updatedAt) } : {}),
+  };
 }

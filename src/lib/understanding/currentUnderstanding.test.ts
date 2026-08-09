@@ -45,6 +45,8 @@ function evt(
     objectId,
     op: 'introduced',
     evidence: [{ conversationId: 'c1' }],
+    origin: 'ai',
+    reviewState: 'accepted',
     occurredAt: new Date('2026-08-01T00:00:00Z'),
     createdAt: new Date('2026-08-02T00:00:00Z'),
     ...overrides,
@@ -133,6 +135,27 @@ describe('assembleCurrentUnderstanding', () => {
       'introduced',
       'introduced',
     ]);
+  });
+
+  it('excludes rejected events from evidence and recent changes; keeps pending ones', () => {
+    const o = obj({ id: 'a' });
+    const events = [
+      evt('a', { evidence: [{ conversationId: 'c1' }] }),
+      evt('a', {
+        op: 'supported',
+        reviewState: 'rejected',
+        evidence: [{ conversationId: 'c2' }],
+        occurredAt: new Date('2026-08-05T00:00:00Z'),
+      }),
+      evt('a', {
+        op: 'refined',
+        reviewState: 'pending',
+        occurredAt: new Date('2026-08-06T00:00:00Z'),
+      }),
+    ];
+    const u = assembleCurrentUnderstanding([o], events, names);
+    expect(u.ideasAndDecisions[0].evidence.map((e) => e.conversationId)).toEqual(['c1']);
+    expect(u.recentChanges.map((c) => c.event.op)).toEqual(['refined', 'introduced']);
   });
 
   it('caps recent changes at recentLimit', () => {

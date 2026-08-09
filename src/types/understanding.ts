@@ -94,6 +94,8 @@ export type UnderstandingOp =
  * One change to an object's understanding, anchored to source evidence.
  * Events are append-only: reconciliation (PRD §10) emits new events rather
  * than rewriting history, mirroring the findings-immutability invariant.
+ * The only mutable part is review (PRD §11): AI-proposed events land
+ * 'pending' and change the object's status only once accepted.
  */
 export interface UnderstandingEvent {
   id: string;
@@ -104,8 +106,13 @@ export interface UnderstandingEvent {
   /** For 'superseded': the object that replaces this one, when known. */
   supersededByObjectId?: string;
   evidence: EvidenceRef[];
+  origin: UnderstandingOrigin;
+  /** 'pending' events are proposals: recorded, visible, but not yet applied. */
+  reviewState: ReviewState;
   /** When the change happened in the source timeline (conversation time). */
   occurredAt: Date;
   /** When Chatdex recorded the event (analysis time). */
   createdAt: Date;
+  /** Set when review changes the event; sync LWW uses it over createdAt. */
+  updatedAt?: Date;
 }

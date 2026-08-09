@@ -73,6 +73,20 @@ export class ChatdexDB extends Dexie {
         '&id, projectId, type, status, reviewState, updatedAt, [projectId+status]',
       understandingEvents: '&id, objectId, op, occurredAt, [objectId+occurredAt]',
     });
+    // v4: events become reviewable (U3.1). Pre-existing events were all
+    // AI-introduced and already applied to their objects, so they backfill
+    // as accepted — review gating only affects events created from here on.
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table('understandingEvents')
+          .toCollection()
+          .modify((e: Partial<UnderstandingEvent>) => {
+            e.origin = e.origin ?? 'ai';
+            e.reviewState = e.reviewState ?? 'accepted';
+          });
+      });
   }
 }
 
