@@ -97,7 +97,9 @@ Decisions:
   non-`introduced` events, that stream is effectively "recently introduced".
 - **Pending objects render with a "pending" badge rather than being hidden** —
   discovery output is all pending, and an empty milestone panel would defeat
-  the point. Rejected objects are excluded everywhere.
+  the point. Rejected objects are excluded everywhere. (There is still no
+  accept/reject UI for *objects* — U1.3 covered projects/associations only;
+  object review is a follow-up.)
 - **Evidence is unioned across each object's event stream**, deduped to one
   link per conversation (messageIds merged, first note kept), rendered as
   links to `/conversations/:id`. Deleted conversations show as
