@@ -449,7 +449,7 @@ spike touched nothing else. U4 (navigation) is otherwise complete.
 
 ## Stage U5 — Chatdex-native AI chat
 
-### U5.1 — Chat surface + storage (2026-08-09)
+### U5.1 — Chat surface + storage (2026-08-09, `807c984`)
 
 PRD §16/§18 groundwork: a native chat surface whose transcripts are ordinary
 Chatdex sources. No context injection yet — that's U5.2; a U5.1 chat starts
