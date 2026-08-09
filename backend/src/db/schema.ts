@@ -82,7 +82,8 @@ export const syncRecords = pgTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    kind: varchar('kind', { length: 20 })
+    // length 32: 'understanding_project' (21 chars) overflows the original 20.
+    kind: varchar('kind', { length: 32 })
       .notNull()
       .$type<
         | 'conversation'
@@ -96,6 +97,10 @@ export const syncRecords = pgTable(
         | 'metadata'
         | 'finding'
         | 'detector_run'
+        | 'understanding_project'
+        | 'project_association'
+        | 'understanding_object'
+        | 'understanding_event'
       >(),
     parentId: text('parent_id'),
     iv: bytea('iv').notNull(),

@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { authRoutes } from './routes/auth.js';
 import { syncRoutes } from './routes/sync.js';
+import { llmRoutes } from './routes/llm.js';
 import { registerAuth } from './middleware/auth.js';
 
 const fastify = Fastify({
@@ -26,6 +27,9 @@ fastify.get('/health', async () => {
 // Register routes
 fastify.register(authRoutes, { prefix: '/api/auth' });
 fastify.register(syncRoutes, { prefix: '/api/sync' });
+// Transit-only LLM relay (CLAUDE.md invariant 6): forwards to the user's own
+// provider account; never persists or logs request/response content.
+fastify.register(llmRoutes, { prefix: '/api/llm' });
 
 // Start server
 const port = parseInt(process.env.PORT || '3003', 10);
