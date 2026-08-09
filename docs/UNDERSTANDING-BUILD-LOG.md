@@ -178,6 +178,10 @@ Worth knowing before the next discovery run:
 
 ### U3 phase plan (2026-08-09)
 
+> Superseded 2026-08-09 by `BUILD-PLAN-shared-understanding-U3-U6.md`, which
+> plans the full remainder of the PRD (U3.2 → U6 + backlog). The U3 breakdown
+> below is unchanged there; it's kept here for the record.
+
 Stage U3 (PRD §8/§10: temporal reconciliation) split like U1 was — invariants
 first, engine second, UI third:
 
