@@ -1,13 +1,7 @@
-import {
-  parseClaudeAIZip,
-  parseClaudeAIJSON,
-  isClaudeAIZip,
-  isClaudeAIJSON,
-} from './claude-ai';
-import {
-  parseClaudeCodeJSONL,
-  isClaudeCodeJSONL,
-} from './claude-code';
+import JSZip from 'jszip';
+import { parseClaudeAIJSON } from './claude-ai';
+import { parseClaudeCodeJSONL } from './claude-code';
+import { parseChatGPTJSON } from './chatgpt';
 import type { StoredConversation, StoredMessage, DataSource } from '../../types';
 
 export type ParsedData = {
@@ -16,46 +10,162 @@ export type ParsedData = {
   source: DataSource;
 };
 
-export type FileFormat = 'claude-ai-zip' | 'claude-ai-json' | 'claude-code-jsonl' | 'unknown';
+export type FileFormat =
+  | 'claude-ai-zip'
+  | 'claude-ai-json'
+  | 'claude-code-jsonl'
+  | 'chatgpt-zip'
+  | 'chatgpt-json'
+  | 'unknown';
 
-export function detectFileFormat(file: File): FileFormat {
-  if (isClaudeAIZip(file)) {
-    return 'claude-ai-zip';
+// Both Claude.ai and ChatGPT export ZIPs contain `conversations.json`, so
+// filename alone can't discriminate. `sniffJSONContent` inspects the payload
+// structure — ChatGPT wraps each conversation in a `mapping` node graph while
+// Claude.ai uses a flat array of message envelopes. Ambiguous JSON defaults
+// to Claude.ai so existing users can't regress.
+export function sniffJSONContent(content: string): 'claude-ai' | 'chatgpt' | 'unknown' {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return 'unknown';
   }
-  if (isClaudeCodeJSONL(file)) {
-    return 'claude-code-jsonl';
+
+  const sample = pickSampleConversation(parsed);
+  if (!sample) return 'unknown';
+
+  if (looksLikeChatGPT(sample)) return 'chatgpt';
+  if (looksLikeClaudeAI(sample)) return 'claude-ai';
+  return 'unknown';
+}
+
+function pickSampleConversation(data: unknown): Record<string, unknown> | null {
+  const array = extractArray(data);
+  if (!array) return null;
+  for (const item of array) {
+    if (item && typeof item === 'object') return item as Record<string, unknown>;
   }
-  if (isClaudeAIJSON(file)) {
-    return 'claude-ai-json';
+  return null;
+}
+
+function extractArray(data: unknown): unknown[] | null {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object') {
+    const obj = data as Record<string, unknown>;
+    for (const key of ['conversations', 'chats', 'data']) {
+      if (Array.isArray(obj[key])) return obj[key] as unknown[];
+    }
   }
+  return null;
+}
+
+function looksLikeChatGPT(item: Record<string, unknown>): boolean {
+  return (
+    ('mapping' in item && typeof item.mapping === 'object' && item.mapping !== null) ||
+    typeof item.current_node === 'string'
+  );
+}
+
+function looksLikeClaudeAI(item: Record<string, unknown>): boolean {
+  return (
+    typeof item.uuid === 'string' &&
+    ('chat_messages' in item || 'messages' in item || 'name' in item)
+  );
+}
+
+export async function detectFileFormat(file: File): Promise<FileFormat> {
+  if (file.name.endsWith('.jsonl')) return 'claude-code-jsonl';
+
+  if (isZipFile(file)) {
+    const content = await tryExtractConversationsJSON(file);
+    if (!content) return 'unknown';
+    return sniffJSONContent(content) === 'chatgpt' ? 'chatgpt-zip' : 'claude-ai-zip';
+  }
+
+  if (isJSONFile(file)) {
+    const content = await file.text().catch(() => '');
+    if (!content) return 'unknown';
+    return sniffJSONContent(content) === 'chatgpt' ? 'chatgpt-json' : 'claude-ai-json';
+  }
+
   return 'unknown';
 }
 
 export async function parseFile(file: File): Promise<ParsedData> {
-  const format = detectFileFormat(file);
-
-  switch (format) {
-    case 'claude-ai-zip': {
-      const result = await parseClaudeAIZip(file);
-      return { ...result, source: 'claude.ai' };
-    }
-
-    case 'claude-ai-json': {
-      const content = await file.text();
-      const result = await parseClaudeAIJSON(content);
-      return { ...result, source: 'claude.ai' };
-    }
-
-    case 'claude-code-jsonl': {
-      const result = await parseClaudeCodeJSONL(file);
-      return { ...result, source: 'claude-code' };
-    }
-
-    default:
-      throw new Error(
-        `Unknown file format. Expected ZIP (Claude.ai export), JSON (conversations.json), or JSONL (Claude Code logs).`
-      );
+  if (file.name.endsWith('.jsonl')) {
+    const result = await parseClaudeCodeJSONL(file);
+    return { ...result, source: 'claude-code' };
   }
+
+  if (isZipFile(file)) {
+    const content = await extractConversationsJSON(file);
+    return parseByContent(content);
+  }
+
+  if (isJSONFile(file)) {
+    const content = await file.text();
+    return parseByContent(content);
+  }
+
+  throw new Error(
+    'Unknown file format. Expected ZIP (Claude.ai or ChatGPT export), JSON (conversations.json), or JSONL (Claude Code logs).'
+  );
+}
+
+async function parseByContent(content: string): Promise<ParsedData> {
+  const sniffed = sniffJSONContent(content);
+  if (sniffed === 'chatgpt') {
+    const result = await parseChatGPTJSON(content);
+    return { ...result, source: 'chatgpt' };
+  }
+  // 'claude-ai' or 'unknown': fall through to the Claude.ai parser so its
+  // detailed error messages surface for truly invalid inputs.
+  const result = await parseClaudeAIJSON(content);
+  return { ...result, source: 'claude.ai' };
+}
+
+async function tryExtractConversationsJSON(file: File): Promise<string | null> {
+  try {
+    return await extractConversationsJSON(file);
+  } catch {
+    return null;
+  }
+}
+
+async function extractConversationsJSON(file: File): Promise<string> {
+  const zip = await JSZip.loadAsync(file);
+  const candidates = [
+    'conversations.json',
+    'claude/conversations.json',
+    'chatgpt/conversations.json',
+    'export/conversations.json',
+    'data/conversations.json',
+  ];
+  for (const path of candidates) {
+    const entry = zip.file(path);
+    if (entry) return entry.async('string');
+  }
+  const match = Object.keys(zip.files).find(
+    (f) => f.endsWith('conversations.json') && !f.startsWith('__MACOSX')
+  );
+  if (match) {
+    const entry = zip.file(match);
+    if (entry) return entry.async('string');
+  }
+  const listing = Object.keys(zip.files)
+    .filter((f) => !f.startsWith('__MACOSX'))
+    .join(', ');
+  throw new Error(
+    `conversations.json not found in ZIP file. Files in archive: ${listing || '(empty)'}`
+  );
+}
+
+function isZipFile(file: File): boolean {
+  return file.type === 'application/zip' || file.name.endsWith('.zip');
+}
+
+function isJSONFile(file: File): boolean {
+  return file.type === 'application/json' || file.name.endsWith('.json');
 }
 
 export async function parseFiles(
@@ -74,7 +184,6 @@ export async function parseFiles(
     allConversations.push(...result.conversations);
     allMessages.push(...result.messages);
 
-    // Track the primary source based on the first file
     if (i === 0) {
       primarySource = result.source;
     }
@@ -89,3 +198,4 @@ export async function parseFiles(
 
 export { parseClaudeAIZip, parseClaudeAIJSON } from './claude-ai';
 export { parseClaudeCodeJSONL } from './claude-code';
+export { parseChatGPTZip, parseChatGPTJSON } from './chatgpt';
