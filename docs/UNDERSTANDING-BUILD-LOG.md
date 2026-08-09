@@ -336,3 +336,32 @@ plan order) because the same projection is the U5.2 agent-context seed.
 
 Not built (deliberately, PRD §14 "do not build all of these yet"): alternate
 projections (spec, architecture doc, briefing), LLM-polish pass.
+
+### U4.1 — Understanding overview (2026-08-09)
+
+PRD §12's home surface, built as an evolution of `/projects` rather than a
+new route (build-plan call: the tree is a starting visualization, not the
+information architecture). Pure assembly — no LLM calls.
+
+- **`src/lib/understanding/overview.ts`** — `assembleOverview(projects,
+  objects, events)` (pure, tested) + `loadUnderstandingOverview()` Dexie
+  loader. Inclusion rules mirror the panel: rejected
+  projects/objects/events excluded everywhere, pending included and counted
+  as awaiting review. Objects under a rejected project are excluded with it.
+- **Per-project stats** (`ProjectOverviewStats`): current-object count, open
+  question count, pending-review count (pending objects + pending events —
+  the reconciliation proposals), last activity (newest live event,
+  source-timeline). Projects ordered by last activity, not `updatedAt`.
+- **Open-questions rollup**: current questions across all projects *and* the
+  unassigned bucket, each linking to its panel, recency-ordered.
+- **Global recent-changes stream**: newest 15 events across everything, with
+  op label, supersession target, project link, `(pending)` markers.
+- **UI**: `ProjectReviewCard` gains an optional stats line (kept as the one
+  card — replacing it with a stats-only card would have dropped association
+  review for reviewed projects); page header counts open questions; empty
+  state now keys off overview content, not just project count (an
+  unassigned-only store previously rendered "No projects yet" with data
+  behind the link).
+
+U3 note: Jacob live-ran "Update understanding" (reconciliation) on real data
+on 2026-08-09 — U3 is now smoke-tested; stage closed.

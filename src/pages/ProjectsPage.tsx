@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FolderKanban, Loader2, Sparkles } from 'lucide-react';
+import { FolderKanban, HelpCircle, History, Loader2, Sparkles } from 'lucide-react';
 import { db, getConversations } from '../lib/db';
-import {
-  getAllUnderstandingProjects,
-  setProjectReviewState,
-  setAssociationReviewState,
-} from '../lib/db/understanding';
+import { setProjectReviewState, setAssociationReviewState } from '../lib/db/understanding';
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
 import type { AuthMode, LLMProviderId } from '../lib/providers';
 import {
@@ -14,23 +10,80 @@ import {
   runDiscoveryInBatches,
   type DisclosureSummary,
 } from '../lib/understanding/runDiscovery';
+import {
+  loadUnderstandingOverview,
+  type UnderstandingOverview,
+  type OverviewChange,
+  type OverviewQuestion,
+} from '../lib/understanding/overview';
+import { OP_LABEL } from '../lib/understanding/livingDocument';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { ProjectReviewCard, type AssociationRow } from '../components/understanding/ProjectReviewCard';
 import { useToastStore } from '../stores/toastStore';
 import type { StoredConversation } from '../types';
-import type { UnderstandingProject, ReviewState } from '../types/understanding';
+import type { ReviewState } from '../types/understanding';
+
+/** Route target for a change/question: its project panel or the unassigned bucket. */
+const projectRoute = (projectId: string | null) =>
+  projectId === null ? '/projects/unassigned' : `/projects/${projectId}`;
+
+function OpenQuestionRow({ question }: { question: OverviewQuestion }) {
+  return (
+    <li className="flex items-baseline gap-2 text-sm">
+      <Link
+        to={projectRoute(question.projectId)}
+        className="text-gray-800 dark:text-gray-200 hover:text-violet-600 dark:hover:text-violet-400 min-w-0 truncate"
+      >
+        {question.object.title}
+      </Link>
+      <span className="shrink-0 text-xs text-gray-400">
+        {question.projectName ?? 'unassigned'}
+      </span>
+      {question.object.reviewState === 'pending' && (
+        <span className="shrink-0 text-xs text-amber-600 dark:text-amber-400">(pending)</span>
+      )}
+    </li>
+  );
+}
+
+function GlobalChangeRow({ change }: { change: OverviewChange }) {
+  const { event } = change;
+  return (
+    <li className="flex items-baseline gap-2 text-sm">
+      <span className="shrink-0 text-xs text-gray-400 w-24 tabular-nums">
+        {event.occurredAt.toLocaleDateString()}
+      </span>
+      <div className="min-w-0">
+        <span className="text-gray-500 dark:text-gray-400">
+          {OP_LABEL[event.op] ?? event.op}:
+        </span>{' '}
+        <span className="text-gray-800 dark:text-gray-200">{change.objectTitle}</span>
+        {change.supersededByTitle && (
+          <span className="text-gray-500 dark:text-gray-400"> → {change.supersededByTitle}</span>
+        )}
+        <Link
+          to={projectRoute(change.projectId)}
+          className="ml-2 text-xs text-violet-600 dark:text-violet-400 hover:underline"
+        >
+          {change.projectName ?? 'unassigned'}
+        </Link>
+        {event.reviewState === 'pending' && (
+          <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">(pending)</span>
+        )}
+      </div>
+    </li>
+  );
+}
 
 export function ProjectsPage() {
   const addToast = useToastStore((s) => s.addToast);
 
-  const [projects, setProjects] = useState<UnderstandingProject[]>([]);
+  const [overview, setOverview] = useState<UnderstandingOverview | null>(null);
   const [associationsByProject, setAssociationsByProject] = useState<
     Map<string, AssociationRow[]>
   >(new Map());
-  const [unassignedCount, setUnassignedCount] = useState(0);
   const [providers, setProviders] = useState<LLMProviderId[]>([]);
   const [provider, setProvider] = useState<LLMProviderId | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
   const [pendingRun, setPendingRun] = useState<{
     disclosure: DisclosureSummary;
@@ -40,8 +93,8 @@ export function ProjectsPage() {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
   const load = useCallback(async () => {
-    const [projectRows, associations, configured] = await Promise.all([
-      getAllUnderstandingProjects(),
+    const [loadedOverview, associations, configured] = await Promise.all([
+      loadUnderstandingOverview(),
       db.projectAssociations.toArray(),
       listReadyProviders(),
     ]);
@@ -60,16 +113,10 @@ export function ProjectsPage() {
       grouped.set(association.projectId, rows);
     }
 
-    setProjects(projectRows.filter((p) => p.reviewState !== 'rejected'));
+    setOverview(loadedOverview);
     setAssociationsByProject(grouped);
-    setUnassignedCount(
-      await db.understandingObjects
-        .filter((o) => o.projectId === null && o.reviewState !== 'rejected')
-        .count()
-    );
     setProviders(configured);
     setProvider((prev) => prev ?? configured[0] ?? null);
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -124,8 +171,12 @@ export function ProjectsPage() {
     await load();
   };
 
-  const pending = projects.filter((p) => p.reviewState === 'pending');
-  const reviewed = projects.filter((p) => p.reviewState !== 'pending');
+  const projects = overview?.projects ?? [];
+  const pending = projects.filter((s) => s.project.reviewState === 'pending');
+  const reviewed = projects.filter((s) => s.project.reviewState !== 'pending');
+  const hasAnything =
+    overview !== null &&
+    (projects.length > 0 || overview.unassignedCount > 0 || overview.recentChanges.length > 0);
 
   return (
     <div>
@@ -135,6 +186,9 @@ export function ProjectsPage() {
           <p className="text-gray-600 dark:text-gray-400">
             {projects.length} project{projects.length !== 1 ? 's' : ''}
             {pending.length > 0 && <> · {pending.length} awaiting review</>}
+            {overview !== null && overview.openQuestions.length > 0 && (
+              <> · {overview.openQuestions.length} open question{overview.openQuestions.length !== 1 ? 's' : ''}</>
+            )}
           </p>
         </div>
 
@@ -182,11 +236,11 @@ export function ProjectsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {overview === null ? (
         <div className="flex justify-center py-16">
           <Loader2 className="animate-spin text-gray-400" size={24} />
         </div>
-      ) : projects.length === 0 ? (
+      ) : !hasAnything ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <FolderKanban size={48} className="mx-auto mb-4 opacity-50" />
           <p>No projects yet</p>
@@ -202,15 +256,14 @@ export function ProjectsPage() {
                 Awaiting review
               </h2>
               <div className="space-y-3">
-                {pending.map((project) => (
+                {pending.map((stats) => (
                   <ProjectReviewCard
-                    key={project.id}
-                    project={project}
-                    associations={associationsByProject.get(project.id) ?? []}
-                    onProjectReview={(state) => void handleProjectReview(project.id, state)}
-                    onAssociationReview={(id, state) =>
-                      void handleAssociationReview(id, state)
-                    }
+                    key={stats.project.id}
+                    project={stats.project}
+                    associations={associationsByProject.get(stats.project.id) ?? []}
+                    stats={stats}
+                    onProjectReview={(state) => void handleProjectReview(stats.project.id, state)}
+                    onAssociationReview={(id, state) => void handleAssociationReview(id, state)}
                   />
                 ))}
               </div>
@@ -224,28 +277,55 @@ export function ProjectsPage() {
                 </h2>
               )}
               <div className="space-y-3">
-                {reviewed.map((project) => (
+                {reviewed.map((stats) => (
                   <ProjectReviewCard
-                    key={project.id}
-                    project={project}
-                    associations={associationsByProject.get(project.id) ?? []}
-                    onProjectReview={(state) => void handleProjectReview(project.id, state)}
-                    onAssociationReview={(id, state) =>
-                      void handleAssociationReview(id, state)
-                    }
+                    key={stats.project.id}
+                    project={stats.project}
+                    associations={associationsByProject.get(stats.project.id) ?? []}
+                    stats={stats}
+                    onProjectReview={(state) => void handleProjectReview(stats.project.id, state)}
+                    onAssociationReview={(id, state) => void handleAssociationReview(id, state)}
                   />
                 ))}
               </div>
             </section>
           )}
-          {unassignedCount > 0 && (
+          {overview.unassignedCount > 0 && (
             <Link
               to="/projects/unassigned"
               className="block text-sm text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400"
             >
-              {unassignedCount} understanding object{unassignedCount !== 1 ? 's' : ''} not tied
-              to a project →
+              {overview.unassignedCount} understanding object
+              {overview.unassignedCount !== 1 ? 's' : ''} not tied to a project →
             </Link>
+          )}
+
+          {overview.openQuestions.length > 0 && (
+            <section>
+              <h2 className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                <HelpCircle size={14} />
+                Open questions
+              </h2>
+              <ul className="space-y-2">
+                {overview.openQuestions.map((question) => (
+                  <OpenQuestionRow key={question.object.id} question={question} />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {overview.recentChanges.length > 0 && (
+            <section>
+              <h2 className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                <History size={14} />
+                Recent changes
+              </h2>
+              <ul className="space-y-2">
+                {overview.recentChanges.map((change) => (
+                  <GlobalChangeRow key={change.event.id} change={change} />
+                ))}
+              </ul>
+            </section>
           )}
         </div>
       )}

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FolderKanban, Sparkles } from 'lucide-react';
 import { ReviewButtons } from './ReviewButtons';
+import type { ProjectOverviewStats } from '../../lib/understanding/overview';
 import type {
   UnderstandingProject,
   ProjectAssociation,
@@ -15,11 +16,14 @@ export interface AssociationRow {
 export function ProjectReviewCard({
   project,
   associations,
+  stats,
   onProjectReview,
   onAssociationReview,
 }: {
   project: UnderstandingProject;
   associations: AssociationRow[];
+  /** Understanding overview counts (U4.1); omitted → line not rendered. */
+  stats?: ProjectOverviewStats;
   onProjectReview: (state: ReviewState) => void;
   onAssociationReview: (associationId: string, state: ReviewState) => void;
 }) {
@@ -65,6 +69,25 @@ export function ProjectReviewCard({
               <> · {pendingAssociations.length} awaiting review</>
             )}
           </p>
+          {stats && stats.objectCount > 0 && (
+            <p className="mt-1 text-xs text-gray-400">
+              {stats.objectCount} understanding object{stats.objectCount !== 1 ? 's' : ''}
+              {stats.openQuestionCount > 0 && (
+                <> · {stats.openQuestionCount} open question{stats.openQuestionCount !== 1 ? 's' : ''}</>
+              )}
+              {stats.pendingReviewCount > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {stats.pendingReviewCount} proposal{stats.pendingReviewCount !== 1 ? 's' : ''} to review
+                  </span>
+                </>
+              )}
+              {stats.lastActivityAt && (
+                <> · active {stats.lastActivityAt.toLocaleDateString()}</>
+              )}
+            </p>
+          )}
         </div>
         {project.reviewState === 'pending' && <ReviewButtons onReview={onProjectReview} />}
       </div>
