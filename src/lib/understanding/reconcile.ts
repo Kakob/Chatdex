@@ -51,6 +51,15 @@ export interface ReconcileConfig {
    * imported/associated later with older timestamps).
    */
   ignoreCursor?: boolean;
+  /**
+   * Scope the run to specific associated conversations (U6.1 "reconcile
+   * this chat"). Scoped runs ignore the project cursor for selection and
+   * never advance it — advancing past unprocessed older conversations
+   * would silently skip them. Processed chatdex conversations are stamped
+   * (`providerMeta.reconciledAt`) instead, which both scoped and normal
+   * runs use to avoid re-processing an unchanged chat.
+   */
+  conversationIds?: string[];
 }
 
 export interface ReconcileResult {
@@ -280,14 +289,26 @@ export interface ReconcileRunOptions {
   onProgress?: (done: number, total: number) => void;
 }
 
+/** A chatdex chat already reconciled at (or after) its current state. */
+function isFreshlyReconciledChat(c: StoredConversation): boolean {
+  if (c.source !== 'chatdex') return false;
+  const stamp = (c.providerMeta as { reconciledAt?: string } | undefined)?.reconciledAt;
+  return Boolean(stamp) && new Date(stamp as string) >= c.updatedAt;
+}
+
 /**
  * The conversations a reconcile run over this project would process:
  * non-rejected associations, newer than the cursor (unless ignoring it),
- * chronological. Exported so the UI can disclose exactly this set.
+ * chronological. `conversationIds` scopes the set (see ReconcileConfig) —
+ * scoped selection skips the project cursor but still skips chats already
+ * stamped as reconciled at their current state. `ignoreCursor` overrides
+ * both filters (true full re-run). Exported so the UI can disclose exactly
+ * this set.
  */
 export async function getReconcilableConversations(
   projectId: string,
-  ignoreCursor = false
+  ignoreCursor = false,
+  conversationIds?: string[]
 ): Promise<StoredConversation[]> {
   const project = await getUnderstandingProject(projectId);
   if (!project) {
@@ -296,11 +317,20 @@ export async function getReconcilableConversations(
   const associations = (await getAssociationsForProject(projectId)).filter(
     (a) => a.reviewState !== 'rejected'
   );
-  const convIds = [...new Set(associations.map((a) => a.conversationId))];
+  let convIds = [...new Set(associations.map((a) => a.conversationId))];
+  if (conversationIds) {
+    const scope = new Set(conversationIds);
+    convIds = convIds.filter((id) => scope.has(id));
+  }
   return (await db.conversations.where('id').anyOf(convIds).toArray())
     .filter(
-      (c) => ignoreCursor || !project.lastReconciledAt || c.updatedAt > project.lastReconciledAt
+      (c) =>
+        ignoreCursor ||
+        conversationIds !== undefined ||
+        !project.lastReconciledAt ||
+        c.updatedAt > project.lastReconciledAt
     )
+    .filter((c) => ignoreCursor || !isFreshlyReconciledChat(c))
     .sort((a, b) => a.updatedAt.getTime() - b.updatedAt.getTime());
 }
 
@@ -318,7 +348,11 @@ export async function reconcileProject(
   if (!project) {
     throw new Error(`Cannot reconcile: project ${projectId} not found`);
   }
-  const conversations = await getReconcilableConversations(projectId, config.ignoreCursor);
+  const conversations = await getReconcilableConversations(
+    projectId,
+    config.ignoreCursor,
+    config.conversationIds
+  );
 
   const result: ReconcileResult = {
     conversationsProcessed: 0,
@@ -350,13 +384,38 @@ export async function reconcileProject(
 
   // Advance the cursor only after every batch succeeded, to the newest
   // conversation actually processed (deterministic; see the field's caveat).
-  await putUnderstandingProject({
-    ...project,
-    lastReconciledAt: conversations[conversations.length - 1].updatedAt,
-    updatedAt: new Date(),
-  });
+  // Scoped runs never advance it: the scope may skip older unprocessed
+  // conversations that a moved cursor would silently exclude forever.
+  if (!config.conversationIds) {
+    await putUnderstandingProject({
+      ...project,
+      lastReconciledAt: conversations[conversations.length - 1].updatedAt,
+      updatedAt: new Date(),
+    });
+  }
+
+  // Stamp processed chats at the state that was processed, so neither a
+  // later scoped run nor a normal run re-processes an unchanged chat.
+  await stampChatsReconciled(conversations);
 
   return result;
+}
+
+async function stampChatsReconciled(processed: StoredConversation[]): Promise<void> {
+  for (const conv of processed) {
+    if (conv.source !== 'chatdex') continue;
+    const fresh = await db.conversations.get(conv.id);
+    if (!fresh) continue;
+    await db.conversations.put({
+      ...fresh,
+      providerMeta: {
+        ...(fresh.providerMeta ?? {}),
+        // The snapshot's updatedAt, not fresh's — messages sent while the
+        // run was in flight are not covered by it.
+        reconciledAt: conv.updatedAt.toISOString(),
+      },
+    });
+  }
 }
 
 async function reconcileBatch(

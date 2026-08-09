@@ -5,6 +5,7 @@ import {
   ChevronRight,
   FileText,
   FolderKanban,
+  GitMerge,
   Loader2,
   MessageCircle,
   Play,
@@ -26,7 +27,7 @@ import {
 } from '../lib/chat/chats';
 import { loadProjectChatContext, type ProjectChatContext } from '../lib/chat/context';
 import { getUnderstandingProject } from '../lib/db/understanding';
-import { getReconcilableConversations } from '../lib/understanding/reconcile';
+import { getReconcilableConversations, reconcileProject } from '../lib/understanding/reconcile';
 import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import {
@@ -210,6 +211,11 @@ export function ChatPage() {
   } | null>(null);
   const [newChatModel, setNewChatModel] = useState<string | null>(null);
   const [railScope, setRailScope] = useState<'all' | 'project'>('all');
+  const [reconciling, setReconciling] = useState(false);
+  const [pendingReconcile, setPendingReconcile] = useState<{
+    disclosure: DisclosureSummary;
+    authMode: AuthMode;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -484,8 +490,61 @@ export function ChatPage() {
     }
   };
 
+  /**
+   * U6.1 — close the loop: feed this chat back through the reconciliation
+   * engine (scoped to this conversation). Proposals land pending in the
+   * project's review strip; once accepted they're in the context injected
+   * into the next send.
+   */
+  const handleReconcileClick = async () => {
+    if (!activeId || !chatProjectId || !effectiveProvider || sending || reconciling) return;
+    const scoped = await getReconcilableConversations(chatProjectId, false, [activeId]);
+    if (scoped.length === 0) {
+      addToast('Nothing new to reconcile — the understanding already covers this chat');
+      return;
+    }
+    setPendingReconcile({
+      disclosure: buildDisclosure(scoped, effectiveProvider),
+      authMode: await getProviderAuthMode(effectiveProvider),
+    });
+  };
+
+  const handleConfirmReconcile = async () => {
+    if (!pendingReconcile || !activeId || !chatProjectId || !effectiveProvider) return;
+    setPendingReconcile(null);
+    setReconciling(true);
+    try {
+      const outcome = await reconcileProject(chatProjectId, {
+        provider: effectiveProvider,
+        conversationIds: [activeId],
+      });
+      addToast(
+        `Understanding updated from this chat: ${outcome.objectsIntroduced} new object${
+          outcome.objectsIntroduced !== 1 ? 's' : ''
+        }, ${outcome.eventsProposed} proposed change${
+          outcome.eventsProposed !== 1 ? 's' : ''
+        } — review them on the project page`
+      );
+      if (outcome.warnings.length > 0) {
+        console.warn('Reconciliation warnings:', outcome.warnings);
+      }
+      // Pick up the reconcile stamp so the button greys out until new messages.
+      setActiveChat((await getChat(activeId)) ?? null);
+    } catch (err) {
+      addToast(`Reconciliation failed: ${(err as Error).message}`, 'error');
+    } finally {
+      setReconciling(false);
+    }
+  };
+
   const providerOptions = useMemo(() => providers ?? [], [providers]);
   const isNewChat = !activeId;
+  // The reconcile stamp covers the chat's current state — nothing new to feed.
+  const chatUpToDate = Boolean(
+    activeChat &&
+      chatMeta?.reconciledAt &&
+      new Date(chatMeta.reconciledAt) >= activeChat.updatedAt
+  );
 
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
@@ -535,10 +594,14 @@ export function ChatPage() {
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
               {activeChat ? activeChat.name : 'New chat'}
             </h1>
-            {projectName && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300">
+            {projectName && chatProjectId && (
+              <Link
+                to={`/projects/${chatProjectId}`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors"
+                title="Open the project's understanding"
+              >
                 <FolderKanban size={11} /> {projectName}
-              </span>
+              </Link>
             )}
           </div>
 
@@ -591,6 +654,25 @@ export function ChatPage() {
                       })();
                     }}
                   />
+                  {chatProjectId && providerReady && (
+                    <button
+                      onClick={() => void handleReconcileClick()}
+                      disabled={sending || reconciling || chatUpToDate}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-800 transition-colors disabled:opacity-50"
+                      title={
+                        chatUpToDate
+                          ? 'The understanding already covers this chat'
+                          : 'Propose understanding updates from this chat'
+                      }
+                    >
+                      {reconciling ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <GitMerge size={14} />
+                      )}
+                      {chatUpToDate ? 'Reconciled' : 'Reconcile chat'}
+                    </button>
+                  )}
                 </>
               )
             )}
@@ -720,6 +802,16 @@ export function ChatPage() {
           confirmLabel="Send with context"
           onConfirm={() => void handleConfirmDisclosure()}
           onCancel={() => setPendingDisclosure(null)}
+        />
+      )}
+
+      {pendingReconcile && (
+        <DisclosureModal
+          disclosure={pendingReconcile.disclosure}
+          authMode={pendingReconcile.authMode}
+          actionLabel="Understanding reconciliation (this chat)"
+          onConfirm={() => void handleConfirmReconcile()}
+          onCancel={() => setPendingReconcile(null)}
         />
       )}
     </div>

@@ -593,3 +593,40 @@ Jacob smoke-tested U5.2 + U5.3 in the browser: project chat with the
 disclosure modal on first send, context panel showing the injected system
 prompt, model picker, Stop mid-stream, and Regenerate. Working. **Stage U5
 (native chat) closed — built, tested, and live-verified.**
+
+## Stage U6 — Closed-loop reconciliation
+
+### U6.1 — Chats feed reconciliation (2026-08-09)
+
+PRD §18: the loop closes. Chat → "Reconcile chat" → pending proposals in
+the U3.3 review strip → accepted changes appear in the context injected
+into the next send. Chats were already in the reconciliation set via their
+U5.1 user-origin association; this phase adds the scoped trigger and the
+cursor semantics that make per-chat runs safe.
+
+- **Scoped runs** — `ReconcileConfig.conversationIds` limits a run to
+  specific associated conversations (unassociated ids are ignored, not
+  trusted). Scoped selection skips the project cursor (the chat may be
+  older than it) and scoped runs **never advance it** — advancing past
+  unprocessed older conversations would silently exclude them forever.
+- **Per-chat reconcile stamp** — successful runs (scoped and normal) stamp
+  processed chatdex conversations with `providerMeta.reconciledAt` = the
+  processed snapshot's `updatedAt` (not the live row — messages sent while
+  the run was in flight aren't covered). Selection skips chats whose stamp
+  covers their current state in both scoped and normal runs, so a chat is
+  never double-processed from either side; new messages invalidate the
+  stamp naturally. `ignoreCursor` (full re-run) remains the escape hatch
+  and ignores stamps too. 6 new engine tests.
+- **UI** — "Reconcile chat" button on project chats (GitMerge, matching
+  the project page's "Update understanding"): disclosure modal
+  (actionLabel "Understanding reconciliation (this chat)") → scoped run →
+  outcome toast pointing at the project page for review. Button reads
+  "Reconciled" and disables while the stamp covers the chat's state; the
+  project chip in the chat header is now a link to `/projects/:id`, so
+  review is one click from the toast.
+
+Not built (U6.2, by observed friction): auto-suggest reconciliation at
+chat end, pending-review badge counts, accept-all-low-risk. **Not yet
+browser-exercised** — Jacob: chat about a project, hit "Reconcile chat",
+accept a proposal on the project page, then send another message and
+confirm the context panel carries the accepted change.

@@ -32,6 +32,12 @@ export interface ChatProviderMeta {
    * Distinct from `model`, which records what actually answered last.
    */
   modelOverride?: string;
+  /**
+   * ISO timestamp of the chat state last fed through reconciliation (U6.1),
+   * written by the reconcile engine. A chat whose updatedAt is not newer
+   * than this has nothing new to reconcile.
+   */
+  reconciledAt?: string;
   [key: string]: unknown;
 }
 

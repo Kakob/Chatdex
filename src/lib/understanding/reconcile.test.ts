@@ -3,6 +3,7 @@ import { db } from '../db/schema';
 import { clearAllData } from '../db';
 import {
   buildReconcileMessages,
+  getReconcilableConversations,
   parseReconcileResponse,
   reconcileProject,
 } from './reconcile';
@@ -417,5 +418,111 @@ describe('reconcileProject', () => {
     expect(result.warnings.some((w) => w.includes('unresolvable supersededBy'))).toBe(true);
     const events = await getEventsForObject(obj.id);
     expect(events.find((e) => e.op === 'superseded')?.supersededByObjectId).toBeUndefined();
+  });
+});
+
+describe('scoped reconciliation (U6.1)', () => {
+  function makeChat(overrides: Partial<StoredConversation> = {}): StoredConversation {
+    return makeConversation({
+      source: 'chatdex',
+      providerMeta: { provider: 'anthropic' },
+      ...overrides,
+    });
+  }
+
+  it('conversationIds scopes selection and ignores the project cursor', async () => {
+    await seedProject();
+    const chat = makeChat({ updatedAt: new Date('2026-08-01T00:00:00Z') });
+    const other = makeConversation({ updatedAt: new Date('2026-08-03T00:00:00Z') });
+    await db.conversations.bulkPut([chat, other]);
+    await associate('proj-1', chat.id);
+    await associate('proj-1', other.id);
+    // Cursor already past the chat — scoped selection must still include it.
+    const project = await getUnderstandingProject('proj-1');
+    await putUnderstandingProject({
+      ...project!,
+      lastReconciledAt: new Date('2026-08-02T00:00:00Z'),
+    });
+
+    const scoped = await getReconcilableConversations('proj-1', false, [chat.id]);
+    expect(scoped.map((c) => c.id)).toEqual([chat.id]);
+  });
+
+  it('scoped selection excludes unassociated conversations', async () => {
+    await seedProject();
+    const stranger = makeChat();
+    await db.conversations.put(stranger);
+    expect(await getReconcilableConversations('proj-1', false, [stranger.id])).toEqual([]);
+  });
+
+  it('scoped run stamps the chat and leaves the project cursor alone', async () => {
+    await seedProject();
+    const chat = makeChat({ updatedAt: new Date('2026-08-01T00:00:00Z') });
+    await db.conversations.put(chat);
+    await associate('proj-1', chat.id);
+    respond({ changes: [] });
+
+    const result = await reconcileProject('proj-1', {
+      provider: 'anthropic',
+      conversationIds: [chat.id],
+    });
+    expect(result.conversationsProcessed).toBe(1);
+
+    const project = await getUnderstandingProject('proj-1');
+    expect(project!.lastReconciledAt).toBeUndefined();
+
+    const stored = await db.conversations.get(chat.id);
+    expect((stored!.providerMeta as { reconciledAt?: string }).reconciledAt).toBe(
+      chat.updatedAt.toISOString()
+    );
+  });
+
+  it('a stamped, unchanged chat is skipped by scoped and normal runs alike', async () => {
+    await seedProject();
+    const chat = makeChat({
+      updatedAt: new Date('2026-08-01T00:00:00Z'),
+      providerMeta: { provider: 'anthropic', reconciledAt: '2026-08-01T00:00:00.000Z' },
+    });
+    await db.conversations.put(chat);
+    await associate('proj-1', chat.id);
+
+    expect(await getReconcilableConversations('proj-1', false, [chat.id])).toEqual([]);
+    expect(await getReconcilableConversations('proj-1', false)).toEqual([]);
+    // Full re-run is the escape hatch and still includes it.
+    expect((await getReconcilableConversations('proj-1', true)).map((c) => c.id)).toEqual([
+      chat.id,
+    ]);
+  });
+
+  it('a chat that changed after its stamp is reconcilable again', async () => {
+    await seedProject();
+    const chat = makeChat({
+      updatedAt: new Date('2026-08-02T00:00:00Z'),
+      providerMeta: { provider: 'anthropic', reconciledAt: '2026-08-01T00:00:00.000Z' },
+    });
+    await db.conversations.put(chat);
+    await associate('proj-1', chat.id);
+
+    expect(
+      (await getReconcilableConversations('proj-1', false, [chat.id])).map((c) => c.id)
+    ).toEqual([chat.id]);
+  });
+
+  it('normal runs also stamp processed chats', async () => {
+    await seedProject();
+    const chat = makeChat({ updatedAt: new Date('2026-08-01T00:00:00Z') });
+    await db.conversations.put(chat);
+    await associate('proj-1', chat.id);
+    respond({ changes: [] });
+
+    await reconcileProject('proj-1', { provider: 'anthropic' });
+
+    const stored = await db.conversations.get(chat.id);
+    expect((stored!.providerMeta as { reconciledAt?: string }).reconciledAt).toBe(
+      chat.updatedAt.toISOString()
+    );
+    // Cursor advanced too — this was an unscoped run.
+    const project = await getUnderstandingProject('proj-1');
+    expect(project!.lastReconciledAt).toEqual(chat.updatedAt);
   });
 });
