@@ -503,3 +503,44 @@ regenerate / per-project history filters (U5.3), reconcile-this-chat
 (U6.1). **Not yet browser-exercised** — Jacob should open /chat, run one
 subscription-path chat, and confirm the transcript appears under Browse
 with the Chatdex chip and syncs.
+
+### U5.2 — Context injection (2026-08-09)
+
+PRD §17: a project chat starts already knowing the project. The injected
+context is the U4.2 living-document projection in agent-context mode
+(`includePending: false` — accepted objects only), wrapped in a system
+prompt, size-budgeted, and always visible to the user.
+
+- **`src/lib/chat/context.ts`** — pure `buildProjectContext(project,
+  understanding, config)` (tested, deterministic) + Dexie loader
+  `loadProjectChatContext(projectId)`. Returns null when nothing accepted
+  exists — the chat then runs context-free and the panel says so. Budget
+  default 4000 estimated tokens (`maxContextTokens`), enforced by staged
+  shrink: full document → drop Recent Changes → cap ideas/decisions at 10 +
+  questions at 10 → direction + 5 questions only → hard character cut with
+  a visible truncation note. `truncated` flag surfaces in the UI.
+- **Injection** — the system message precedes the transcript on *every*
+  send, and the context is reloaded per send: accept a pending object
+  mid-chat and the next message already carries it. Existing chats resolve
+  their project from `providerMeta.projectId`, so project scope survives
+  past the first message (U5.1 only read the ?project= param).
+- **Shown to the user** — collapsible "Context sent to the model" panel
+  above the thread (token estimate, truncation marker, full system prompt
+  verbatim). What the model was told is never invisible.
+- **Disclosure (invariant 6)** — injecting understanding is a new
+  disclosure: the first context-carrying send of each chat is gated on the
+  DisclosureModal, listing the source conversations the understanding
+  derives from (the project's non-rejected associations, minus the chat
+  itself) with cross-provider sources flagged. Modal copy is
+  parameterized via new `sendsDescription`/`confirmLabel` props ("sends
+  Chatdex's synthesized understanding of X … along with your message").
+  Acceptance is stamped per chat (`providerMeta.contextDisclosedAt`, new
+  `markChatContextDisclosed`, tested); cancel sends nothing and keeps the
+  typed message in the composer.
+
+Not built (deliberate): context for non-project chats, per-send disclosure
+re-prompts (once per chat matches discovery/reconcile's per-run modal),
+model-visible evidence deep links (footnotes carry conversation names
+only). **Not yet browser-exercised** — Jacob: open a project chat, confirm
+the disclosure modal on first send, expand the context panel, and check
+the model actually answers from the injected understanding.

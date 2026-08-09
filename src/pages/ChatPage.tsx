@@ -1,19 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { FolderKanban, Loader2, MessageCircle, Plus, SendHorizontal } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  FolderKanban,
+  Loader2,
+  MessageCircle,
+  Plus,
+  SendHorizontal,
+} from 'lucide-react';
 import {
   appendChatMessage,
   createChat,
   getChat,
   getChatMessages,
   listChats,
+  markChatContextDisclosed,
   type ChatProviderMeta,
 } from '../lib/chat/chats';
+import { loadProjectChatContext, type ProjectChatContext } from '../lib/chat/context';
 import { getUnderstandingProject } from '../lib/db/understanding';
+import { getReconcilableConversations } from '../lib/understanding/reconcile';
+import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
+import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import {
+  getProviderAuthMode,
   getProviderInfo,
   listReadyProviders,
   streamComplete,
+  type AuthMode,
   type ChatMessage,
   type LLMProviderId,
 } from '../lib/providers';
@@ -57,6 +73,41 @@ function ChatListItem({ chat, active }: { chat: StoredConversation; active: bool
   );
 }
 
+/**
+ * What the model was told (U5.2): the injected project context is never
+ * invisible — collapsed by default, one click away.
+ */
+function ContextPanel({ context }: { context: ProjectChatContext | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-sm">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <FileText size={14} />
+        {context ? (
+          <>
+            Context sent to the model: current understanding of {context.projectName}
+            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
+              ~{context.estimatedTokens.toLocaleString()} tokens
+              {context.truncated ? ' · truncated to budget' : ''}
+            </span>
+          </>
+        ) : (
+          <>No project understanding to inject yet — this chat runs without context</>
+        )}
+      </button>
+      {open && context && (
+        <pre className="px-3 pb-3 whitespace-pre-wrap break-words font-mono text-xs text-gray-700 dark:text-gray-300 max-h-80 overflow-y-auto">
+          {context.systemPrompt}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 export function ChatPage() {
   const { id: activeId } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -72,10 +123,20 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  const [context, setContext] = useState<ProjectChatContext | null>(null);
+  const [pendingDisclosure, setPendingDisclosure] = useState<{
+    text: string;
+    disclosure: DisclosureSummary;
+    authMode: AuthMode;
+    context: ProjectChatContext;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ?project= only applies to a chat being started, not an open one.
-  const projectId = activeId ? null : searchParams.get('project');
+  // ?project= applies to a chat being started; an open chat carries its
+  // project in providerMeta.
+  const newChatProjectId = activeId ? null : searchParams.get('project');
+  const chatMetaForProject = activeChat?.providerMeta as ChatProviderMeta | undefined;
+  const chatProjectId = chatMetaForProject?.projectId ?? newChatProjectId;
 
   const refreshChats = useCallback(async () => {
     setChats(await listChats());
@@ -107,12 +168,22 @@ export function ChatPage() {
   }, [activeId]);
 
   useEffect(() => {
-    if (!projectId) {
+    if (!chatProjectId) {
       setProjectName(null);
+      setContext(null);
       return;
     }
-    void getUnderstandingProject(projectId).then((p) => setProjectName(p?.name ?? null));
-  }, [projectId]);
+    let cancelled = false;
+    void getUnderstandingProject(chatProjectId).then((p) => {
+      if (!cancelled) setProjectName(p?.name ?? null);
+    });
+    void loadProjectChatContext(chatProjectId).then((ctx) => {
+      if (!cancelled) setContext(ctx);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [chatProjectId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -129,18 +200,20 @@ export function ChatPage() {
       .filter((m) => m.sender === 'user' || m.sender === 'assistant')
       .map((m) => ({ role: m.sender as 'user' | 'assistant', content: m.text }));
 
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || sending || !effectiveProvider || !providerReady) return;
+  const performSend = async (
+    text: string,
+    ctx: ProjectChatContext | null,
+    markDisclosed = false
+  ) => {
+    if (!effectiveProvider) return;
     setSending(true);
-    setInput('');
     let conversationId = activeId;
     try {
       let history: ChatMessage[];
       if (!conversationId) {
         const conv = await createChat({
           provider: effectiveProvider,
-          ...(projectId ? { projectId } : {}),
+          ...(chatProjectId ? { projectId: chatProjectId } : {}),
           firstUserMessage: text,
         });
         conversationId = conv.id;
@@ -151,6 +224,16 @@ export function ChatPage() {
         const stored = await getChatMessages(conversationId);
         setMessages(stored);
         history = historyFromStored(stored);
+      }
+      if (markDisclosed) {
+        await markChatContextDisclosed(conversationId);
+        setActiveChat((await getChat(conversationId)) ?? null);
+      }
+      // The injected context precedes the transcript on every send — the
+      // understanding is reloaded per send, so accepted reviews show up in
+      // the next message without reopening the chat.
+      if (ctx) {
+        history = [{ role: 'system', content: ctx.systemPrompt }, ...history];
       }
       void refreshChats();
 
@@ -174,6 +257,46 @@ export function ChatPage() {
       setStreamingText(null);
       setSending(false);
     }
+  };
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending || !effectiveProvider || !providerReady) return;
+
+    // Fresh context at send time; the panel mirrors what actually goes out.
+    let ctx: ProjectChatContext | null = null;
+    if (chatProjectId) {
+      ctx = await loadProjectChatContext(chatProjectId);
+      setContext(ctx);
+    }
+
+    // Context injection is a new disclosure (invariant 6): the first
+    // context-carrying send of each chat is gated on the modal. Cancelling
+    // leaves the input untouched and sends nothing.
+    const alreadyDisclosed = Boolean(chatMetaForProject?.contextDisclosedAt);
+    if (ctx && !alreadyDisclosed) {
+      const conversations = (await getReconcilableConversations(chatProjectId!, true)).filter(
+        (c) => c.id !== activeId
+      );
+      setPendingDisclosure({
+        text,
+        context: ctx,
+        disclosure: buildDisclosure(conversations, effectiveProvider),
+        authMode: await getProviderAuthMode(effectiveProvider),
+      });
+      return;
+    }
+
+    setInput('');
+    await performSend(text, ctx);
+  };
+
+  const handleConfirmDisclosure = async () => {
+    if (!pendingDisclosure) return;
+    const { text, context: ctx } = pendingDisclosure;
+    setPendingDisclosure(null);
+    setInput('');
+    await performSend(text, ctx, true);
   };
 
   const providerOptions = useMemo(() => providers ?? [], [providers]);
@@ -241,6 +364,8 @@ export function ChatPage() {
             )
           )}
         </div>
+
+        {chatProjectId && <ContextPanel context={context} />}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 space-y-3">
           {messages.length === 0 && streamingText === null && (
@@ -314,6 +439,22 @@ export function ChatPage() {
           )}
         </div>
       </div>
+
+      {pendingDisclosure && (
+        <DisclosureModal
+          disclosure={pendingDisclosure.disclosure}
+          authMode={pendingDisclosure.authMode}
+          actionLabel="Project chat"
+          sendsDescription={`Chatdex's synthesized understanding of "${
+            pendingDisclosure.context.projectName
+          }" (derived from ${pendingDisclosure.disclosure.totalConversations} conversation${
+            pendingDisclosure.disclosure.totalConversations !== 1 ? 's' : ''
+          }) along with your message`}
+          confirmLabel="Send with context"
+          onConfirm={() => void handleConfirmDisclosure()}
+          onCancel={() => setPendingDisclosure(null)}
+        />
+      )}
     </div>
   );
 }

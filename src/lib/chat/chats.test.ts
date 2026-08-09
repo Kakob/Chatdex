@@ -8,6 +8,8 @@ import {
   listChats,
   getChat,
   getChatMessages,
+  markChatContextDisclosed,
+  type ChatProviderMeta,
 } from './chats';
 
 beforeEach(async () => {
@@ -104,6 +106,28 @@ describe('appendChatMessage', () => {
     await expect(
       appendChatMessage('missing-id', { sender: 'user', text: 'x' })
     ).rejects.toThrow('Chat conversation not found');
+  });
+});
+
+describe('markChatContextDisclosed', () => {
+  it('stamps contextDisclosedAt without disturbing other meta', async () => {
+    const conv = await createChat({
+      provider: 'anthropic',
+      projectId: 'proj-1',
+      firstUserMessage: 'Hi',
+    });
+    await markChatContextDisclosed(conv.id);
+    const meta = (await getChat(conv.id))!.providerMeta as ChatProviderMeta;
+    expect(meta.contextDisclosedAt).toBeDefined();
+    expect(new Date(meta.contextDisclosedAt!).getTime()).not.toBeNaN();
+    expect(meta.provider).toBe('anthropic');
+    expect(meta.projectId).toBe('proj-1');
+  });
+
+  it('rejects unknown conversations', async () => {
+    await expect(markChatContextDisclosed('nope')).rejects.toThrow(
+      'Chat conversation not found'
+    );
   });
 });
 

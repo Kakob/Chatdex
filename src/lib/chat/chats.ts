@@ -21,6 +21,12 @@ export interface ChatProviderMeta {
   model?: string;
   /** Project this chat was started from, if any. */
   projectId?: string;
+  /**
+   * ISO timestamp of the user accepting the context-injection disclosure for
+   * this chat (U5.2). Absent ⇒ the disclosure modal gates the next send that
+   * would carry project understanding.
+   */
+  contextDisclosedAt?: string;
   [key: string]: unknown;
 }
 
@@ -148,6 +154,23 @@ export async function appendChatMessage(
   });
   await invalidateIndex();
   return message;
+}
+
+/** Record that the user accepted the context-injection disclosure (U5.2). */
+export async function markChatContextDisclosed(conversationId: string): Promise<void> {
+  await db.transaction('rw', [db.conversations], async () => {
+    const conversation = await db.conversations.get(conversationId);
+    if (!conversation || conversation.source !== 'chatdex') {
+      throw new Error(`Chat conversation not found: ${conversationId}`);
+    }
+    await db.conversations.put({
+      ...conversation,
+      providerMeta: {
+        ...(conversation.providerMeta ?? {}),
+        contextDisclosedAt: new Date().toISOString(),
+      },
+    });
+  });
 }
 
 /** All chats, most recently active first; optionally only one project's. */

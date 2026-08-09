@@ -12,6 +12,8 @@ export function DisclosureModal({
   onConfirm,
   onCancel,
   actionLabel = 'Project discovery',
+  sendsDescription,
+  confirmLabel = 'Send and analyze',
 }: {
   disclosure: DisclosureSummary;
   authMode: AuthMode;
@@ -19,6 +21,12 @@ export function DisclosureModal({
   onCancel: () => void;
   /** What the run is called in the copy, e.g. "Understanding reconciliation". */
   actionLabel?: string;
+  /**
+   * What gets sent, replacing the default "excerpts from N conversations" —
+   * e.g. context injection sends synthesized understanding, not excerpts.
+   */
+  sendsDescription?: string;
+  confirmLabel?: string;
 }) {
   const crossProvider = disclosure.crossProviderSources;
 
@@ -27,7 +35,9 @@ export function DisclosureModal({
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-start justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Send conversation excerpts to {disclosure.providerLabel}?
+            {sendsDescription
+              ? `Send project understanding to ${disclosure.providerLabel}?`
+              : `Send conversation excerpts to ${disclosure.providerLabel}?`}
           </h2>
           <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
             <X size={18} />
@@ -35,8 +45,12 @@ export function DisclosureModal({
         </div>
 
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          {actionLabel} sends excerpts from {disclosure.totalConversations} conversation
-          {disclosure.totalConversations !== 1 ? 's' : ''} to {disclosure.providerLabel}
+          {actionLabel} sends{' '}
+          {sendsDescription ??
+            `excerpts from ${disclosure.totalConversations} conversation${
+              disclosure.totalConversations !== 1 ? 's' : ''
+            }`}{' '}
+          to {disclosure.providerLabel}
           {authMode === 'subscription'
             ? `, billed to your ${disclosure.providerLabel} subscription,`
             : ' using your own API key,'}{' '}
@@ -82,7 +96,7 @@ export function DisclosureModal({
             className="flex items-center gap-2 px-4 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors"
           >
             <Send size={14} />
-            Send and analyze
+            {confirmLabel}
           </button>
         </div>
       </div>
