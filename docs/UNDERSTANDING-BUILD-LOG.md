@@ -147,10 +147,7 @@ message); what was missing was message-level evidence to feed it.
   all messages when ≤ `maxDigestMessages` (default 8), else first 3 + latest 5
   — openings establish the topic, endings carry current state. Per-message
   text capped at `messageExcerptLength` (default 200 chars). Conversations
-  with no stored messages keep the old excerpt fallback. **Cost note:** a full
-  digest is now ~1.6k chars/conversation vs ~600 — roughly 2.7× input tokens
-  per discovery batch. Still prefer the Anthropic subscription path for big
-  runs (Codex adds ~14k tokens/call harness overhead on top).
+  with no stored messages keep the old excerpt fallback.
 - **The model cites indexes, not ids.** Object evidence in the response schema
   is now `[{conversationId, messageIndexes}]`; indexes are cheap to transmit
   and trivially validated. The hallucination guard extends to messages: only
@@ -166,10 +163,17 @@ message); what was missing was message-level evidence to feed it.
   cited messages render as numbered `#2 #3` links. Conversation-level
   evidence (no messageIds) links to the conversation as before.
 
-Existing understanding objects keep conversation-level evidence; re-running
-discovery produces message-anchored objects (idempotency note: re-runs dedupe
-projects/associations but objects are created fresh each run — same behavior
-as before, the review queue absorbs duplicates).
+Worth knowing before the next discovery run:
+
+- **Discovery input cost roughly 2.7×'d.** A full message-granular digest is
+  ~1.6k chars/conversation vs ~600 for the old excerpt (~10k tokens per
+  25-conversation batch). Prefer the Anthropic subscription path for big runs
+  — the Codex path adds ~14k tokens/call of harness overhead on top.
+- **Existing objects stay conversation-level.** Evidence created before U2.2
+  has no messageIds and never will; only a fresh discovery run produces
+  message-anchored objects. Re-runs dedupe projects/associations but create
+  objects fresh each time (same behavior as before) — the review queue absorbs
+  the duplicates.
 
 ### Gap: `npm run typecheck` does not cover the backend
 
