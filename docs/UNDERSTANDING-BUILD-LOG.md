@@ -27,6 +27,7 @@ phase, plus operational notes that affect deployment.
 | U4.2 | 2026-08-09 | `d085de1` | Living understanding document: deterministic markdown projection with footnote provenance; Panel/Document toggle, copy + .md export |
 | U4.1 | 2026-08-09 | `4851906` | Understanding overview on /projects: per-project stats, open-questions rollup, global recent-changes stream |
 | U4.3 | 2026-08-09 | `aec1e8f` | History drawer: per-object audit-trail stream (rejected included), status replay, supersession-chain navigation |
+| U4.4 | 2026-08-09 | `640f076` | Map spike: chain-lane timeline view (SVG, no graph lib); §13 coverage review recorded — cross-project recurrence parked as list candidate |
 
 ---
 
