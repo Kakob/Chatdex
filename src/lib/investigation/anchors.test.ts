@@ -9,7 +9,11 @@ import {
   getInvestigationAnchorsForFile,
   deleteConversation,
 } from '../db/index';
-import { deriveAnchorsForConversation, ANCHOR_DERIVER_VERSION } from './anchors';
+import {
+  deriveAnchorsForConversation,
+  deriveAnchorsForAllAgentSessions,
+  ANCHOR_DERIVER_VERSION,
+} from './anchors';
 import { sha256Hex } from '../utils/hash';
 import type { ContentBlock, StoredConversation, StoredMessage } from '../../types/unified';
 
@@ -202,6 +206,28 @@ describe('deriveAnchorsForConversation — deterministic anchors (SPEC §7.3)', 
     const byFile = await getInvestigationAnchorsForFile('/proj/src/z.ts');
     expect(byFile).toHaveLength(1);
     expect(byFile[0].kind).toBe('write');
+  });
+
+  it('backfills all agent sessions but never chat-only sources', async () => {
+    const chatConv = { ...conv('conv-chat'), source: 'claude.ai' as const };
+    await bulkPutConversations([chatConv]);
+    await bulkPutMessages([
+      msg('assistant', [editBlock]),
+      msg('assistant', [editBlock], '', 'conv-chat'),
+    ]);
+
+    const progress: number[] = [];
+    const result = await deriveAnchorsForAllAgentSessions((p) => progress.push(p.current));
+
+    expect(result).toEqual({
+      conversationsProcessed: 1,
+      anchorsDerived: 1,
+      failures: 0,
+    });
+    expect(progress).toEqual([1]);
+    const stored = await db.investigationAnchors.toArray();
+    expect(stored).toHaveLength(1);
+    expect(stored[0].conversationId).toBe(CONV_ID);
   });
 
   it('cascades derived anchors on conversation deletion', async () => {

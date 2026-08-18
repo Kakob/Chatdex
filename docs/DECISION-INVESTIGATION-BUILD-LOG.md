@@ -44,3 +44,21 @@ Completes spec milestone M1 (deterministic anchors; every anchor opens its exact
 **Next (DI-2a):** Investigate route — chronological anchor browser with metadata filters (project/session/date/path substring/change type/case state), backfill derivation trigger for pre-existing conversations.
 
 Commit: `fa62c05`
+
+## DI-2a — Investigate page: neutral anchor browser (2026-08-18)
+
+**Built:**
+
+- `/investigate` route + sidebar entry (`src/pages/InvestigatePage.tsx`, FileSearch icon). Rows show only literal metadata (spec §7.4): change-type chip, file path or `N files`, session name, timestamp, case-state chip (`Uninvestigated` for all until DI-2c), and a `legacy` provenance badge for pre-DI-1a anchors with a re-import hint. `Open source` deep-links to `/conversations/:id?scrollTo=<messageId>` (existing ConversationView support).
+- Filters (`src/lib/investigation/filter.ts`, pure + tested): session, project path, change kind, case-insensitive **literal** path substring (regex metacharacters are text), inclusive local-day date range, case state. Ordering is chronological asc/desc only — no relevance ordering exists anywhere, by design.
+- `anchorCaseState()` — the §8.1 state vocabulary (`uninvestigated | open | adjudicated`) stubbed constant until cases exist; the filter and UI already speak the full enum so DI-2c doesn't change their shape.
+- Backfill: `deriveAnchorsForAllAgentSessions()` (idempotent, per-conversation failure counting, progress callback) wired to a "Derive anchors" button — this is how sessions imported before DI-1b get anchors without re-import.
+- `src/hooks/useInvestigationAnchors.ts` — one-shot fetch + manual refresh, matching the app's existing non-reactive read pattern.
+
+**Tests (+10; 597 frontend total):** all filter dimensions incl. literal-substring semantics and inclusive date bounds, file-label literalness, backfill covers agent sessions only + progress reporting. Production build verified.
+
+**Known limits (by phase design):** `Start investigation` action absent until cases exist (DI-2c); anchor list is unvirtualized (fine at current scale; workbench virtualization lands in DI-2b); anchors don't auto-refresh when an import finishes while the page is open (app-wide non-reactive pattern).
+
+**Next (DI-2b):** investigation workbench — new virtualized three-region reader (transcript / code event / case notebook) + literal in-source search with exact highlighting and match navigation.
+
+Commit: (pending)

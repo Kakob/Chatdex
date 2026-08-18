@@ -8,6 +8,7 @@
 // so re-running never duplicates and cases can reference anchors durably.
 
 import { normalizeSession, type Step } from '../detection/normalize';
+import { db } from '../db/schema';
 import { getMessagesForConversation } from '../db/messages';
 import { getRawSourcesForConversation } from '../db/rawSources';
 import { replaceInvestigationAnchors } from '../db/investigationAnchors';
@@ -111,6 +112,45 @@ async function buildAnchors(
     });
   }
   return anchors;
+}
+
+export interface BackfillProgress {
+  current: number;
+  total: number;
+}
+
+export interface BackfillResult {
+  conversationsProcessed: number;
+  anchorsDerived: number;
+  failures: number;
+}
+
+/**
+ * Derive anchors for every stored agent session (claude-code is the MVP's
+ * only code-bearing source, spec §5.1). Idempotent — safe to re-run; used by
+ * the Investigate page to cover conversations imported before DI-1b.
+ * Per-conversation failures are counted, never thrown.
+ */
+export async function deriveAnchorsForAllAgentSessions(
+  onProgress?: (progress: BackfillProgress) => void
+): Promise<BackfillResult> {
+  const ids = (await db.conversations
+    .where('source')
+    .equals('claude-code')
+    .primaryKeys()) as string[];
+
+  let anchorsDerived = 0;
+  let failures = 0;
+  for (let i = 0; i < ids.length; i++) {
+    onProgress?.({ current: i + 1, total: ids.length });
+    try {
+      anchorsDerived += (await deriveAnchorsForConversation(ids[i])).length;
+    } catch (err) {
+      failures++;
+      console.error('[investigation] backfill derivation failed for', ids[i], err);
+    }
+  }
+  return { conversationsProcessed: ids.length, anchorsDerived, failures };
 }
 
 /** Exposed for tests: which steps would anchor, without persistence. */

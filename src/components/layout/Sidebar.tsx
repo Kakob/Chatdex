@@ -7,6 +7,7 @@ import {
   MessageSquare,
   MessageCircle,
   Anchor,
+  FileSearch,
   FolderKanban,
   Upload,
   Settings,
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/conversations', icon: MessageSquare, label: 'Browse' },
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
   { to: '/knowledge', icon: Anchor, label: 'Knowledge' },
+  { to: '/investigate', icon: FileSearch, label: 'Investigate' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
