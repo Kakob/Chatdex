@@ -24,4 +24,4 @@ Key calls: reuse detection-layer normalization as the event substrate; raw sourc
 
 **Not done here (next: DI-1b):** persisted source events (Step model + tool-pair alignment), derived investigation anchors with stable keys (source hash + ordinal + change index), golden-trace anchor fixtures.
 
-Commit: (pending)
+Commit: `9af4f06`
