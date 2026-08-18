@@ -17,6 +17,10 @@ import type {
 import { estimateTokens } from '../utils/tokens';
 import { generateId } from '../utils/ids';
 
+// Stamped onto RawSource rows at import (SPEC-decision-investigation §7.1).
+// Bump whenever parsing output changes for identical input.
+export const CHATGPT_PARSER_VERSION = '1.0.0';
+
 export interface ParsedChatGPT {
   conversations: StoredConversation[];
   messages: StoredMessage[];

@@ -3,6 +3,11 @@ import type { ClaudeAIConversation, ClaudeAIMessage } from '../../types/claude-a
 import type { StoredConversation, StoredMessage, ContentBlock } from '../../types/unified';
 import { estimateTokens } from '../utils/tokens';
 
+// Stamped onto RawSource rows at import (SPEC-decision-investigation §7.1).
+// Bump whenever parsing output changes for identical input.
+// 1.1.0: preserve tool_use ids / tool_use_id on ContentBlock (toolUseId).
+export const CLAUDE_AI_PARSER_VERSION = '1.1.0';
+
 export interface ParsedClaudeAI {
   conversations: StoredConversation[];
   messages: StoredMessage[];
@@ -308,6 +313,7 @@ function extractMessageContent(msg: ClaudeAIMessage): ExtractedContent {
           type: 'tool_use',
           toolName: toolBlock.name || 'Tool',
           toolInput: toolBlock.input,
+          toolUseId: toolBlock.id,
         });
       } else if (block.type === 'tool_result') {
         // Handle tool result blocks
@@ -328,6 +334,7 @@ function extractMessageContent(msg: ClaudeAIMessage): ExtractedContent {
           contentBlocks.push({
             type: 'tool_result',
             toolResult: resultText,
+            toolUseId: resultBlock.tool_use_id,
           });
           textParts.push(resultText);
         }

@@ -19,6 +19,7 @@ import type {
   UnderstandingEvent,
 } from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
+import type { RawSource } from '../../types/investigation';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -42,6 +43,7 @@ export class ChatdexDB extends Dexie {
   projectAssociations!: Table<ProjectAssociation, string>;
   understandingObjects!: Table<UnderstandingObject, string>;
   understandingEvents!: Table<UnderstandingEvent, string>;
+  rawSources!: Table<RawSource, string>;
 
   constructor() {
     super('chatdex');
@@ -87,6 +89,13 @@ export class ChatdexDB extends Dexie {
             e.reviewState = e.reviewState ?? 'accepted';
           });
       });
+    // v5: immutable raw-source retention (SPEC-decision-investigation §7.1,
+    // phase DI-1a). LOCAL-ONLY — deliberately never hooked into the sync
+    // engine (spec §21 decision 3): raw payloads must not enter the
+    // ciphertext sync path; only hash/provenance metadata may ever sync.
+    this.version(5).stores({
+      rawSources: '&id, &contentHash, importedAt, *conversationIds',
+    });
   }
 }
 

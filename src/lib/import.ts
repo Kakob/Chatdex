@@ -1,5 +1,5 @@
 import { parseFiles, type ParsedData } from './parsers';
-import { bulkPutConversations, bulkPutMessages, db } from './db/index';
+import { bulkPutConversations, bulkPutMessages, storeRawSources, db } from './db/index';
 import { autoAnalyzeConversations } from './detection/autoAnalyze';
 import type { DataSource, StoredConversation, StoredMessage } from '../types';
 
@@ -9,6 +9,8 @@ export interface ImportResult {
   messagesAdded: number;
   source: DataSource;
   addedConversationIds: string[];
+  /** Raw payloads retained this import (deduped by content hash). */
+  rawSourcesAdded: number;
 }
 
 export interface ImportProgress {
@@ -65,6 +67,13 @@ async function storeData(
   data: ParsedData,
   onProgress?: (current: number, total: number) => void
 ): Promise<ImportResult> {
+  // Retain raw payloads first (SPEC-decision-investigation §7.1): the primary
+  // source must survive even if the normalized writes below fail partway.
+  // Content-hash dedup makes this idempotent, and it runs regardless of
+  // conversation dedup — a grown session file whose conversation id already
+  // exists still gets its new raw version recorded.
+  const rawResult = await storeRawSources(data.rawSources);
+
   const incomingIds = data.conversations.map((c) => c.id);
   const existingIds = new Set(
     (await db.conversations.bulkGet(incomingIds))
@@ -107,5 +116,6 @@ async function storeData(
     messagesAdded: totalMessages,
     source: data.source,
     addedConversationIds,
+    rawSourcesAdded: rawResult.added,
   };
 }

@@ -16,6 +16,10 @@ export interface ContentBlock {
   toolName?: string;
   toolInput?: Record<string, unknown>;
   toolResult?: string;
+  // Source-provided pairing id: the tool_use block's `id`, or a tool_result's
+  // `tool_use_id`. Absent on data imported before parser v1.1.0 — pairing for
+  // those falls back to positional adjacency (SPEC-decision-investigation §7.5).
+  toolUseId?: string;
   // Artifact blocks
   artifactTitle?: string;
   artifactType?: string;

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { selectAutoAnalyzeIds } from './import';
+import { describe, expect, it, beforeEach } from 'vitest';
+import { importFiles, selectAutoAnalyzeIds } from './import';
+import { db, clearAllData, getRawSourcesForConversation } from './db/index';
 import type { DataSource, StoredConversation } from '../types';
 
 function conv(id: string, source: DataSource): StoredConversation {
@@ -40,5 +41,91 @@ describe('selectAutoAnalyzeIds — auto-analysis is gated to agent sessions', ()
   it('returns empty for a chat-only import batch', () => {
     const conversations = [conv('ai-1', 'claude.ai'), conv('gpt-1', 'chatgpt')];
     expect(selectAutoAnalyzeIds(conversations, ['ai-1', 'gpt-1'])).toEqual([]);
+  });
+});
+
+// DI-1a (SPEC-decision-investigation §7.1): the import flow retains the
+// verbatim payload, content-hash-deduped, independently of conversation dedup.
+describe('importFiles — raw source retention', () => {
+  const entry = (type: string, extra: Record<string, unknown>) =>
+    JSON.stringify({ type, timestamp: '2026-01-15T10:00:00Z', ...extra });
+
+  const baseLines = [
+    entry('user', {
+      sessionId: 'session-raw-1',
+      cwd: '/project',
+      message: { content: 'Please edit the file' },
+    }),
+    entry('assistant', {
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_raw_1',
+            name: 'Edit',
+            input: { file_path: '/a.ts', old_string: 'x', new_string: 'y' },
+          },
+        ],
+      },
+    }),
+  ];
+
+  function jsonlFile(lines: string[], name = 'session.jsonl'): File {
+    return new File([lines.join('\n')], name, { type: 'application/x-jsonlines' });
+  }
+
+  beforeEach(async () => {
+    await clearAllData();
+  });
+
+  it('retains the raw payload once and dedups a byte-identical re-import', async () => {
+    const first = await importFiles([jsonlFile(baseLines)]);
+    expect(first.conversationsAdded).toBe(1);
+    expect(first.rawSourcesAdded).toBe(1);
+
+    const second = await importFiles([jsonlFile(baseLines)]);
+    expect(second.conversationsAdded).toBe(0);
+    expect(second.conversationsSkipped).toBe(1);
+    expect(second.rawSourcesAdded).toBe(0);
+    expect(await db.rawSources.count()).toBe(1);
+
+    const sources = await getRawSourcesForConversation('session-raw-1');
+    expect(sources).toHaveLength(1);
+    expect(sources[0].rawText).toBe(baseLines.join('\n'));
+    expect(sources[0].parserVersion).toBeTruthy();
+    expect(sources[0].contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('records a grown session file as a new raw version even though the conversation is skipped', async () => {
+    await importFiles([jsonlFile(baseLines)]);
+
+    const grownLines = [
+      ...baseLines,
+      entry('user', {
+        message: {
+          content: [{ type: 'tool_result', tool_use_id: 'toolu_raw_1', content: 'ok' }],
+        },
+      }),
+    ];
+    const result = await importFiles([jsonlFile(grownLines)]);
+
+    // Conversation dedup still skips (frozen-at-import, spec §7.3)…
+    expect(result.conversationsAdded).toBe(0);
+    expect(result.conversationsSkipped).toBe(1);
+    // …but the changed payload is retained as a second immutable version.
+    expect(result.rawSourcesAdded).toBe(1);
+    expect(await getRawSourcesForConversation('session-raw-1')).toHaveLength(2);
+  });
+
+  it('stores tool ids end-to-end on imported message content blocks', async () => {
+    await importFiles([jsonlFile(baseLines)]);
+    const messages = await db.messages
+      .where('conversationId')
+      .equals('session-raw-1')
+      .toArray();
+    const toolUse = messages
+      .flatMap((m) => m.contentBlocks ?? [])
+      .find((b) => b.type === 'tool_use');
+    expect(toolUse?.toolUseId).toBe('toolu_raw_1');
   });
 });

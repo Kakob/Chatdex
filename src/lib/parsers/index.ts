@@ -1,13 +1,24 @@
 import JSZip from 'jszip';
-import { parseClaudeAIJSON } from './claude-ai';
-import { parseClaudeCodeJSONL } from './claude-code';
-import { parseChatGPTJSON } from './chatgpt';
+import { parseClaudeAIJSON, CLAUDE_AI_PARSER_VERSION } from './claude-ai';
+import { parseClaudeCodeContent, CLAUDE_CODE_PARSER_VERSION } from './claude-code';
+import { parseChatGPTJSON, CHATGPT_PARSER_VERSION } from './chatgpt';
 import type { StoredConversation, StoredMessage, DataSource } from '../../types';
+
+// Verbatim payload a parser consumed, captured per input file so import can
+// persist it as an immutable RawSource row (SPEC-decision-investigation §7.1).
+export type RawSourceCapture = {
+  kind: DataSource;
+  filename: string;
+  rawText: string;
+  parserVersion: string;
+  conversationIds: string[];
+};
 
 export type ParsedData = {
   conversations: StoredConversation[];
   messages: StoredMessage[];
   source: DataSource;
+  rawSources: RawSourceCapture[];
 };
 
 export type FileFormat =
@@ -93,11 +104,20 @@ export async function detectFileFormat(file: File): Promise<FileFormat> {
 
 export async function parseFile(file: File): Promise<ParsedData> {
   if (file.name.endsWith('.jsonl')) {
-    const result = await parseClaudeCodeJSONL(file);
-    return { ...result, source: 'claude-code' };
+    const content = await file.text();
+    const result = parseClaudeCodeContent(content, file.name);
+    return {
+      ...result,
+      source: 'claude-code',
+      rawSources: [
+        capture('claude-code', file.name, content, CLAUDE_CODE_PARSER_VERSION, result.conversations),
+      ],
+    };
   }
 
   if (isZipFile(file)) {
+    // The retained payload is the extracted conversations.json — the text the
+    // parser actually consumed — not the ZIP container bytes.
     const content = await extractConversationsJSON(file);
     return parseByContent(content, file.name);
   }
@@ -116,12 +136,34 @@ async function parseByContent(content: string, sourceFilename: string): Promise<
   const sniffed = sniffJSONContent(content);
   if (sniffed === 'chatgpt') {
     const result = await parseChatGPTJSON(content, sourceFilename);
-    return { ...result, source: 'chatgpt' };
+    return {
+      ...result,
+      source: 'chatgpt',
+      rawSources: [
+        capture('chatgpt', sourceFilename, content, CHATGPT_PARSER_VERSION, result.conversations),
+      ],
+    };
   }
   // 'claude-ai' or 'unknown': fall through to the Claude.ai parser so its
   // detailed error messages surface for truly invalid inputs.
   const result = await parseClaudeAIJSON(content, sourceFilename);
-  return { ...result, source: 'claude.ai' };
+  return {
+    ...result,
+    source: 'claude.ai',
+    rawSources: [
+      capture('claude.ai', sourceFilename, content, CLAUDE_AI_PARSER_VERSION, result.conversations),
+    ],
+  };
+}
+
+function capture(
+  kind: DataSource,
+  filename: string,
+  rawText: string,
+  parserVersion: string,
+  conversations: StoredConversation[]
+): RawSourceCapture {
+  return { kind, filename, rawText, parserVersion, conversationIds: conversations.map((c) => c.id) };
 }
 
 async function tryExtractConversationsJSON(file: File): Promise<string | null> {
@@ -174,6 +216,7 @@ export async function parseFiles(
 ): Promise<ParsedData> {
   const allConversations: StoredConversation[] = [];
   const allMessages: StoredMessage[] = [];
+  const allRawSources: RawSourceCapture[] = [];
   let primarySource: DataSource = 'claude.ai';
 
   for (let i = 0; i < files.length; i++) {
@@ -183,6 +226,7 @@ export async function parseFiles(
     const result = await parseFile(file);
     allConversations.push(...result.conversations);
     allMessages.push(...result.messages);
+    allRawSources.push(...result.rawSources);
 
     if (i === 0) {
       primarySource = result.source;
@@ -193,6 +237,7 @@ export async function parseFiles(
     conversations: allConversations,
     messages: allMessages,
     source: primarySource,
+    rawSources: allRawSources,
   };
 }
 

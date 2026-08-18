@@ -10,6 +10,11 @@ import type { StoredConversation, StoredMessage, ContentBlock } from '../../type
 import { estimateTokens } from '../utils/tokens';
 import { generateId } from '../utils/ids';
 
+// Stamped onto RawSource rows at import (SPEC-decision-investigation §7.1).
+// Bump whenever parsing output changes for identical input.
+// 1.1.0: preserve tool_use ids / tool_use_id on ContentBlock (toolUseId).
+export const CLAUDE_CODE_PARSER_VERSION = '1.1.0';
+
 export interface ParsedClaudeCode {
   conversations: StoredConversation[];
   messages: StoredMessage[];
@@ -235,11 +240,15 @@ function extractContent(content: string | ClaudeCodeContentBlock[]): ExtractedCo
       const toolName = block.name ?? block.tool_name ?? 'tool';
       const toolInput = (block.input ?? block.tool_input ?? {}) as Record<string, unknown>;
       textParts.push(`[Tool: ${toolName}]`);
-      contentBlocks.push({ type: 'tool_use', toolName, toolInput });
+      contentBlocks.push({ type: 'tool_use', toolName, toolInput, toolUseId: block.id });
     } else if (block.type === 'tool_result') {
       const resultText = flattenToolResultContent(block.content ?? block.result);
       textParts.push(resultText ? `[Tool Result] ${resultText}` : '[Tool Result]');
-      contentBlocks.push({ type: 'tool_result', toolResult: resultText });
+      contentBlocks.push({
+        type: 'tool_result',
+        toolResult: resultText,
+        toolUseId: block.tool_use_id,
+      });
     }
   }
 

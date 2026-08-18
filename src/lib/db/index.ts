@@ -14,6 +14,7 @@ export * from './metadata';
 export * from './findings';
 export * from './detectorRuns';
 export * from './understanding';
+export * from './rawSources';
 
 import { db } from './schema';
 
@@ -36,6 +37,7 @@ export async function clearAllData(): Promise<void> {
       db.projectAssociations,
       db.understandingObjects,
       db.understandingEvents,
+      db.rawSources,
     ],
     async () => {
       await db.conversations.clear();
@@ -53,6 +55,7 @@ export async function clearAllData(): Promise<void> {
       await db.projectAssociations.clear();
       await db.understandingObjects.clear();
       await db.understandingEvents.clear();
+      await db.rawSources.clear();
     }
   );
 }

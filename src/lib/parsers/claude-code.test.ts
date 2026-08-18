@@ -146,4 +146,59 @@ describe('parseClaudeCodeContent', () => {
     const result = parseClaudeCodeContent(content, 'blocks.jsonl');
     expect(result.messages.length).toBeGreaterThanOrEqual(2);
   });
+
+  // SPEC-decision-investigation §7.2/§7.5: source-provided tool ids are the
+  // first-precedence alignment key between tool calls and their results.
+  it('preserves tool_use id and tool_result tool_use_id on content blocks', () => {
+    const content = [
+      makeEntry('user', { cwd: '/project', message: { content: 'Edit the file' } }),
+      makeEntry('assistant', {
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'toolu_abc123',
+              name: 'Edit',
+              input: { file_path: '/a.ts', old_string: 'x', new_string: 'y' },
+            },
+          ],
+        },
+      }),
+      makeEntry('user', {
+        message: {
+          content: [
+            { type: 'tool_result', tool_use_id: 'toolu_abc123', content: 'edited ok' },
+          ],
+        },
+      }),
+    ].join('\n');
+
+    const result = parseClaudeCodeContent(content, 'tool-ids.jsonl');
+    const blocks = result.messages.flatMap((m) => m.contentBlocks ?? []);
+    const toolUse = blocks.find((b) => b.type === 'tool_use');
+    const toolResult = blocks.find((b) => b.type === 'tool_result');
+
+    expect(toolUse?.toolUseId).toBe('toolu_abc123');
+    expect(toolUse?.toolName).toBe('Edit');
+    expect(toolUse?.toolInput).toEqual({ file_path: '/a.ts', old_string: 'x', new_string: 'y' });
+    expect(toolResult?.toolUseId).toBe('toolu_abc123');
+  });
+
+  it('leaves toolUseId undefined when the source carries no ids', () => {
+    const content = [
+      makeEntry('user', { cwd: '/project', message: { content: 'go' } }),
+      makeEntry('assistant', {
+        message: {
+          content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }],
+        },
+      }),
+    ].join('\n');
+
+    const result = parseClaudeCodeContent(content, 'no-ids.jsonl');
+    const toolUse = result.messages
+      .flatMap((m) => m.contentBlocks ?? [])
+      .find((b) => b.type === 'tool_use');
+    expect(toolUse).toBeDefined();
+    expect(toolUse?.toolUseId).toBeUndefined();
+  });
 });
