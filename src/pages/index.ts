@@ -6,6 +6,7 @@ export { ChatPage } from './ChatPage';
 export { ImportPage } from './ImportPage';
 export { KnowledgePage } from './KnowledgePage';
 export { InvestigatePage } from './InvestigatePage';
+export { InvestigationWorkbenchPage } from './InvestigationWorkbenchPage';
 export { ProjectsPage } from './ProjectsPage';
 export { ProjectUnderstandingPage } from './ProjectUnderstandingPage';
 export { SettingsPage } from './SettingsPage';

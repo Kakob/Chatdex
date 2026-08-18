@@ -8,6 +8,7 @@ import {
   ChatPage,
   KnowledgePage,
   InvestigatePage,
+  InvestigationWorkbenchPage,
   ProjectsPage,
   ProjectUnderstandingPage,
   ImportPage,
@@ -31,6 +32,7 @@ export function App() {
           <Route path="chat/:id?" element={<ChatPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="investigate" element={<InvestigatePage />} />
+          <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectUnderstandingPage />} />
           <Route path="import" element={<ImportPage />} />

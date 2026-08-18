@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
+    "@tanstack/react-virtual": "^3.14.10",
     "dexie": "^4.2.1",
     "fuse.js": "^7.1.0",
     "html2canvas": "^1.4.1",

@@ -62,3 +62,22 @@ Commit: `fa62c05`
 **Next (DI-2b):** investigation workbench — new virtualized three-region reader (transcript / code event / case notebook) + literal in-source search with exact highlighting and match navigation.
 
 Commit: `02259a1`
+
+## DI-2b — Investigation workbench (2026-08-18)
+
+**Built:**
+
+- `/investigate/:anchorId` route (`src/pages/InvestigationWorkbenchPage.tsx`, anchor ids URL-encoded — they contain `#`). Three regions per spec §8.2: transcript, code event, case notebook; side-by-side on wide screens, labeled tabs below `lg`. Each region scrolls independently. Anchor rows on the Investigate page gained `Open workbench`.
+- **Transcript reader** (`src/components/investigation/TranscriptReader.tsx`) — the app's first virtualized list (`@tanstack/react-virtual`, new dependency, dynamic row measurement). Renders the complete normalized step stream: prose always verbatim and in full; tool payloads collapsible but clearly labeled with exact character counts, always expanding to the original content; role/tool/step-ordinal/timestamp metadata visible per row; `code change` badges on anchor steps. Opens centered on the anchor's step.
+- **Code event panel** (`CodeEventPanel.tsx`) — verbatim old/new (or written content) per file change, literal metadata only (tool, step, timestamp, stable key, tool-use id, source provenance). Clicking a tool call in the transcript with edit hunks selects it here (`Show in code panel`); `Show in transcript` scrolls back; `Back to anchor event` restores the primary event. No generated prose about code anywhere.
+- **Literal in-source search** (`src/lib/investigation/search.ts` + `WorkbenchSearch.tsx`) — case-insensitive exact-substring over `stepDisplayText` (the same text the reader renders, so highlighting is character-exact); match count, prev/next with wraparound, jumping auto-expands collapsed payloads containing the current match. Fuse.js is not involved (spec §8.6 as amended).
+- **Context service** (`src/lib/investigation/context.ts`) — `getInvestigationContext(anchorId)`: anchor + conversation + full step stream with per-step timestamps + sibling anchors (which also power the notebook's "code changes in this session" cross-navigation list). Notebook region otherwise explains that cases land next phase.
+- Keyboard (spec §13, secondary to labeled controls): `/` focuses search, `j`/`k` step navigation, `[`/`]` match navigation; all ignored while typing in fields.
+
+**Tests (+12; 609 frontend total):** search offsets (exact characters, regex-metacharacters-as-text, non-ASCII, adjacent repeats, empty-query), `stepDisplayText` contract per step kind, context assembly (full stream reachable, anchor-step alignment incl. toolUseId, timestamps, null for unknown/orphaned anchors). Production build verified; react-compiler lint kept at baseline (sync-setState effects refactored to derived state; one documented eslint-disable for the virtualizer's compiler opt-out).
+
+**Known limits (by phase design):** exhibit pinning, review scopes, and the real notebook are DI-2c; search is scoped to the open source (cross-source search out of MVP, spec §8.6); regex mode deferred.
+
+**Next (DI-2c):** cases, exhibits (transcript spans + code hunks with offset/hash locators), review scopes, case-scoped search records — the first synced entities (~7-edit plumbing each, spec §21 decision 4 keeps sourceEvents/anchors out of sync).
+
+Commit: (pending)

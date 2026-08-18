@@ -264,6 +264,12 @@ function AnchorRow({
         {state === 'uninvestigated' ? 'Uninvestigated' : state}
       </span>
       <Link
+        to={`/investigate/${encodeURIComponent(anchor.id)}`}
+        className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
+      >
+        Open workbench
+      </Link>
+      <Link
         to={`/conversations/${anchor.conversationId}?scrollTo=${anchor.messageId}`}
         className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
       >
