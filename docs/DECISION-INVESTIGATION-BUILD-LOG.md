@@ -101,4 +101,4 @@ Completes spec milestone M2 (investigate one real event, leave, return, continue
 
 **Next (DI-3):** verdict form with per-category evidence validation (§8.8), finalize → immutable `VerdictRevision` + reopen/refinalize (§8.9), decision ledger (§9), factual coverage view (§10), closure/continuation links (§8.10).
 
-Commit: (pending)
+Commit: `e463aaf`
