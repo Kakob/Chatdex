@@ -14,6 +14,7 @@ import {
   pinTranscriptExhibit,
   pinToolEventExhibit,
   pinCodeExhibit,
+  setExhibitNote,
   removeDraftExhibit,
   confirmReviewScope,
   removeDraftReviewScope,
@@ -59,6 +60,7 @@ export interface UseInvestigationCaseResult {
   pinCodeEvent: () => Promise<void>;
   pinCodeSide: (changeIndex: number, codeSide: 'before' | 'after') => Promise<void>;
   removeExhibit: (exhibitId: string) => Promise<void>;
+  saveExhibitNote: (exhibitId: string, note: string) => Promise<void>;
   confirmScope: (startStepIndex: number, endStepIndex: number) => Promise<void>;
   removeScope: (scopeId: string) => Promise<void>;
   recordSearch: (query: string, resultCount: number) => Promise<void>;
@@ -202,6 +204,10 @@ export function useInvestigationCase(
     removeExhibit: (exhibitId) =>
       run(() =>
         caseRow ? removeDraftExhibit(caseRow.id, exhibitId) : Promise.resolve()
+      ),
+    saveExhibitNote: (exhibitId, note) =>
+      run(() =>
+        caseRow ? setExhibitNote(caseRow.id, exhibitId, note) : Promise.resolve()
       ),
     confirmScope: (startStepIndex, endStepIndex) =>
       run(() =>

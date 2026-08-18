@@ -122,3 +122,22 @@ Completes spec milestone M3: the full import → read → evidence → verdict �
 **Next (DI-4):** hardening — offline/no-AI E2E constraint tests (§16.3), 10k-event virtualization check (§16.4), keyboard/narrow-screen pass, source-mismatch UX verification, implementation report + manual QA script (§18/§19).
 
 Commit: `f1154f2`
+
+## DI-4 — Hardening and handoff (2026-08-18)
+
+Completes milestone M4. All automated parts of the definition of done (§19) are satisfied; the remaining items are the human acceptance pass (§18 — script provided).
+
+**Built:**
+
+- **§16.3 constraint test** (`src/lib/investigation/constraints.test.ts`): the complete flow — import → anchors → case → literal search → pins → review scope → verdict → ledger → coverage → continuation → exhibit resolution → reopen → refinalize — with `fetch`/`XMLHttpRequest`/`WebSocket` all replaced by violation-recording stubs. Asserts **zero network attempts** across the whole flow, plus the non-generation invariants: template-only title, empty notes, `verdictDraft` undefined at case creation, ledger prose = human fields + fixed `ORIGIN_LABELS`, exhibits resolving to exact source slices, revision-1 immutality through refinalize.
+- **§16.4 performance check** (`perf.test.ts`): deterministic 10,000-event fixture, 2,000 derived anchors. Observed: normalize 53ms · displayText 3ms · literal search 3ms · derive-anchors 349ms · coverage 290ms. Recorded in the implementation report; assertions are generous ceilings per the spec's no-invented-SLA rule.
+- **Owed features folded in:** exhibit `humanNote` now editable inline in the notebook (service `setExhibitNote`, annotation never touches the pinned content hash); ledger gained session + finalized-date-range filters (`LedgerEntry.conversationId`).
+- **Implementation report + manual QA script**: `docs/DECISION-INVESTIGATION-IMPLEMENTATION-REPORT.md` — migrations table (Dexie v5–v8, no Postgres migration), major files, test coverage vs the §16.1 checklist, observed timings, the seven recorded spec deviations, known limitations, and the 12-step §18 acceptance script (incl. keyboard-only, narrow-screen, and DevTools-offline passes).
+
+**Deliberate §14 decision recorded:** conversation deletion cascades investigation records including adjudicated cases (spec-permitted); tombstoning is future work.
+
+**Tests (+4; 639 frontend + 6 backend total, all green).** Typecheck clean, production build passes, lint at pre-feature baseline.
+
+**Remaining (human):** the §18 manual acceptance scenario on a real session — DI-2c/DI-3/DI-4 UI has not yet had a browser pass. The QA script in the implementation report is the checklist.
+
+Commit: (pending)

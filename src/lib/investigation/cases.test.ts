@@ -16,6 +16,7 @@ import {
   pinTranscriptExhibit,
   pinToolEventExhibit,
   pinCodeExhibit,
+  setExhibitNote,
   removeDraftExhibit,
   recordCaseSearch,
   confirmReviewScope,
@@ -287,6 +288,21 @@ describe('search records and review scopes (SPEC §8.6–§8.7)', () => {
     await expect(
       confirmReviewScope(caseRow.id, { startStepIndex: 0, endStepIndex: 99 })
     ).rejects.toThrow('Invalid review range');
+  });
+
+  it('sets and clears the human note on an exhibit', async () => {
+    const anchor = await fixtureAnchor();
+    const caseRow = await startInvestigation(anchor);
+    const exhibit = await pinToolEventExhibit(caseRow.id, anchor.stableKey);
+
+    const withNote = await setExhibitNote(caseRow.id, exhibit.id, 'this is the key edit');
+    expect(withNote.humanNote).toBe('this is the key edit');
+    // The pinned content is untouched — only the annotation changes.
+    expect(withNote.selectedContentHash).toBe(exhibit.selectedContentHash);
+
+    const cleared = await setExhibitNote(caseRow.id, exhibit.id, '   ');
+    expect(cleared.humanNote).toBeUndefined();
+    await expect(setExhibitNote(caseRow.id, 'nope', 'x')).rejects.toThrow('belong');
   });
 
   it('removes draft exhibits and scopes but verifies ownership', async () => {

@@ -11,6 +11,7 @@ import {
   ORIGIN_LABELS,
   type LedgerEntry,
 } from '../lib/investigation/verdicts';
+import { db } from '../lib/db/schema';
 import type {
   VerdictConfidence,
   VerdictOrigin,
@@ -25,17 +26,33 @@ interface LedgerFilters {
   status?: VerdictStatus;
   confidence?: VerdictConfidence;
   filePathSubstring?: string;
+  conversationId?: string;
+  finalizedFrom?: string; // yyyy-mm-dd (local)
+  finalizedTo?: string;
+}
+
+interface LedgerData {
+  entries: LedgerEntry[];
+  sessionNames: Map<string, string>;
 }
 
 export function LedgerPage() {
-  const [entries, setEntries] = useState<LedgerEntry[] | null>(null);
+  const [data, setData] = useState<LedgerData | null>(null);
   const [filters, setFilters] = useState<LedgerFilters>({});
+  const entries = data?.entries ?? null;
 
   useEffect(() => {
     let cancelled = false;
-    void listDecisionLedger().then((rows) => {
-      if (!cancelled) setEntries(rows);
-    });
+    void (async () => {
+      const rows = await listDecisionLedger();
+      const convIds = [...new Set(rows.map((r) => r.conversationId))];
+      const convs = await db.conversations.bulkGet(convIds);
+      const sessionNames = new Map<string, string>();
+      convs.forEach((conv, i) => {
+        if (conv) sessionNames.set(convIds[i], conv.name);
+      });
+      if (!cancelled) setData({ entries: rows, sessionNames });
+    })();
     return () => {
       cancelled = true;
     };
@@ -44,10 +61,17 @@ export function LedgerPage() {
   const visible = useMemo(() => {
     if (!entries) return [];
     const needle = filters.filePathSubstring?.trim().toLowerCase();
+    const from = filters.finalizedFrom ? localDayStart(filters.finalizedFrom) : null;
+    const to = filters.finalizedTo ? localDayEnd(filters.finalizedTo) : null;
     return entries.filter((entry) => {
       if (filters.origin && entry.latest.origin !== filters.origin) return false;
       if (filters.status && entry.latest.status !== filters.status) return false;
       if (filters.confidence && entry.latest.confidence !== filters.confidence) return false;
+      if (filters.conversationId && entry.conversationId !== filters.conversationId) {
+        return false;
+      }
+      if (from && entry.latest.finalizedAt < from) return false;
+      if (to && entry.latest.finalizedAt > to) return false;
       if (needle && !entry.filePaths.some((p) => p.toLowerCase().includes(needle))) {
         return false;
       }
@@ -128,6 +152,35 @@ export function LedgerPage() {
           onChange={(e) => set({ filePathSubstring: e.target.value || undefined })}
           aria-label="Filter by file path substring"
         />
+        {data && data.sessionNames.size > 1 && (
+          <select
+            className={inputClass}
+            value={filters.conversationId ?? ''}
+            onChange={(e) => set({ conversationId: e.target.value || undefined })}
+            aria-label="Filter by session"
+          >
+            <option value="">All sessions</option>
+            {[...data.sessionNames.entries()].map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        )}
+        <input
+          type="date"
+          className={inputClass}
+          value={filters.finalizedFrom ?? ''}
+          onChange={(e) => set({ finalizedFrom: e.target.value || undefined })}
+          aria-label="Finalized from date"
+        />
+        <input
+          type="date"
+          className={inputClass}
+          value={filters.finalizedTo ?? ''}
+          onChange={(e) => set({ finalizedTo: e.target.value || undefined })}
+          aria-label="Finalized to date"
+        />
       </div>
 
       {entries === null ? (
@@ -192,4 +245,14 @@ export function LedgerPage() {
       )}
     </div>
   );
+}
+
+function localDayStart(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+function localDayEnd(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999);
 }

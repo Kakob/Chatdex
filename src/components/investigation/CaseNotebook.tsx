@@ -47,6 +47,7 @@ export function CaseNotebook({
     pinWholeStep,
     pinCodeEvent,
     removeExhibit,
+    saveExhibitNote,
     confirmScope,
     removeScope,
   } = caseApi;
@@ -234,6 +235,12 @@ export function CaseNotebook({
                   <p className="font-mono text-xs text-gray-700 dark:text-gray-300 line-clamp-2 whitespace-pre-wrap break-words">
                     {text}
                   </p>
+                  <ExhibitNote
+                    exhibitId={exhibit.id}
+                    note={exhibit.humanNote ?? ''}
+                    editable={editable}
+                    onSave={(value) => void saveExhibitNote(exhibit.id, value)}
+                  />
                 </li>
               );
             })}
@@ -321,6 +328,42 @@ export function CaseNotebook({
 
       {error && <ErrorLine message={error} onDismiss={clearError} />}
     </div>
+  );
+}
+
+function ExhibitNote({
+  exhibitId,
+  note,
+  editable,
+  onSave,
+}: {
+  exhibitId: string;
+  note: string;
+  editable: boolean;
+  onSave: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState<{ id: string; text: string } | null>(null);
+  const value = draft?.id === exhibitId ? draft.text : note;
+
+  if (!editable) {
+    return note ? (
+      <p className="mt-1 text-xs italic text-gray-500 dark:text-gray-400">
+        Your note: {note}
+      </p>
+    ) : null;
+  }
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder="Your note (optional)…"
+      aria-label="Your note on this exhibit"
+      onChange={(e) => setDraft({ id: exhibitId, text: e.target.value })}
+      onBlur={() => {
+        if (value !== note) onSave(value);
+      }}
+      className="mt-1 w-full px-1.5 py-0.5 text-xs italic rounded border border-gray-200 dark:border-gray-700 bg-transparent text-gray-600 dark:text-gray-300"
+    />
   );
 }
 

@@ -261,6 +261,26 @@ export async function pinCodeExhibit(
   return exhibit;
 }
 
+/** The user's own annotation on an exhibit (spec §8.5) — never generated. */
+export async function setExhibitNote(
+  caseId: string,
+  exhibitId: string,
+  humanNote: string
+): Promise<CaseExhibit> {
+  await requireEditableCase(caseId);
+  const exhibit = await getCaseExhibit(exhibitId);
+  if (!exhibit || exhibit.caseId !== caseId) {
+    throw new Error('Exhibit does not belong to this case');
+  }
+  const updated: CaseExhibit = {
+    ...exhibit,
+    humanNote: humanNote.trim() || undefined,
+    updatedAt: new Date(),
+  };
+  await putCaseExhibit(updated);
+  return updated;
+}
+
 export async function removeDraftExhibit(caseId: string, exhibitId: string): Promise<void> {
   await requireEditableCase(caseId);
   const exhibit = await getCaseExhibit(exhibitId);

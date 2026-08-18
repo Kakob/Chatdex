@@ -171,6 +171,7 @@ export interface LedgerEntry {
   caseState: CaseState;
   filePaths: string[];
   primaryAnchorStableKey: string;
+  conversationId: string;
   exhibitCount: number;
   reviewScopeCount: number;
 }
@@ -199,6 +200,7 @@ export async function listDecisionLedger(): Promise<LedgerEntry[]> {
       caseState: caseRow.state,
       filePaths: anchor?.filePaths ?? [],
       primaryAnchorStableKey: caseRow.primaryAnchorStableKey,
+      conversationId: caseRow.conversationId,
       exhibitCount: (await getExhibitsForCase(caseId)).length,
       reviewScopeCount: (await getScopesForCase(caseId)).length,
     });
