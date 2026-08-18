@@ -61,4 +61,4 @@ Commit: `fa62c05`
 
 **Next (DI-2b):** investigation workbench — new virtualized three-region reader (transcript / code event / case notebook) + literal in-source search with exact highlighting and match navigation.
 
-Commit: (pending)
+Commit: `02259a1`
