@@ -121,4 +121,4 @@ Completes spec milestone M3: the full import → read → evidence → verdict �
 
 **Next (DI-4):** hardening — offline/no-AI E2E constraint tests (§16.3), 10k-event virtualization check (§16.4), keyboard/narrow-screen pass, source-mismatch UX verification, implementation report + manual QA script (§18/§19).
 
-Commit: (pending)
+Commit: `f1154f2`
