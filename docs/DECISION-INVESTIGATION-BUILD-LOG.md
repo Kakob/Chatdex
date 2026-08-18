@@ -80,4 +80,4 @@ Commit: `02259a1`
 
 **Next (DI-2c):** cases, exhibits (transcript spans + code hunks with offset/hash locators), review scopes, case-scoped search records — the first synced entities (~7-edit plumbing each, spec §21 decision 4 keeps sourceEvents/anchors out of sync).
 
-Commit: (pending)
+Commit: `a731b0c`
