@@ -43,4 +43,4 @@ Completes spec milestone M1 (deterministic anchors; every anchor opens its exact
 
 **Next (DI-2a):** Investigate route — chronological anchor browser with metadata filters (project/session/date/path substring/change type/case state), backfill derivation trigger for pre-existing conversations.
 
-Commit: (pending)
+Commit: `fa62c05`
