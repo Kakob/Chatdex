@@ -82,8 +82,56 @@ export interface InvestigationCase {
   notes: string;
   state: CaseState;
   searchRecords: CaseSearchRecord[];
+  /** Working verdict (spec §8.8) — human selections only, never preselected. */
+  verdictDraft?: VerdictDraft;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// --- Verdicts (spec §8.8–§8.9, §11; DI-3) ---
+//
+// The verdict is the human's adjudication. No field is ever preselected,
+// no rationale is ever generated, and finalized revisions are append-only
+// snapshots that later edits can never mutate.
+
+export type VerdictOrigin =
+  | 'user_directed'
+  | 'agent_proposed_user_adopted'
+  | 'agent_implemented_without_recorded_discussion'
+  | 'inherited_default'
+  | 'emergent_across_exchanges'
+  | 'conflicts_with_user_direction'
+  | 'indeterminate';
+
+export type VerdictStatus = 'active' | 'experimental' | 'superseded' | 'reversed' | 'unknown';
+
+export type VerdictConfidence = 'low' | 'medium' | 'high';
+
+export interface VerdictDraft {
+  origin?: VerdictOrigin;
+  status?: VerdictStatus;
+  confidence?: VerdictConfidence;
+  /** Human-authored only. */
+  rationale?: string;
+}
+
+export interface VerdictRevision {
+  id: string;
+  caseId: string;
+  /** Denormalized for delete cascades. */
+  conversationId: string;
+  /** 1-based, strictly increasing per case. */
+  revisionNumber: number;
+  origin: VerdictOrigin;
+  status: VerdictStatus;
+  confidence: VerdictConfidence;
+  rationale: string;
+  /** Evidence included in this revision — rows referenced here are
+   *  protected from removal even after the case reopens (spec §8.7/§8.9). */
+  exhibitIds: string[];
+  reviewScopeIds: string[];
+  searchRecordIds: string[];
+  finalizedAt: Date;
 }
 
 export type ExhibitKind = 'transcript_span' | 'tool_event' | 'code_span';

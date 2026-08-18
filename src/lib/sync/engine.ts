@@ -38,6 +38,7 @@ import {
   envelopeInvestigationCase,
   envelopeCaseExhibit,
   envelopeReviewScope,
+  envelopeVerdictRevision,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -56,6 +57,7 @@ import {
   rehydrateInvestigationCase,
   rehydrateCaseExhibit,
   rehydrateReviewScope,
+  rehydrateVerdictRevision,
   type SyncEnvelope,
 } from './serializer';
 
@@ -104,6 +106,7 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         await db.investigationCases.where('conversationId').equals(rec.id).delete();
         await db.caseExhibits.where('conversationId').equals(rec.id).delete();
         await db.reviewScopes.where('conversationId').equals(rec.id).delete();
+        await db.verdictRevisions.where('conversationId').equals(rec.id).delete();
         return;
       case 'message':
         await db.messages.delete(rec.id);
@@ -152,12 +155,16 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         await db.investigationCases.delete(rec.id);
         await db.caseExhibits.where('caseId').equals(rec.id).delete();
         await db.reviewScopes.where('caseId').equals(rec.id).delete();
+        await db.verdictRevisions.where('caseId').equals(rec.id).delete();
         return;
       case 'case_exhibit':
         await db.caseExhibits.delete(rec.id);
         return;
       case 'review_scope':
         await db.reviewScopes.delete(rec.id);
+        return;
+      case 'verdict_revision':
+        await db.verdictRevisions.delete(rec.id);
         return;
     }
   }
@@ -215,6 +222,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'review_scope':
       await db.reviewScopes.put(rehydrateReviewScope(payload));
+      return;
+    case 'verdict_revision':
+      await db.verdictRevisions.put(rehydrateVerdictRevision(payload));
       return;
   }
 }
@@ -302,6 +312,10 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'review_scope': {
       const s = await db.reviewScopes.get(entry.id);
       return s ? envelopeReviewScope(s) : null;
+    }
+    case 'verdict_revision': {
+      const v = await db.verdictRevisions.get(entry.id);
+      return v ? envelopeVerdictRevision(v) : null;
     }
   }
 }
@@ -434,6 +448,7 @@ class SyncEngine {
       ['investigation_case', db.investigationCases],
       ['case_exhibit', db.caseExhibits],
       ['review_scope', db.reviewScopes],
+      ['verdict_revision', db.verdictRevisions],
     ];
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
@@ -531,6 +546,10 @@ class SyncEngine {
     db.reviewScopes.hook('creating', upsert('review_scope'));
     db.reviewScopes.hook('updating', (_m, k) => upsert('review_scope')(k as string));
     db.reviewScopes.hook('deleting', remove('review_scope'));
+
+    db.verdictRevisions.hook('creating', upsert('verdict_revision'));
+    db.verdictRevisions.hook('updating', (_m, k) => upsert('verdict_revision')(k as string));
+    db.verdictRevisions.hook('deleting', remove('verdict_revision'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().

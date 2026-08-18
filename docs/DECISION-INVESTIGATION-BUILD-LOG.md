@@ -102,3 +102,23 @@ Completes spec milestone M2 (investigate one real event, leave, return, continue
 **Next (DI-3):** verdict form with per-category evidence validation (§8.8), finalize → immutable `VerdictRevision` + reopen/refinalize (§8.9), decision ledger (§9), factual coverage view (§10), closure/continuation links (§8.10).
 
 Commit: `e463aaf`
+
+## DI-3 — Verdicts, ledger, coverage (2026-08-18)
+
+Completes spec milestone M3: the full import → read → evidence → verdict → ledger → next-anchor loop works without AI or network.
+
+**Built:**
+
+- **Verdict model** (`src/types/investigation.ts`, Dexie v8): `VerdictDraft` embedded on the case (human selections only, never preselected) and `VerdictRevision` — append-only snapshot rows (`&[caseId+revisionNumber]` unique) carrying origin/status/confidence, human rationale, and the exhibit/scope/search-record ids included at finalization. Fourth synced kind `verdict_revision` through all seven plumbing sites; no DB migration (16 chars < varchar 32). No delete helper exists for revisions by design.
+- **Trust boundary** (`src/lib/investigation/verdicts.ts`): `validateVerdict` implements the §8.8 category matrix — code/tool exhibit always required; transcript exhibit for explicit-direction/adopted/conflict origins; confirmed review scope for silence/indeterminate/inherited origins — reported as the exact list of missing requirements. `finalizeVerdict` validates, snapshots, adjudicates; `reopenCase` never touches prior revisions; refinalize appends revision N+1. Evidence referenced by any finalized revision is **permanently protected from removal** (guards added to the DI-2c removal ops, §8.7/§8.9).
+- **Verdict UI** (`VerdictPanel.tsx` in the notebook): origin/status/confidence selects (spec's fixed labels verbatim, none preselected), human rationale, live missing-requirements list, finalize with a confirmation dialog explaining revision immutability. Adjudicated view = §8.10 factual closure: "Verdict recorded", revision metadata, rationale, reopen button, and continuation links to chronological prev/next uninvestigated anchors + same-file anchors (`getContinuationTargets` — real neighbors, no gamification). Notebook locks pinning/editing while adjudicated.
+- **Decision ledger** (`/ledger` + sidebar Scale icon): finalized human verdicts only, newest first — human title, rationale shown *before* the taxonomy/evidence metadata, origin/status/confidence filters + literal path filter, revision counts, reopened badge, `Open investigation` link. Drafts never appear.
+- **Coverage view** (§10): second tab on `/investigate` — per-file factual table (total/uninvestigated/open/adjudicated anchors, last adjudication time) + overall counts, with explicit "not a measure of understanding" copy; clicking a path jumps to the anchor list filtered to it.
+
+**Tests (+11; 635 frontend total):** full §8.8 validation matrix (empty draft enumerates all requirements; transcript-exhibit categories; scope categories incl. inherited_default), finalize snapshot contents + adjudication lock, reject-unfinalizable, reopen/refinalize with revision-1 byte-equality, revision-referenced evidence removal guards, ledger excludes drafts, coverage counts + last-adjudication propagation, continuation targets before/after adjudication.
+
+**Known limits:** ledger session/date filters deferred (origin/status/confidence/path implemented); adjudicated-case tombstoning on conversation delete still cascades (unchanged from DI-2c; revisit in DI-4); ledger export explicitly optional per §9 and not built.
+
+**Next (DI-4):** hardening — offline/no-AI E2E constraint tests (§16.3), 10k-event virtualization check (§16.4), keyboard/narrow-screen pass, source-mismatch UX verification, implementation report + manual QA script (§18/§19).
+
+Commit: (pending)

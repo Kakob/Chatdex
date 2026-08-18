@@ -21,6 +21,7 @@ import {
 } from '../db/investigationCases';
 import { getInvestigationAnchor } from '../db/investigationAnchors';
 import { getConversationSourceRef } from './anchors';
+import { isReferencedByRevision } from './verdicts';
 import { stepDisplayText } from './search';
 import { anchorFileLabel, KIND_LABELS } from './filter';
 import { sha256Hex } from '../utils/hash';
@@ -266,6 +267,11 @@ export async function removeDraftExhibit(caseId: string, exhibitId: string): Pro
   if (!exhibit || exhibit.caseId !== caseId) {
     throw new Error('Exhibit does not belong to this case');
   }
+  if (await isReferencedByRevision(caseId, 'exhibit', exhibitId)) {
+    throw new Error(
+      'This exhibit is part of a finalized verdict revision and cannot be removed'
+    );
+  }
   await deleteCaseExhibit(exhibitId);
 }
 
@@ -342,6 +348,11 @@ export async function removeDraftReviewScope(caseId: string, scopeId: string): P
   const scope = await getReviewScope(scopeId);
   if (!scope || scope.caseId !== caseId) {
     throw new Error('Review scope does not belong to this case');
+  }
+  if (await isReferencedByRevision(caseId, 'scope', scopeId)) {
+    throw new Error(
+      'This review scope is part of a finalized verdict revision and cannot be removed'
+    );
   }
   await deleteReviewScope(scopeId);
 }

@@ -25,6 +25,7 @@ import type {
   InvestigationCase,
   CaseExhibit,
   ReviewScope,
+  VerdictRevision,
 } from '../../types/investigation';
 
 export interface KnowledgeFolderRow {
@@ -54,6 +55,7 @@ export class ChatdexDB extends Dexie {
   investigationCases!: Table<InvestigationCase, string>;
   caseExhibits!: Table<CaseExhibit, string>;
   reviewScopes!: Table<ReviewScope, string>;
+  verdictRevisions!: Table<VerdictRevision, string>;
 
   constructor() {
     super('chatdex');
@@ -120,6 +122,11 @@ export class ChatdexDB extends Dexie {
         '&id, conversationId, primaryAnchorStableKey, state, updatedAt',
       caseExhibits: '&id, caseId, conversationId',
       reviewScopes: '&id, caseId, conversationId',
+    });
+    // v8: verdict revisions (spec §8.9, DI-3) — append-only adjudication
+    // snapshots, synced encrypted like the other human records.
+    this.version(8).stores({
+      verdictRevisions: '&id, caseId, conversationId, &[caseId+revisionNumber]',
     });
   }
 }

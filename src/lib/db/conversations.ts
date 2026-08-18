@@ -50,6 +50,7 @@ export async function deleteConversation(id: string): Promise<void> {
       db.investigationCases,
       db.caseExhibits,
       db.reviewScopes,
+      db.verdictRevisions,
     ],
     async () => {
       await db.conversations.delete(id);
@@ -67,6 +68,7 @@ export async function deleteConversation(id: string): Promise<void> {
       await db.investigationCases.where('conversationId').equals(id).delete();
       await db.caseExhibits.where('conversationId').equals(id).delete();
       await db.reviewScopes.where('conversationId').equals(id).delete();
+      await db.verdictRevisions.where('conversationId').equals(id).delete();
     }
   );
 }

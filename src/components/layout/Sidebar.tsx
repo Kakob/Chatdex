@@ -9,6 +9,7 @@ import {
   Anchor,
   FileSearch,
   FolderKanban,
+  Scale,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/chat', icon: MessageCircle, label: 'Chat' },
   { to: '/knowledge', icon: Anchor, label: 'Knowledge' },
   { to: '/investigate', icon: FileSearch, label: 'Investigate' },
+  { to: '/ledger', icon: Scale, label: 'Ledger' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];

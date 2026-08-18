@@ -8,6 +8,7 @@ import type {
   InvestigationCase,
   CaseExhibit,
   ReviewScope,
+  VerdictRevision,
 } from '../../types/investigation';
 
 // --- cases ---
@@ -79,4 +80,19 @@ export async function getScopesForCase(caseId: string): Promise<ReviewScope[]> {
 
 export async function deleteReviewScope(id: string): Promise<void> {
   await db.reviewScopes.delete(id);
+}
+
+// --- verdict revisions (append-only; no delete helper by design) ---
+
+export async function addVerdictRevision(row: VerdictRevision): Promise<void> {
+  await db.verdictRevisions.add(row);
+}
+
+export async function getRevisionsForCase(caseId: string): Promise<VerdictRevision[]> {
+  const rows = await db.verdictRevisions.where('caseId').equals(caseId).toArray();
+  return rows.sort((a, b) => a.revisionNumber - b.revisionNumber);
+}
+
+export async function listAllVerdictRevisions(): Promise<VerdictRevision[]> {
+  return db.verdictRevisions.toArray();
 }

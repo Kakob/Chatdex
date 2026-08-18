@@ -302,6 +302,7 @@ export function InvestigationWorkbenchPage() {
               Case notebook
             </h2>
             <CaseNotebook
+              anchor={anchor}
               stepCount={steps.length}
               focusedStep={focusedStep}
               focusedStepTextLength={displayTexts[focusedStep]?.length ?? 0}

@@ -16,6 +16,7 @@ import {
   type AnchorCaseState,
 } from '../lib/investigation/filter';
 import { getCaseStatesByAnchor, startInvestigation } from '../lib/investigation/cases';
+import { CoverageView } from '../components/investigation/CoverageView';
 import type {
   CaseState,
   CodeChangeKind,
@@ -29,6 +30,7 @@ const inputClass =
 export function InvestigatePage() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [filters, setFilters] = useState<AnchorBrowserFilters>({});
+  const [view, setView] = useState<'anchors' | 'coverage'>('anchors');
   const {
     anchors,
     conversationInfo,
@@ -95,6 +97,34 @@ export function InvestigatePage() {
         </p>
       </div>
 
+      <div className="mb-4 flex gap-1" role="tablist" aria-label="Investigate views">
+        {(['anchors', 'coverage'] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={view === v}
+            onClick={() => setView(v)}
+            className={`px-3 py-1.5 text-sm rounded-lg font-medium ${
+              view === v
+                ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`}
+          >
+            {v === 'anchors' ? 'Anchors' : 'Coverage'}
+          </button>
+        ))}
+      </div>
+
+      {view === 'coverage' ? (
+        <CoverageView
+          onFilterByPath={(path) => {
+            setFilters((f) => ({ ...f, filePathSubstring: path }));
+            setView('anchors');
+          }}
+        />
+      ) : (
+        <>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
           className={inputClass}
@@ -249,6 +279,8 @@ export function InvestigatePage() {
               />
             ))}
           </ul>
+        </>
+      )}
         </>
       )}
     </div>

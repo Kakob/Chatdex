@@ -21,6 +21,7 @@ import type {
   CaseExhibit,
   ReviewScope,
   CaseSearchRecord,
+  VerdictRevision,
 } from '../../types/investigation';
 import type { SyncKind } from './syncApi';
 
@@ -384,4 +385,19 @@ export function rehydrateReviewScope(payload: unknown): ReviewScope {
     createdAt: isoToDate(p.createdAt),
     updatedAt: isoToDate(p.updatedAt),
   };
+}
+
+export function envelopeVerdictRevision(v: VerdictRevision): SyncEnvelope<'verdict_revision'> {
+  return {
+    kind: 'verdict_revision',
+    parentId: v.caseId,
+    // Revisions are immutable — finalizedAt is their only, final write moment.
+    updatedAt: v.finalizedAt,
+    payload: { ...v, finalizedAt: dateToIso(v.finalizedAt) },
+  };
+}
+
+export function rehydrateVerdictRevision(payload: unknown): VerdictRevision {
+  const p = payload as VerdictRevision & { finalizedAt: string };
+  return { ...p, finalizedAt: isoToDate(p.finalizedAt) };
 }

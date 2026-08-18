@@ -7,9 +7,11 @@ import { useState } from 'react';
 import { Pin, Trash2 } from 'lucide-react';
 import type { UseInvestigationCaseResult } from '../../hooks/useInvestigationCase';
 import { captureTranscriptSelection } from '../../lib/investigation/selection';
-import type { CaseExhibit } from '../../types/investigation';
+import { VerdictPanel } from './VerdictPanel';
+import type { CaseExhibit, InvestigationAnchor } from '../../types/investigation';
 
 interface CaseNotebookProps {
+  anchor: InvestigationAnchor;
   stepCount: number;
   focusedStep: number;
   focusedStepTextLength: number;
@@ -24,6 +26,7 @@ const EXHIBIT_KIND_LABELS: Record<CaseExhibit['kind'], string> = {
 };
 
 export function CaseNotebook({
+  anchor,
   stepCount,
   focusedStep,
   focusedStepTextLength,
@@ -63,6 +66,7 @@ export function CaseNotebook({
   const activeDraft = draft && caseRow && draft.caseId === caseRow.id ? draft : null;
   const title = activeDraft?.title ?? caseRow?.title ?? '';
   const notes = activeDraft?.notes ?? caseRow?.notes ?? '';
+  const editable = caseRow ? caseRow.state !== 'adjudicated' : false;
   const editDraft = (patch: Partial<{ title: string; notes: string }>) => {
     if (!caseRow) return;
     setDraft({ caseId: caseRow.id, title, notes, ...patch });
@@ -119,6 +123,7 @@ export function CaseNotebook({
           id="case-title"
           type="text"
           value={title}
+          disabled={!editable}
           onChange={(e) => editDraft({ title: e.target.value })}
           onBlur={() => {
             if (title !== caseRow.title) void saveTitle(title);
@@ -141,6 +146,7 @@ export function CaseNotebook({
         <textarea
           id="case-notes"
           value={notes}
+          disabled={!editable}
           onChange={(e) => editDraft({ notes: e.target.value })}
           onBlur={() => {
             if (notes !== caseRow.notes) void saveNotes(notes);
@@ -156,21 +162,23 @@ export function CaseNotebook({
             Exhibits ({exhibits.length})
           </h3>
         </div>
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          <NotebookButton onClick={pinCurrentSelection} icon={<Pin size={12} />}>
-            Pin selection
-          </NotebookButton>
-          <NotebookButton
-            onClick={pinFocused}
-            icon={<Pin size={12} />}
-            disabled={focusedStepTextLength === 0}
-          >
-            Pin step #{focusedStep}
-          </NotebookButton>
-          <NotebookButton onClick={() => void pinCodeEvent()} icon={<Pin size={12} />}>
-            Pin this code event
-          </NotebookButton>
-        </div>
+        {editable && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            <NotebookButton onClick={pinCurrentSelection} icon={<Pin size={12} />}>
+              Pin selection
+            </NotebookButton>
+            <NotebookButton
+              onClick={pinFocused}
+              icon={<Pin size={12} />}
+              disabled={focusedStepTextLength === 0}
+            >
+              Pin step #{focusedStep}
+            </NotebookButton>
+            <NotebookButton onClick={() => void pinCodeEvent()} icon={<Pin size={12} />}>
+              Pin this code event
+            </NotebookButton>
+          </div>
+        )}
         {pinHint && (
           <p className="text-xs text-amber-600 dark:text-amber-400 mb-1.5">{pinHint}</p>
         )}
@@ -237,7 +245,7 @@ export function CaseNotebook({
         <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
           Reviewed ranges ({scopes.length})
         </h3>
-        <div className="flex items-center gap-1.5 mb-2">
+        <div className={`${editable ? 'flex' : 'hidden'} items-center gap-1.5 mb-2`}>
           <input
             type="number"
             min={0}
@@ -305,6 +313,10 @@ export function CaseNotebook({
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+        <VerdictPanel anchor={anchor} caseApi={caseApi} />
       </div>
 
       {error && <ErrorLine message={error} onDismiss={clearError} />}

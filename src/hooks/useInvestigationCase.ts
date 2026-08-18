@@ -21,12 +21,21 @@ import {
   resolveExhibit,
   type ExhibitResolution,
 } from '../lib/investigation/cases';
+import {
+  saveVerdictDraft,
+  validateVerdict,
+  finalizeVerdict,
+  reopenCase,
+} from '../lib/investigation/verdicts';
+import { getRevisionsForCase } from '../lib/db/investigationCases';
 import type { TranscriptSelection } from '../lib/investigation/selection';
 import type {
   CaseExhibit,
   InvestigationAnchor,
   InvestigationCase,
   ReviewScope,
+  VerdictDraft,
+  VerdictRevision,
 } from '../types/investigation';
 
 export interface UseInvestigationCaseResult {
@@ -34,8 +43,14 @@ export interface UseInvestigationCaseResult {
   exhibits: CaseExhibit[];
   scopes: ReviewScope[];
   resolutions: Map<string, ExhibitResolution>;
+  revisions: VerdictRevision[];
+  /** §8.8 finalization requirements still missing (empty = finalizable). */
+  verdictMissing: string[];
   error: string | null;
   clearError: () => void;
+  saveVerdict: (draft: VerdictDraft) => Promise<void>;
+  finalize: () => Promise<void>;
+  reopen: () => Promise<void>;
   start: () => Promise<void>;
   saveTitle: (title: string) => Promise<void>;
   saveNotes: (notes: string) => Promise<void>;
@@ -54,37 +69,49 @@ interface CaseData {
   exhibits: CaseExhibit[];
   scopes: ReviewScope[];
   resolutions: Map<string, ExhibitResolution>;
+  revisions: VerdictRevision[];
+  verdictMissing: string[];
 }
+
+const EMPTY_DATA: CaseData = {
+  caseRow: null,
+  exhibits: [],
+  scopes: [],
+  resolutions: new Map(),
+  revisions: [],
+  verdictMissing: [],
+};
 
 async function loadCaseData(
   anchor: InvestigationAnchor | null,
   displayTexts: string[]
 ): Promise<CaseData> {
-  if (!anchor) {
-    return { caseRow: null, exhibits: [], scopes: [], resolutions: new Map() };
-  }
+  if (!anchor) return EMPTY_DATA;
   const caseRow = (await getCaseByPrimaryAnchor(anchor.stableKey)) ?? null;
-  const exhibits = caseRow ? await getExhibitsForCase(caseRow.id) : [];
-  const scopes = caseRow ? await getScopesForCase(caseRow.id) : [];
+  if (!caseRow) return EMPTY_DATA;
+  const exhibits = await getExhibitsForCase(caseRow.id);
+  const scopes = await getScopesForCase(caseRow.id);
   const resolutions = new Map<string, ExhibitResolution>();
   for (const exhibit of exhibits) {
     resolutions.set(exhibit.id, await resolveExhibit(exhibit, displayTexts));
   }
-  return { caseRow, exhibits, scopes, resolutions };
+  return {
+    caseRow,
+    exhibits,
+    scopes,
+    resolutions,
+    revisions: await getRevisionsForCase(caseRow.id),
+    verdictMissing: await validateVerdict(caseRow.id),
+  };
 }
 
 export function useInvestigationCase(
   anchor: InvestigationAnchor | null,
   displayTexts: string[]
 ): UseInvestigationCaseResult {
-  const [data, setData] = useState<CaseData>({
-    caseRow: null,
-    exhibits: [],
-    scopes: [],
-    resolutions: new Map(),
-  });
+  const [data, setData] = useState<CaseData>(EMPTY_DATA);
   const [error, setError] = useState<string | null>(null);
-  const { caseRow, exhibits, scopes, resolutions } = data;
+  const { caseRow, exhibits, scopes, resolutions, revisions, verdictMissing } = data;
 
   useEffect(() => {
     let cancelled = false;
@@ -118,8 +145,15 @@ export function useInvestigationCase(
     exhibits,
     scopes,
     resolutions,
+    revisions,
+    verdictMissing,
     error,
     clearError: () => setError(null),
+    saveVerdict: (draft) =>
+      run(() => (caseRow ? saveVerdictDraft(caseRow.id, draft) : Promise.resolve())),
+    finalize: () =>
+      run(() => (caseRow ? finalizeVerdict(caseRow.id) : Promise.resolve())),
+    reopen: () => run(() => (caseRow ? reopenCase(caseRow.id) : Promise.resolve())),
     start: () => run(() => (anchor ? startInvestigation(anchor) : Promise.resolve())),
     saveTitle: (title) =>
       run(() =>

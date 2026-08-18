@@ -9,6 +9,7 @@ import {
   KnowledgePage,
   InvestigatePage,
   InvestigationWorkbenchPage,
+  LedgerPage,
   ProjectsPage,
   ProjectUnderstandingPage,
   ImportPage,
@@ -33,6 +34,7 @@ export function App() {
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="investigate" element={<InvestigatePage />} />
           <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
+          <Route path="ledger" element={<LedgerPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/:id" element={<ProjectUnderstandingPage />} />
           <Route path="import" element={<ImportPage />} />
