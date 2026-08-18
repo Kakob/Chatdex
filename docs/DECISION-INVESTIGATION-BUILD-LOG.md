@@ -25,3 +25,22 @@ Key calls: reuse detection-layer normalization as the event substrate; raw sourc
 **Not done here (next: DI-1b):** persisted source events (Step model + tool-pair alignment), derived investigation anchors with stable keys (source hash + ordinal + change index), golden-trace anchor fixtures.
 
 Commit: `9af4f06`
+
+## DI-1b — Derived investigation anchors (2026-08-18)
+
+Completes spec milestone M1 (deterministic anchors; every anchor opens its exact source event via `messageId`/`stepIndex`).
+
+**Built:**
+
+- `Step.toolUseId` (`src/lib/detection/normalize.ts`) — the normalized step stream now carries the source-provided pairing id through from ContentBlock; additive, detectors untouched.
+- `src/lib/investigation/anchors.ts` — `deriveAnchorsForConversation()`: one anchor per structured edit hunk group (Edit / Write / MultiEdit / NotebookEdit), derived from the detection layer's `normalizeSession` (shared substrate, §21 decision 1). Shell commands never anchor. `ANCHOR_DERIVER_VERSION = 1.0.0` stamped on rows.
+- **Stable keys** = `{rawSourceContentHash}#s{stepIndex}` (anchor id ≡ stableKey → idempotent re-derivation). Pre-DI-1a conversations with no retained raw fall back to `conv:{conversationId}#s{n}` and are marked `sourceProvenance: 'legacy'` until re-imported — pragmatic deviation from spec §7.3, recorded here.
+- Per-change `contentHash` (SHA-256 over NUL-separated path/old/new, with an explicit absent-vs-empty oldString marker) for future exhibit integrity checks.
+- Dexie v6 `investigationAnchors` (`&id, conversationId, occurredAt, *filePaths`) — derived, **local-only, never synced**; replaced atomically per conversation; cascaded on conversation delete (rawSources deliberately not cascaded — a raw payload can back many conversations; deletion policy is a §14 open item).
+- Import wiring: anchors derive automatically after detection for new claude-code sessions; derivation failure never fails an import.
+
+**Tests (+9; 587 frontend total):** raw-hash stable keys, legacy fallback, MultiEdit parent/child ordering, Write-vs-empty-Edit hash distinction, shell-command exclusion, idempotent re-derivation, chronological + per-file listing, delete cascade, and end-to-end anchors from `importFiles`.
+
+**Next (DI-2a):** Investigate route — chronological anchor browser with metadata filters (project/session/date/path substring/change type/case state), backfill derivation trigger for pre-existing conversations.
+
+Commit: (pending)

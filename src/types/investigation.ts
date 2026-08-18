@@ -29,3 +29,53 @@ export interface RawSource {
    */
   rawText: string;
 }
+
+// --- Investigation anchors (spec §7.3, DI-1b) ---
+//
+// An anchor is a neutral, mechanically derived entry point: one per
+// structured code-changing tool call. It is NOT a detected decision and
+// carries no semantic labels. Anchors are DERIVED data (spec §21 decision 3):
+// local-only, never synced, rebuilt deterministically from stored messages —
+// the anchor's stableKey (= its id) is the identity that future cases
+// reference, and it survives re-derivation.
+
+export type CodeChangeKind = 'edit' | 'write' | 'multi_edit' | 'notebook_edit';
+
+export interface DerivedFileChange {
+  /** Normalized file path (detection-layer normalizePath). */
+  path: string;
+  /** Position within the parent tool call (0 except for multi-edit). */
+  changeIndex: number;
+  /** Absent for whole-file writes. */
+  oldString?: string;
+  newString: string;
+  /** SHA-256 over path + oldString + newString (exhibit integrity, §2.3). */
+  contentHash: string;
+}
+
+export interface InvestigationAnchor {
+  /** Equals stableKey — deterministic, so re-derivation is idempotent. */
+  id: string;
+  /** `${sourceRef}#s${stepIndex}`; sourceRef is the raw-source content hash,
+   *  or `conv:${conversationId}` for pre-DI-1a imports with no retained raw. */
+  stableKey: string;
+  conversationId: string;
+  /** Backing message, for opening the exact source event in the UI. */
+  messageId: string;
+  /** Ordinal in the detection-layer normalized step stream. */
+  stepIndex: number;
+  toolName: string;
+  /** Source-provided tool_use id when the parser preserved one. */
+  toolUseId?: string;
+  kind: CodeChangeKind;
+  fileChanges: DerivedFileChange[];
+  /** Denormalized for the multiEntry index (coverage view, spec §10). */
+  filePaths: string[];
+  /** Timestamp of the backing message. */
+  occurredAt: Date;
+  sourceContentHash?: string;
+  /** 'raw' = keyed to a retained raw source; 'legacy' = conversation-keyed. */
+  sourceProvenance: 'raw' | 'legacy';
+  deriverVersion: string;
+  createdAt: Date;
+}

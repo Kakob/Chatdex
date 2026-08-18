@@ -19,7 +19,7 @@ import type {
   UnderstandingEvent,
 } from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
-import type { RawSource } from '../../types/investigation';
+import type { RawSource, InvestigationAnchor } from '../../types/investigation';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -44,6 +44,7 @@ export class ChatdexDB extends Dexie {
   understandingObjects!: Table<UnderstandingObject, string>;
   understandingEvents!: Table<UnderstandingEvent, string>;
   rawSources!: Table<RawSource, string>;
+  investigationAnchors!: Table<InvestigationAnchor, string>;
 
   constructor() {
     super('chatdex');
@@ -95,6 +96,13 @@ export class ChatdexDB extends Dexie {
     // ciphertext sync path; only hash/provenance metadata may ever sync.
     this.version(5).stores({
       rawSources: '&id, &contentHash, importedAt, *conversationIds',
+    });
+    // v6: derived investigation anchors (SPEC-decision-investigation §7.3,
+    // DI-1b). LOCAL-ONLY, rebuilt deterministically from stored messages —
+    // never synced (spec §21 decision 3). Named investigationAnchors because
+    // `anchors` is the AIPKMS bookmark table (§21 decision 8).
+    this.version(6).stores({
+      investigationAnchors: '&id, conversationId, occurredAt, *filePaths',
     });
   }
 }

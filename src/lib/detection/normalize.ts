@@ -30,6 +30,12 @@ export interface Step {
   toolName?: string;
   toolInput?: Record<string, unknown>;
   toolResult?: string;
+  /**
+   * Source-provided pairing id (tool_use `id` / tool_result `tool_use_id`),
+   * when the parser preserved one. First-precedence call↔result alignment
+   * for the investigation layer (SPEC-decision-investigation §7.5).
+   */
+  toolUseId?: string;
   /** Present on tool_call steps only. */
   signature?: string;
   toolClass?: ToolCallClass;
@@ -107,6 +113,7 @@ function expandMessage(message: StoredMessage): PartialStep[] {
         kind: 'tool_call',
         toolName: block.toolName ?? message.toolName ?? 'unknown',
         toolInput: block.toolInput ?? parseToolInput(message.toolInput),
+        toolUseId: block.toolUseId,
       });
     } else if (block.type === 'tool_result') {
       flushText();
@@ -114,6 +121,7 @@ function expandMessage(message: StoredMessage): PartialStep[] {
         kind: 'tool_result',
         toolName: block.toolName ?? message.toolName,
         toolResult: block.toolResult ?? message.toolResult ?? '',
+        toolUseId: block.toolUseId,
       });
     } else if (block.text) {
       textBuffer.push(block.text);

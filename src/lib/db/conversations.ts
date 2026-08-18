@@ -40,13 +40,17 @@ export async function getConversationCount(source?: DataSource): Promise<number>
 export async function deleteConversation(id: string): Promise<void> {
   await db.transaction(
     'rw',
-    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns, db.investigationAnchors],
     async () => {
       await db.conversations.delete(id);
       await db.messages.where('conversationId').equals(id).delete();
       await db.anchors.where('conversationId').equals(id).delete();
       await db.findings.where('conversationId').equals(id).delete();
       await db.detectorRuns.where('conversationId').equals(id).delete();
+      // Derived rows go with the conversation; rawSources stay — a raw payload
+      // can back multiple conversations, and deletion policy for primary
+      // sources is a separate decision (spec §14).
+      await db.investigationAnchors.where('conversationId').equals(id).delete();
     }
   );
 }

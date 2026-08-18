@@ -1,6 +1,7 @@
 import { parseFiles, type ParsedData } from './parsers';
 import { bulkPutConversations, bulkPutMessages, storeRawSources, db } from './db/index';
 import { autoAnalyzeConversations } from './detection/autoAnalyze';
+import { deriveAnchorsForConversation } from './investigation/anchors';
 import type { DataSource, StoredConversation, StoredMessage } from '../types';
 
 export interface ImportResult {
@@ -39,9 +40,22 @@ export async function importFiles(
   });
 
   // Auto-run failure detection over freshly ingested agent sessions (SPEC §4).
-  await autoAnalyzeConversations(
-    selectAutoAnalyzeIds(parsed.conversations, result.addedConversationIds)
+  const agentSessionIds = selectAutoAnalyzeIds(
+    parsed.conversations,
+    result.addedConversationIds
   );
+  await autoAnalyzeConversations(agentSessionIds);
+
+  // Derive investigation anchors for the same sessions (claude-code is the
+  // MVP's only code-bearing source, SPEC-decision-investigation §5.1).
+  // Like detection, a derivation failure never fails an import.
+  for (const id of agentSessionIds) {
+    try {
+      await deriveAnchorsForConversation(id);
+    } catch (err) {
+      console.error('[investigation] anchor derivation failed for', id, err);
+    }
+  }
 
   onProgress?.({
     phase: 'complete',

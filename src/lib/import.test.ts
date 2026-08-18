@@ -117,6 +117,20 @@ describe('importFiles — raw source retention', () => {
     expect(await getRawSourcesForConversation('session-raw-1')).toHaveLength(2);
   });
 
+  it('derives investigation anchors during import, keyed to the raw source (DI-1b)', async () => {
+    await importFiles([jsonlFile(baseLines)]);
+    const anchors = await db.investigationAnchors
+      .where('conversationId')
+      .equals('session-raw-1')
+      .toArray();
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0].kind).toBe('edit');
+    expect(anchors[0].toolUseId).toBe('toolu_raw_1');
+    expect(anchors[0].sourceProvenance).toBe('raw');
+    expect(anchors[0].stableKey).toMatch(/^[0-9a-f]{64}#s\d+$/);
+    expect(anchors[0].fileChanges[0].path).toBe('/a.ts');
+  });
+
   it('stores tool ids end-to-end on imported message content blocks', async () => {
     await importFiles([jsonlFile(baseLines)]);
     const messages = await db.messages
