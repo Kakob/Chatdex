@@ -81,3 +81,24 @@ Commit: `02259a1`
 **Next (DI-2c):** cases, exhibits (transcript spans + code hunks with offset/hash locators), review scopes, case-scoped search records — the first synced entities (~7-edit plumbing each, spec §21 decision 4 keeps sourceEvents/anchors out of sync).
 
 Commit: `a731b0c`
+
+## DI-2c — Cases, exhibits, review scopes (2026-08-18)
+
+Completes spec milestone M2 (investigate one real event, leave, return, continue with all source links intact). First synced entities of the feature.
+
+**Built:**
+
+- **Entities** (`src/types/investigation.ts`, Dexie v7): `InvestigationCase` (state draft|open|adjudicated|reopened, human title/notes, **embedded** append-only `searchRecords` per §21 decision 4), `CaseExhibit` (transcript_span with utf16 offsets / tool_event / code_span with side+line locators; cached preview + SHA-256 of the exact selection), `ReviewScope` (inclusive step range, event count, captured search-record ids, explicit `humanConfirmedAt`). All reference anchors by **stableKey**, which survives re-derivation.
+- **Trust boundary** (`src/lib/investigation/cases.ts`, spec §12): every mutation validates state (adjudicated ⇒ reject), offsets/line ranges against the actual source, and ownership; selected text + hash are **recomputed from source**, never trusted from the caller. `startInvestigation` is idempotent per anchor with the deterministic title template `Investigate {kind}: {file}`. `resolveExhibit` re-renders from source + locator and returns `source_mismatch` (cached copy shown, never silently relocated) when hashes disagree.
+- **Sync**: three new kinds — `investigation_case`, `case_exhibit`, `review_scope` — through all seven plumbing sites (types, Dexie v7, clearAllData, SyncKind, serializer envelope/rehydrate, engine ×4 incl. conversation-delete cascade, backend KindSchema + `$type` union). No Postgres migration needed: `kind` is `varchar(32)` and the longest new name is 18 chars. rawSources/investigationAnchors stay unhooked (local-only).
+- **Deletion**: conversation delete (local + sync-incoming) cascades cases/exhibits/scopes — evidence must not outlive its primary source and silently appear authoritative (spec §14). Tombstoning *adjudicated* cases instead is deferred to DI-3.
+- **Workbench notebook is now real** (`CaseNotebook.tsx` + `useInvestigationCase`): start investigation; editable question + notes (labeled as the user's writing); pin selection (DOM selection → single-step utf16 span via `selection.ts`), pin focused step `#n` (keyboard alternative, spec §13), pin the code event; exhibits list with jump-to-step, mismatch badges, remove; reviewed ranges with explicit "I reviewed this range" confirmation and green range markers in the transcript. Executed searches are recorded once per distinct query on match navigation.
+- **Anchor browser**: real derived states (Uninvestigated/Open/Adjudicated chips), case-state filter select, and per spec §8.1 actions — `Start investigation` (creates draft + opens workbench) / `Resume investigation`.
+
+**Tests (+15; 624 frontend total):** title template + idempotent start, human-field validation (empty title, adjudicated lock), transcript-span offset validation + source-recomputed hashes, tool-event and line-range code pinning with bounds rejection, exhibit resolution incl. tamper → `source_mismatch`, verbatim search records, ordered review-scope validation + search-record capture, ownership-checked removals, case-state map incl. linked anchors, and filter/anchor-state derivation updates.
+
+**Known limits (by phase design):** exhibit `humanNote` supported by the service but not yet editable in UI; per-hunk code-span pinning has no dedicated picker (service-complete, `tool_event` + whole-side pinning cover the workflow); search recording keys on match navigation, not every keystroke.
+
+**Next (DI-3):** verdict form with per-category evidence validation (§8.8), finalize → immutable `VerdictRevision` + reopen/refinalize (§8.9), decision ledger (§9), factual coverage view (§10), closure/continuation links (§8.10).
+
+Commit: (pending)

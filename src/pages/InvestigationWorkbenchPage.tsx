@@ -10,6 +10,8 @@ import { ArrowLeft, FileSearch } from 'lucide-react';
 import { TranscriptReader, type ScrollRequest } from '../components/investigation/TranscriptReader';
 import { CodeEventPanel, type CodePanelChange } from '../components/investigation/CodeEventPanel';
 import { WorkbenchSearch } from '../components/investigation/WorkbenchSearch';
+import { CaseNotebook } from '../components/investigation/CaseNotebook';
+import { useInvestigationCase } from '../hooks/useInvestigationCase';
 import {
   getInvestigationContext,
   type InvestigationContext,
@@ -46,6 +48,7 @@ export function InvestigationWorkbenchPage() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollSeq = useRef(0);
+  const lastRecordedQuery = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +91,16 @@ export function InvestigationWorkbenchPage() {
   const currentMatch: StepSearchMatch | null =
     matchIndex >= 0 ? matches[matchIndex] : null;
 
+  const caseApi = useInvestigationCase(context?.anchor ?? null, displayTexts);
+
+  const reviewedStepIndexes = useMemo(() => {
+    const set = new Set<number>();
+    for (const scope of caseApi.scopes) {
+      for (let i = scope.startStepIndex; i <= scope.endStepIndex; i++) set.add(i);
+    }
+    return set;
+  }, [caseApi.scopes]);
+
   const matchesByStep = useMemo(() => {
     const map = new Map<number, StepSearchMatch[]>();
     for (const m of matches) {
@@ -113,8 +126,14 @@ export function InvestigationWorkbenchPage() {
       setNav({ query, index: next });
       scrollSeq.current += 1;
       setScrollRequest({ stepIndex: matches[next].stepIndex, seq: scrollSeq.current });
+      // Record the executed query once per distinct query while a case is
+      // open (spec §8.6) — navigation through results is the execution signal.
+      if (query.trim() && lastRecordedQuery.current !== query) {
+        lastRecordedQuery.current = query;
+        void caseApi.recordSearch(query, matches.length);
+      }
     },
-    [matches, matchIndex, query]
+    [matches, matchIndex, query, caseApi]
   );
 
   // Keyboard: '/' focus search, j/k next/prev event, [/] prev/next match
@@ -257,6 +276,7 @@ export function InvestigationWorkbenchPage() {
             currentMatch={currentMatch}
             scrollRequest={scrollRequest}
             onToolCallClick={(stepIndex) => setCodeStepIndex(stepIndex)}
+            reviewedStepIndexes={reviewedStepIndexes}
           />
         </div>
 
@@ -276,17 +296,20 @@ export function InvestigationWorkbenchPage() {
 
           <section
             aria-label="Case notebook"
-            className={`${region === 'notebook' ? 'block' : 'hidden'} lg:block rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 overflow-y-auto max-h-72`}
+            className={`${region === 'notebook' ? 'block' : 'hidden'} lg:block rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 overflow-y-auto max-h-[28rem]`}
           >
             <h2 className="font-semibold text-gray-900 dark:text-white text-sm mb-2">
               Case notebook
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-              Cases — your question, pinned exhibits, reviewed ranges, and verdict —
-              arrive in the next build phase. Reading and evidence come first.
-            </p>
+            <CaseNotebook
+              stepCount={steps.length}
+              focusedStep={focusedStep}
+              focusedStepTextLength={displayTexts[focusedStep]?.length ?? 0}
+              caseApi={caseApi}
+              onJumpToStep={scrollToStep}
+            />
             {siblingAnchors.length > 1 && (
-              <>
+              <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
                 <h3 className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Code changes in this session
                 </h3>
@@ -314,7 +337,7 @@ export function InvestigationWorkbenchPage() {
                     </li>
                   ))}
                 </ul>
-              </>
+              </div>
             )}
           </section>
         </div>

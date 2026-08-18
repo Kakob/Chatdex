@@ -49,6 +49,8 @@ interface TranscriptReaderProps {
   currentMatch: StepSearchMatch | null;
   scrollRequest: ScrollRequest | null;
   onToolCallClick: (stepIndex: number) => void;
+  /** Steps inside a confirmed review scope (visual display, spec §8.7). */
+  reviewedStepIndexes?: Set<number>;
 }
 
 export function TranscriptReader({
@@ -61,6 +63,7 @@ export function TranscriptReader({
   currentMatch,
   scrollRequest,
   onToolCallClick,
+  reviewedStepIndexes,
 }: TranscriptReaderProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<number>>(
@@ -132,6 +135,7 @@ export function TranscriptReader({
                 isAnchor={anchorStepIndexes.has(item.index)}
                 isPrimary={item.index === primaryStepIndex}
                 isSelectedCode={item.index === selectedCodeStepIndex}
+                isReviewed={reviewedStepIndexes?.has(item.index) ?? false}
                 isExpanded={!isToolPayload || expanded.has(item.index)}
                 matches={matchesByStep.get(item.index) ?? []}
                 currentMatch={
@@ -158,6 +162,7 @@ function StepRow({
   isAnchor,
   isPrimary,
   isSelectedCode,
+  isReviewed,
   isExpanded,
   matches,
   currentMatch,
@@ -169,6 +174,7 @@ function StepRow({
   isAnchor: boolean;
   isPrimary: boolean;
   isSelectedCode: boolean;
+  isReviewed: boolean;
   isExpanded: boolean;
   matches: StepSearchMatch[];
   currentMatch: StepSearchMatch | null;
@@ -181,7 +187,9 @@ function StepRow({
 
   return (
     <div
-      className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 ${
+      className={`px-4 py-3 border-b border-gray-100 dark:border-gray-800 border-l-2 ${
+        isReviewed ? 'border-l-emerald-400/80' : 'border-l-transparent'
+      } ${
         isPrimary
           ? 'bg-violet-50/60 dark:bg-violet-900/10'
           : isSelectedCode
@@ -240,7 +248,10 @@ function StepRow({
 
       {isExpanded ? (
         text ? (
-          <pre className="whitespace-pre-wrap break-words font-mono text-sm text-gray-800 dark:text-gray-200 max-h-96 overflow-y-auto">
+          <pre
+            data-step-body={step.index}
+            className="whitespace-pre-wrap break-words font-mono text-sm text-gray-800 dark:text-gray-200 max-h-96 overflow-y-auto"
+          >
             <HighlightedBody text={text} matches={matches} currentMatch={currentMatch} />
           </pre>
         ) : (

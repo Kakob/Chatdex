@@ -53,6 +53,91 @@ export interface DerivedFileChange {
   contentHash: string;
 }
 
+// --- Cases, exhibits, review scopes (spec §8.3–§8.7, §11; DI-2c) ---
+//
+// These are the feature's first SYNCED entities: human-authored records that
+// encrypt and replicate like findings do. They reference anchors by
+// stableKey (which survives re-derivation), never by table row identity.
+
+export type CaseState = 'draft' | 'open' | 'adjudicated' | 'reopened';
+
+/** Embedded in the case row (spec §21 decision 4) — append-only process
+ *  evidence about what the human searched, never about what exists. */
+export interface CaseSearchRecord {
+  id: string;
+  query: string;
+  mode: 'literal';
+  resultCount: number;
+  createdAt: Date;
+}
+
+export interface InvestigationCase {
+  id: string;
+  conversationId: string;
+  primaryAnchorStableKey: string;
+  linkedAnchorStableKeys: string[];
+  /** Human-editable; initialized from a deterministic literal template only. */
+  title: string;
+  /** Human-authored notes — always labeled as the user's writing in UI. */
+  notes: string;
+  state: CaseState;
+  searchRecords: CaseSearchRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ExhibitKind = 'transcript_span' | 'tool_event' | 'code_span';
+
+export interface CaseExhibit {
+  id: string;
+  caseId: string;
+  conversationId: string;
+  kind: ExhibitKind;
+  /** Ordinal of the source event in the normalized step stream. */
+  stepIndex: number;
+  messageId: string;
+  anchorStableKey?: string;
+  /** Raw-source hash at pin time (absent for legacy-provenance sources). */
+  sourceContentHash?: string;
+  // transcript_span: offsets into stepDisplayText(step), UTF-16 code units.
+  startOffset?: number;
+  endOffset?: number;
+  offsetEncoding?: 'utf16';
+  // code_span: locator into an anchor's file change.
+  filePath?: string;
+  changeIndex?: number;
+  codeSide?: 'before' | 'after';
+  /** 1-based inclusive line bounds within the chosen side. */
+  startLine?: number;
+  endLine?: number;
+  /** Cached preview — the source + locator is the authority (spec §8.4). */
+  selectedText: string;
+  /** SHA-256 of the exact selected text; mismatch ⇒ 'Source mismatch'. */
+  selectedContentHash: string;
+  humanNote?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ReviewScope {
+  id: string;
+  caseId: string;
+  conversationId: string;
+  /** Contiguous inclusive step range the human attests to having reviewed. */
+  startStepIndex: number;
+  endStepIndex: number;
+  eventCount: number;
+  startMessageId: string;
+  endMessageId: string;
+  sourceContentHash?: string;
+  /** Case search records that existed when the human confirmed. */
+  includedSearchRecordIds: string[];
+  /** Explicit confirmation moment — never inferred from scrolling. */
+  humanConfirmedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface InvestigationAnchor {
   /** Equals stableKey — deterministic, so re-derivation is idempotent. */
   id: string;

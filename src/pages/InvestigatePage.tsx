@@ -3,8 +3,8 @@
 // literal paths, session, timestamp, case state. Ordering is chronological
 // only — no relevance, importance, or recommendation exists by design.
 
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, FileSearch, RefreshCw } from 'lucide-react';
 import { useInvestigationAnchors } from '../hooks/useInvestigationAnchors';
 import {
@@ -13,8 +13,14 @@ import {
   filterAnchors,
   KIND_LABELS,
   type AnchorBrowserFilters,
+  type AnchorCaseState,
 } from '../lib/investigation/filter';
-import type { CodeChangeKind, InvestigationAnchor } from '../types/investigation';
+import { getCaseStatesByAnchor, startInvestigation } from '../lib/investigation/cases';
+import type {
+  CaseState,
+  CodeChangeKind,
+  InvestigationAnchor,
+} from '../types/investigation';
 import type { AnchorConversationInfo } from '../hooks/useInvestigationAnchors';
 
 const inputClass =
@@ -32,6 +38,11 @@ export function InvestigatePage() {
     backfillResult,
   } = useInvestigationAnchors(order);
 
+  const [caseStates, setCaseStates] = useState<Map<string, CaseState>>(new Map());
+  useEffect(() => {
+    void getCaseStatesByAnchor().then(setCaseStates);
+  }, [anchors]);
+
   const conversationMeta = useMemo(
     () =>
       new Map(
@@ -44,8 +55,8 @@ export function InvestigatePage() {
   );
 
   const visible = useMemo(
-    () => filterAnchors(anchors, filters, conversationMeta),
-    [anchors, filters, conversationMeta]
+    () => filterAnchors(anchors, filters, conversationMeta, caseStates),
+    [anchors, filters, conversationMeta, caseStates]
   );
 
   const sessions = useMemo(
@@ -133,6 +144,22 @@ export function InvestigatePage() {
           ))}
         </select>
 
+        <select
+          className={inputClass}
+          value={filters.caseState ?? ''}
+          onChange={(e) =>
+            set({
+              caseState: (e.target.value || undefined) as AnchorCaseState | undefined,
+            })
+          }
+          aria-label="Filter by case state"
+        >
+          <option value="">All states</option>
+          <option value="uninvestigated">Uninvestigated</option>
+          <option value="open">Open</option>
+          <option value="adjudicated">Adjudicated</option>
+        </select>
+
         <input
           type="text"
           className={inputClass}
@@ -218,6 +245,7 @@ export function InvestigatePage() {
                 key={anchor.id}
                 anchor={anchor}
                 info={conversationInfo.get(anchor.conversationId)}
+                state={anchorCaseState(anchor, caseStates)}
               />
             ))}
           </ul>
@@ -227,14 +255,38 @@ export function InvestigatePage() {
   );
 }
 
+const STATE_CHIP: Record<AnchorCaseState, { label: string; tone: string }> = {
+  uninvestigated: {
+    label: 'Uninvestigated',
+    tone: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300',
+  },
+  open: {
+    label: 'Open',
+    tone: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
+  },
+  adjudicated: {
+    label: 'Adjudicated',
+    tone: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300',
+  },
+};
+
 function AnchorRow({
   anchor,
   info,
+  state,
 }: {
   anchor: InvestigationAnchor;
   info: AnchorConversationInfo | undefined;
+  state: AnchorCaseState;
 }) {
-  const state = anchorCaseState();
+  const navigate = useNavigate();
+  const workbenchPath = `/investigate/${encodeURIComponent(anchor.id)}`;
+
+  const startAndOpen = async () => {
+    await startInvestigation(anchor);
+    navigate(workbenchPath);
+  };
+
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3">
       <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
@@ -260,15 +312,27 @@ function AnchorRow({
           legacy
         </span>
       )}
-      <span className="ml-auto px-2 py-0.5 text-xs rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
-        {state === 'uninvestigated' ? 'Uninvestigated' : state}
-      </span>
-      <Link
-        to={`/investigate/${encodeURIComponent(anchor.id)}`}
-        className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
+      <span
+        className={`ml-auto px-2 py-0.5 text-xs rounded-full ${STATE_CHIP[state].tone}`}
       >
-        Open workbench
-      </Link>
+        {STATE_CHIP[state].label}
+      </span>
+      {state === 'uninvestigated' ? (
+        <button
+          type="button"
+          onClick={() => void startAndOpen()}
+          className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
+        >
+          Start investigation
+        </button>
+      ) : (
+        <Link
+          to={workbenchPath}
+          className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
+        >
+          Resume investigation
+        </Link>
+      )}
       <Link
         to={`/conversations/${anchor.conversationId}?scrollTo=${anchor.messageId}`}
         className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"

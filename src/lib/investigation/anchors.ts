@@ -40,9 +40,19 @@ export async function deriveAnchorsForConversation(
   conversationId: string
 ): Promise<InvestigationAnchor[]> {
   const messages = await getMessagesForConversation(conversationId);
-  const anchors = await buildAnchors(conversationId, messages, await sourceRef(conversationId));
+  const anchors = await buildAnchors(
+    conversationId,
+    messages,
+    await getConversationSourceRef(conversationId)
+  );
   await replaceInvestigationAnchors(conversationId, anchors);
   return anchors;
+}
+
+export interface ConversationSourceRef {
+  ref: string;
+  contentHash?: string;
+  provenance: 'raw' | 'legacy';
 }
 
 /**
@@ -50,11 +60,12 @@ export async function deriveAnchorsForConversation(
  * raw source (the payload that actually produced the stored messages —
  * conversations are frozen at import, so later raw versions were skipped).
  * Pre-DI-1a imports have no retained raw; they key off the conversation id
- * and are marked 'legacy' until re-imported.
+ * and are marked 'legacy' until re-imported. Also used by exhibits/scopes
+ * to stamp provenance at pin time.
  */
-async function sourceRef(
+export async function getConversationSourceRef(
   conversationId: string
-): Promise<{ ref: string; contentHash?: string; provenance: 'raw' | 'legacy' }> {
+): Promise<ConversationSourceRef> {
   const sources = await getRawSourcesForConversation(conversationId);
   if (sources.length === 0) {
     return { ref: `conv:${conversationId}`, provenance: 'legacy' };
@@ -68,7 +79,7 @@ async function sourceRef(
 async function buildAnchors(
   conversationId: string,
   messages: StoredMessage[],
-  source: { ref: string; contentHash?: string; provenance: 'raw' | 'legacy' }
+  source: ConversationSourceRef
 ): Promise<InvestigationAnchor[]> {
   const { steps } = normalizeSession(conversationId, messages);
   const messageById = new Map(messages.map((m) => [m.id, m]));

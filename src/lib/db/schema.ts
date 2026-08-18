@@ -19,7 +19,13 @@ import type {
   UnderstandingEvent,
 } from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
-import type { RawSource, InvestigationAnchor } from '../../types/investigation';
+import type {
+  RawSource,
+  InvestigationAnchor,
+  InvestigationCase,
+  CaseExhibit,
+  ReviewScope,
+} from '../../types/investigation';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -45,6 +51,9 @@ export class ChatdexDB extends Dexie {
   understandingEvents!: Table<UnderstandingEvent, string>;
   rawSources!: Table<RawSource, string>;
   investigationAnchors!: Table<InvestigationAnchor, string>;
+  investigationCases!: Table<InvestigationCase, string>;
+  caseExhibits!: Table<CaseExhibit, string>;
+  reviewScopes!: Table<ReviewScope, string>;
 
   constructor() {
     super('chatdex');
@@ -103,6 +112,14 @@ export class ChatdexDB extends Dexie {
     // `anchors` is the AIPKMS bookmark table (§21 decision 8).
     this.version(6).stores({
       investigationAnchors: '&id, conversationId, occurredAt, *filePaths',
+    });
+    // v7: investigation cases, exhibits, review scopes (spec §8.3–§8.7,
+    // DI-2c) — human-authored records that SYNC (encrypted) like findings.
+    this.version(7).stores({
+      investigationCases:
+        '&id, conversationId, primaryAnchorStableKey, state, updatedAt',
+      caseExhibits: '&id, caseId, conversationId',
+      reviewScopes: '&id, caseId, conversationId',
     });
   }
 }

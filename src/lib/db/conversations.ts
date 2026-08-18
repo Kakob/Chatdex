@@ -40,7 +40,17 @@ export async function getConversationCount(source?: DataSource): Promise<number>
 export async function deleteConversation(id: string): Promise<void> {
   await db.transaction(
     'rw',
-    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns, db.investigationAnchors],
+    [
+      db.conversations,
+      db.messages,
+      db.anchors,
+      db.findings,
+      db.detectorRuns,
+      db.investigationAnchors,
+      db.investigationCases,
+      db.caseExhibits,
+      db.reviewScopes,
+    ],
     async () => {
       await db.conversations.delete(id);
       await db.messages.where('conversationId').equals(id).delete();
@@ -51,6 +61,12 @@ export async function deleteConversation(id: string): Promise<void> {
       // can back multiple conversations, and deletion policy for primary
       // sources is a separate decision (spec §14).
       await db.investigationAnchors.where('conversationId').equals(id).delete();
+      // Cases and their evidence cannot outlive their primary source without
+      // silently appearing authoritative (spec §14) — cascade for now;
+      // tombstoning adjudicated cases is a DI-3 concern.
+      await db.investigationCases.where('conversationId').equals(id).delete();
+      await db.caseExhibits.where('conversationId').equals(id).delete();
+      await db.reviewScopes.where('conversationId').equals(id).delete();
     }
   );
 }

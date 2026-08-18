@@ -20,6 +20,9 @@ const KindSchema = z.enum([
   'project_association',
   'understanding_object',
   'understanding_event',
+  'investigation_case',
+  'case_exhibit',
+  'review_scope',
 ]);
 
 const PushRecordSchema = z.object({

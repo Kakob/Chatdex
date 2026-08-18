@@ -16,6 +16,12 @@ import type {
 } from '../../types/understanding';
 import type { AnchoredItem } from '../aipkms/types';
 import type { KnowledgeFolderRow } from '../db/schema';
+import type {
+  InvestigationCase,
+  CaseExhibit,
+  ReviewScope,
+  CaseSearchRecord,
+} from '../../types/investigation';
 import type { SyncKind } from './syncApi';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
@@ -294,5 +300,88 @@ export function rehydrateUnderstandingEvent(payload: unknown): UnderstandingEven
     occurredAt: isoToDate(p.occurredAt),
     createdAt: isoToDate(p.createdAt),
     ...(p.updatedAt ? { updatedAt: isoToDate(p.updatedAt) } : {}),
+  };
+}
+
+// --- decision investigation (SPEC-decision-investigation §11, DI-2c) ---
+// Only human-authored records sync: cases, exhibits, review scopes.
+// Raw sources, source events, and derived anchors are local-only by design
+// (spec §21 decisions 3–4).
+
+export function envelopeInvestigationCase(
+  c: InvestigationCase
+): SyncEnvelope<'investigation_case'> {
+  return {
+    kind: 'investigation_case',
+    parentId: c.conversationId,
+    updatedAt: c.updatedAt,
+    payload: {
+      ...c,
+      createdAt: dateToIso(c.createdAt),
+      updatedAt: dateToIso(c.updatedAt),
+      searchRecords: c.searchRecords.map((r) => ({
+        ...r,
+        createdAt: dateToIso(r.createdAt),
+      })),
+    },
+  };
+}
+
+export function rehydrateInvestigationCase(payload: unknown): InvestigationCase {
+  const p = payload as Omit<InvestigationCase, 'createdAt' | 'updatedAt' | 'searchRecords'> & {
+    createdAt: string;
+    updatedAt: string;
+    searchRecords?: Array<Omit<CaseSearchRecord, 'createdAt'> & { createdAt: string }>;
+  };
+  return {
+    ...p,
+    createdAt: isoToDate(p.createdAt),
+    updatedAt: isoToDate(p.updatedAt),
+    searchRecords: (p.searchRecords ?? []).map((r) => ({
+      ...r,
+      createdAt: isoToDate(r.createdAt),
+    })),
+  };
+}
+
+export function envelopeCaseExhibit(e: CaseExhibit): SyncEnvelope<'case_exhibit'> {
+  return {
+    kind: 'case_exhibit',
+    parentId: e.caseId,
+    updatedAt: e.updatedAt,
+    payload: { ...e, createdAt: dateToIso(e.createdAt), updatedAt: dateToIso(e.updatedAt) },
+  };
+}
+
+export function rehydrateCaseExhibit(payload: unknown): CaseExhibit {
+  const p = payload as CaseExhibit & { createdAt: string; updatedAt: string };
+  return { ...p, createdAt: isoToDate(p.createdAt), updatedAt: isoToDate(p.updatedAt) };
+}
+
+export function envelopeReviewScope(s: ReviewScope): SyncEnvelope<'review_scope'> {
+  return {
+    kind: 'review_scope',
+    parentId: s.caseId,
+    updatedAt: s.updatedAt,
+    payload: {
+      ...s,
+      humanConfirmedAt: dateToIso(s.humanConfirmedAt),
+      createdAt: dateToIso(s.createdAt),
+      updatedAt: dateToIso(s.updatedAt),
+    },
+  };
+}
+
+export function rehydrateReviewScope(payload: unknown): ReviewScope {
+  const p = payload as ReviewScope & {
+    humanConfirmedAt: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  return {
+    ...p,
+    humanConfirmedAt: isoToDate(p.humanConfirmedAt),
+    createdAt: isoToDate(p.createdAt),
+    updatedAt: isoToDate(p.updatedAt),
   };
 }

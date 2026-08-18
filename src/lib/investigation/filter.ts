@@ -3,11 +3,14 @@
 // timestamp range checks only. No relevance, importance, or recommended
 // ordering exists anywhere in this module by design.
 
-import type { CodeChangeKind, InvestigationAnchor } from '../../types/investigation';
+import type {
+  CaseState,
+  CodeChangeKind,
+  InvestigationAnchor,
+} from '../../types/investigation';
 
-// Case state is a fixed vocabulary from spec §8.1. Until cases exist (DI-2c)
-// every anchor is 'uninvestigated'; the filter already speaks the full enum
-// so the UI doesn't change shape later.
+// The §8.1 anchor-state vocabulary, derived from linked cases (never stored —
+// spec §11 "derive anchor state when practical").
 export type AnchorCaseState = 'uninvestigated' | 'open' | 'adjudicated';
 
 export interface AnchorBrowserFilters {
@@ -28,16 +31,20 @@ export interface AnchorConversationMeta {
   projectPath?: string;
 }
 
-/** Until DI-2c introduces cases, anchor state is constant. (Will take the
- *  anchor's linked cases as input once those exist.) */
-export function anchorCaseState(): AnchorCaseState {
-  return 'uninvestigated';
+export function anchorCaseState(
+  anchor: InvestigationAnchor,
+  caseStates: Map<string, CaseState>
+): AnchorCaseState {
+  const state = caseStates.get(anchor.stableKey);
+  if (!state) return 'uninvestigated';
+  return state === 'adjudicated' ? 'adjudicated' : 'open';
 }
 
 export function filterAnchors(
   anchors: InvestigationAnchor[],
   filters: AnchorBrowserFilters,
-  conversationMeta: Map<string, AnchorConversationMeta>
+  conversationMeta: Map<string, AnchorConversationMeta>,
+  caseStates: Map<string, CaseState> = new Map()
 ): InvestigationAnchor[] {
   const needle = filters.filePathSubstring?.trim().toLowerCase();
   return anchors.filter((anchor) => {
@@ -54,7 +61,9 @@ export function filterAnchors(
       return false;
     }
     if (filters.kind && anchor.kind !== filters.kind) return false;
-    if (filters.caseState && anchorCaseState() !== filters.caseState) return false;
+    if (filters.caseState && anchorCaseState(anchor, caseStates) !== filters.caseState) {
+      return false;
+    }
     return true;
   });
 }

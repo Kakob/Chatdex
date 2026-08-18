@@ -35,6 +35,9 @@ import {
   envelopeProjectAssociation,
   envelopeUnderstandingObject,
   envelopeUnderstandingEvent,
+  envelopeInvestigationCase,
+  envelopeCaseExhibit,
+  envelopeReviewScope,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -50,6 +53,9 @@ import {
   rehydrateProjectAssociation,
   rehydrateUnderstandingObject,
   rehydrateUnderstandingEvent,
+  rehydrateInvestigationCase,
+  rehydrateCaseExhibit,
+  rehydrateReviewScope,
   type SyncEnvelope,
 } from './serializer';
 
@@ -91,6 +97,13 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         // Associations dangle without their conversation; understanding
         // objects/events survive — synthesis outlives any single source.
         await db.projectAssociations.where('conversationId').equals(rec.id).delete();
+        // Investigation records cannot outlive their primary source (spec
+        // §14) — mirror the local deleteConversation cascade. Derived
+        // investigationAnchors are local-only and cascade here too.
+        await db.investigationAnchors.where('conversationId').equals(rec.id).delete();
+        await db.investigationCases.where('conversationId').equals(rec.id).delete();
+        await db.caseExhibits.where('conversationId').equals(rec.id).delete();
+        await db.reviewScopes.where('conversationId').equals(rec.id).delete();
         return;
       case 'message':
         await db.messages.delete(rec.id);
@@ -134,6 +147,17 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         return;
       case 'understanding_event':
         await db.understandingEvents.delete(rec.id);
+        return;
+      case 'investigation_case':
+        await db.investigationCases.delete(rec.id);
+        await db.caseExhibits.where('caseId').equals(rec.id).delete();
+        await db.reviewScopes.where('caseId').equals(rec.id).delete();
+        return;
+      case 'case_exhibit':
+        await db.caseExhibits.delete(rec.id);
+        return;
+      case 'review_scope':
+        await db.reviewScopes.delete(rec.id);
         return;
     }
   }
@@ -182,6 +206,15 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'understanding_event':
       await db.understandingEvents.put(rehydrateUnderstandingEvent(payload));
+      return;
+    case 'investigation_case':
+      await db.investigationCases.put(rehydrateInvestigationCase(payload));
+      return;
+    case 'case_exhibit':
+      await db.caseExhibits.put(rehydrateCaseExhibit(payload));
+      return;
+    case 'review_scope':
+      await db.reviewScopes.put(rehydrateReviewScope(payload));
       return;
   }
 }
@@ -257,6 +290,18 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'understanding_event': {
       const e = await db.understandingEvents.get(entry.id);
       return e ? envelopeUnderstandingEvent(e) : null;
+    }
+    case 'investigation_case': {
+      const c = await db.investigationCases.get(entry.id);
+      return c ? envelopeInvestigationCase(c) : null;
+    }
+    case 'case_exhibit': {
+      const e = await db.caseExhibits.get(entry.id);
+      return e ? envelopeCaseExhibit(e) : null;
+    }
+    case 'review_scope': {
+      const s = await db.reviewScopes.get(entry.id);
+      return s ? envelopeReviewScope(s) : null;
     }
   }
 }
@@ -386,6 +431,9 @@ class SyncEngine {
       ['project_association', db.projectAssociations],
       ['understanding_object', db.understandingObjects],
       ['understanding_event', db.understandingEvents],
+      ['investigation_case', db.investigationCases],
+      ['case_exhibit', db.caseExhibits],
+      ['review_scope', db.reviewScopes],
     ];
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
@@ -468,6 +516,21 @@ class SyncEngine {
     db.understandingEvents.hook('creating', upsert('understanding_event'));
     db.understandingEvents.hook('updating', (_m, k) => upsert('understanding_event')(k as string));
     db.understandingEvents.hook('deleting', remove('understanding_event'));
+
+    // Decision-investigation human records (DI-2c). rawSources and
+    // investigationAnchors are deliberately NOT hooked — local-only by
+    // design (SPEC-decision-investigation §21 decisions 3–4).
+    db.investigationCases.hook('creating', upsert('investigation_case'));
+    db.investigationCases.hook('updating', (_m, k) => upsert('investigation_case')(k as string));
+    db.investigationCases.hook('deleting', remove('investigation_case'));
+
+    db.caseExhibits.hook('creating', upsert('case_exhibit'));
+    db.caseExhibits.hook('updating', (_m, k) => upsert('case_exhibit')(k as string));
+    db.caseExhibits.hook('deleting', remove('case_exhibit'));
+
+    db.reviewScopes.hook('creating', upsert('review_scope'));
+    db.reviewScopes.hook('updating', (_m, k) => upsert('review_scope')(k as string));
+    db.reviewScopes.hook('deleting', remove('review_scope'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().
