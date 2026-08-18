@@ -140,4 +140,4 @@ Completes milestone M4. All automated parts of the definition of done (§19) are
 
 **Remaining (human):** the §18 manual acceptance scenario on a real session — DI-2c/DI-3/DI-4 UI has not yet had a browser pass. The QA script in the implementation report is the checklist.
 
-Commit: (pending)
+Commit: `fa5a83c`
