@@ -22,7 +22,7 @@ export function TimelinePage() {
 
       if (format === 'json') {
         downloadExport(
-          buildJson(activities, { source: 'claude-utils' }),
+          buildJson(activities, { source: 'chatdex' }),
           'claude-activities',
           'json'
         );

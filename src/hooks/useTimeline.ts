@@ -51,9 +51,9 @@ export function useTimeline(options: UseTimelineOptions = {}): UseTimelineResult
       fetchActivities();
     };
 
-    window.addEventListener('claude-utils-activity', handleNewActivity);
+    window.addEventListener('chatdex-activity', handleNewActivity);
     return () => {
-      window.removeEventListener('claude-utils-activity', handleNewActivity);
+      window.removeEventListener('chatdex-activity', handleNewActivity);
     };
   }, [fetchActivities]);
 

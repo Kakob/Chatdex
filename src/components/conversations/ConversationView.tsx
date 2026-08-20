@@ -184,7 +184,7 @@ export function ConversationView({
       downloadExport(conversationToMarkdown(conversation, messages), slug, 'markdown');
     } else {
       downloadExport(
-        buildJson({ conversation, messages }, { source: 'claude-utils' }),
+        buildJson({ conversation, messages }, { source: 'chatdex' }),
         slug,
         'json'
       );

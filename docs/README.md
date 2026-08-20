@@ -14,7 +14,7 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 | Document | What it covers | Status |
 |---|---|---|
-| **[claude-utils-prd.md](./claude-utils-prd.md)** | Core platform PRD: search, analytics, export, conversation browser, prompt library | Source of truth |
+| **[chatdex-prd.md](./chatdex-prd.md)** | Core platform PRD: search, analytics, export, conversation browser, prompt library | Source of truth |
 | **[prd-aipkms.md](./prd-aipkms.md)** | AIPKMS feature PRD: anchoring, threads, resurfacing, synthesis, workspaces | Source of truth |
 | **[PRD activity tracker.md](./PRD%20activity%20tracker.md)** | Activity Tracker PRD: real-time timeline, token usage, artifact capture | Source of truth |
 

@@ -120,7 +120,7 @@ IndexedDB (Dexie) is the only boundary — no network, no worker. Which means th
 
 **Decision:** Timeline reads an `activities` table that **nothing in the app writes**.
 **Evidence:** [CODE — only writer is `api.addActivity`, zero callers; the Chrome extension that fed it targets `/api/activities`, a route the backend no longer registers]
-**Consequence:** the Timeline page is structurally dead — permanently showing its "Install the Chrome extension" empty state. A live listener (`claude-utils-activity` window event) remains wired to a ghost.
+**Consequence:** the Timeline page is structurally dead — permanently showing its "Install the Chrome extension" empty state. A live listener (`chatdex-activity` window event) remains wired to a ghost.
 
 ## Invariants and assumptions
 

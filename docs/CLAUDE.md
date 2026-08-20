@@ -62,7 +62,7 @@ npm run typecheck        # TypeScript check (no emit)
 ## Project Structure
 
 ```
-claude-utils/
+chatdex/
 ├── src/                         # Frontend web app (React 18 + Vite)
 │   ├── components/
 │   │   ├── common/              # Shared UI components
@@ -265,7 +265,7 @@ Backend can be deployed to Fly.io, Railway, or any Postgres-compatible host. Set
 
 ### Project docs (in this repo)
 - [Docs index](./README.md) — Start here for all docs
-- [Core product PRD](./claude-utils-prd.md) — Search, analytics, export, etc.
+- [Core product PRD](./chatdex-prd.md) — Search, analytics, export, etc.
 - [AIPKMS PRD](./prd-aipkms.md) — Anchor, threads, resurfacing, synthesis
 - [AIPKMS vision](./claude-aipkms.md) — The "why" and compounding value story
 - [Activity Tracker PRD](./PRD%20activity%20tracker.md) — Real-time extension PRD

@@ -22,7 +22,7 @@ Chatdex contains two complementary capture/curation systems:
 AIPKMS is built **on top of** the conversation store that the Activity Tracker and import pipeline populate. The underlying data (conversations + messages in Postgres) is shared; AIPKMS adds the curation, organization, and resurfacing layer.
 
 **Source-of-truth docs:**
-- Core platform (search, analytics, export): [claude-utils-prd.md](./claude-utils-prd.md)
+- Core platform (search, analytics, export): [chatdex-prd.md](./chatdex-prd.md)
 - Activity Tracker (real-time extension): [PRD activity tracker.md](./PRD%20activity%20tracker.md)
 - AIPKMS (this doc): you are here
 

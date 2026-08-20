@@ -99,16 +99,16 @@ npm run typecheck        # TypeScript check
 
 ## Documentation
 
-All project documentation lives in `PRD-AND-CLAUDE-MDs/`:
+All project documentation lives in `docs/`:
 
 | Doc | Purpose |
 |---|---|
-| [README.md](./PRD-AND-CLAUDE-MDs/README.md) | Docs index and architecture overview |
-| [CLAUDE.md](./PRD-AND-CLAUDE-MDs/CLAUDE.md) | Full AI agent instructions |
-| [claude-utils-prd.md](./PRD-AND-CLAUDE-MDs/claude-utils-prd.md) | Core platform PRD |
-| [prd-aipkms.md](./PRD-AND-CLAUDE-MDs/prd-aipkms.md) | AIPKMS feature PRD |
-| [claude-aipkms.md](./PRD-AND-CLAUDE-MDs/claude-aipkms.md) | AIPKMS vision doc |
-| [PRD activity tracker.md](./PRD-AND-CLAUDE-MDs/PRD%20activity%20tracker.md) | Activity Tracker PRD |
+| [README.md](./docs/README.md) | Docs index and architecture overview |
+| [CLAUDE.md](./docs/CLAUDE.md) | Full AI agent instructions |
+| [chatdex-prd.md](./docs/chatdex-prd.md) | Core platform PRD |
+| [prd-aipkms.md](./docs/prd-aipkms.md) | AIPKMS feature PRD |
+| [claude-aipkms.md](./docs/claude-aipkms.md) | AIPKMS vision doc |
+| [PRD activity tracker.md](./docs/PRD%20activity%20tracker.md) | Activity Tracker PRD |
 
 ---
 

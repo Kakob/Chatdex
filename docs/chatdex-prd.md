@@ -615,7 +615,7 @@ IndexedDB typically allows 50MB-unlimited depending on browser. Should be fine f
 ### Project Structure
 
 ```
-claude-utils/
+chatdex/
 ├── public/
 │   ├── favicon.ico
 │   └── og-image.png
