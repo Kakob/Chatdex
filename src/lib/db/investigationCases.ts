@@ -9,6 +9,7 @@ import type {
   CaseExhibit,
   ReviewScope,
   VerdictRevision,
+  InvestigationFinding,
 } from '../../types/investigation';
 
 // --- cases ---
@@ -34,6 +35,7 @@ export async function getCaseByPrimaryAnchor(
 
 export async function listInvestigationCases(options: {
   conversationId?: string;
+  projectId?: string;
 } = {}): Promise<InvestigationCase[]> {
   if (options.conversationId) {
     return db.investigationCases
@@ -41,7 +43,31 @@ export async function listInvestigationCases(options: {
       .equals(options.conversationId)
       .toArray();
   }
+  if (options.projectId) {
+    const rows = await db.investigationCases
+      .where('[projectId+updatedAt]')
+      .between([options.projectId, new Date(0)], [options.projectId, new Date(8.64e15)])
+      .toArray();
+    return rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
   return db.investigationCases.toArray();
+}
+
+// --- human findings ---
+
+export async function putInvestigationFinding(row: InvestigationFinding): Promise<void> {
+  await db.investigationFindings.put(row);
+}
+
+export async function getInvestigationFinding(
+  id: string
+): Promise<InvestigationFinding | undefined> {
+  return db.investigationFindings.get(id);
+}
+
+export async function getFindingsForCase(caseId: string): Promise<InvestigationFinding[]> {
+  const rows = await db.investigationFindings.where('caseId').equals(caseId).toArray();
+  return rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 // --- exhibits ---

@@ -22,6 +22,7 @@ import {
   type StepSearchMatch,
 } from '../lib/investigation/search';
 import { anchorFileLabel, KIND_LABELS } from '../lib/investigation/filter';
+import { getAssociationsForProject } from '../lib/db/understanding';
 
 type Region = 'transcript' | 'code' | 'notebook';
 
@@ -32,9 +33,15 @@ interface LoadState {
   context: InvestigationContext | null;
 }
 
-export function InvestigationWorkbenchPage() {
-  const { anchorId } = useParams<{ anchorId: string }>();
+export function InvestigationWorkbenchPage({
+  projectScoped = false,
+}: {
+  projectScoped?: boolean;
+}) {
+  const { id: projectId, anchorId } = useParams<{ id: string; anchorId: string }>();
   const navigate = useNavigate();
+  const investigateBasePath =
+    projectScoped && projectId ? `/projects/${projectId}/investigate` : '/investigate';
   const [loaded, setLoaded] = useState<LoadState | null>(null);
 
   const [query, setQuery] = useState('');
@@ -53,7 +60,18 @@ export function InvestigationWorkbenchPage() {
   useEffect(() => {
     let cancelled = false;
     if (!anchorId) return;
-    void getInvestigationContext(anchorId).then((ctx) => {
+    void getInvestigationContext(anchorId).then(async (ctx) => {
+      if (cancelled) return;
+      if (ctx && projectScoped && projectId) {
+        const conversationId = ctx.conversation.id;
+        const associations = await getAssociationsForProject(projectId);
+        const belongsToProject = associations.some(
+          (association) =>
+            association.conversationId === conversationId &&
+            (association.reviewState === 'accepted' || association.reviewState === 'edited')
+        );
+        if (!belongsToProject) ctx = null;
+      }
       if (cancelled) return;
       setLoaded({ anchorId, context: ctx });
       if (ctx) {
@@ -66,7 +84,7 @@ export function InvestigationWorkbenchPage() {
     return () => {
       cancelled = true;
     };
-  }, [anchorId]);
+  }, [anchorId, projectId, projectScoped]);
 
   const isLoading = loaded?.anchorId !== anchorId;
   const context = isLoading ? null : loaded?.context ?? null;
@@ -185,7 +203,7 @@ export function InvestigationWorkbenchPage() {
           conversation was deleted.
         </p>
         <Link
-          to="/investigate"
+          to={investigateBasePath}
           className="text-violet-600 dark:text-violet-400 hover:underline"
         >
           Back to Investigate
@@ -219,7 +237,7 @@ export function InvestigationWorkbenchPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)] min-h-0">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <Link
-          to="/investigate"
+          to={investigateBasePath}
           className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
         >
           <ArrowLeft size={16} /> Investigate
@@ -308,6 +326,7 @@ export function InvestigationWorkbenchPage() {
               focusedStepTextLength={displayTexts[focusedStep]?.length ?? 0}
               caseApi={caseApi}
               onJumpToStep={scrollToStep}
+              investigateBasePath={investigateBasePath}
             />
             {siblingAnchors.length > 1 && (
               <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
@@ -323,7 +342,7 @@ export function InvestigationWorkbenchPage() {
                           if (a.id === anchor.id) {
                             scrollToStep(a.stepIndex);
                           } else {
-                            navigate(`/investigate/${encodeURIComponent(a.id)}`);
+                            navigate(`${investigateBasePath}/${encodeURIComponent(a.id)}`);
                           }
                         }}
                         className={`w-full text-left text-xs px-2 py-1 rounded-lg font-mono truncate ${

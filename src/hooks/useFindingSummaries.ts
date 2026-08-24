@@ -17,12 +17,12 @@ export function useFindingSummaries(
   const idsKey = conversationIds.join('\n');
 
   useEffect(() => {
-    if (idsKey === '') {
-      setSummaries(EMPTY);
-      return;
-    }
     let cancelled = false;
-    getFindingChipSummaries(idsKey.split('\n')).then((result) => {
+    const pending =
+      idsKey === ''
+        ? Promise.resolve(EMPTY)
+        : getFindingChipSummaries(idsKey.split('\n'));
+    pending.then((result) => {
       if (!cancelled) setSummaries(result);
     });
     return () => {

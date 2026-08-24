@@ -2,14 +2,8 @@ import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   Search,
-  Clock,
-  BarChart3,
   MessageSquare,
-  MessageCircle,
-  Anchor,
-  FileSearch,
   FolderKanban,
-  Scale,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -17,20 +11,15 @@ import { useAppStore } from '../../stores/appStore';
 import { loadPendingReviewCounts } from '../../lib/understanding/pendingReviews';
 
 const navItems = [
-  { to: '/search', icon: Search, label: 'Search' },
-  { to: '/timeline', icon: Clock, label: 'Timeline' },
-  { to: '/analytics', icon: BarChart3, label: 'Analytics' },
-  { to: '/conversations', icon: MessageSquare, label: 'Browse' },
-  { to: '/chat', icon: MessageCircle, label: 'Chat' },
-  { to: '/knowledge', icon: Anchor, label: 'Knowledge' },
-  { to: '/investigate', icon: FileSearch, label: 'Investigate' },
-  { to: '/ledger', icon: Scale, label: 'Ledger' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/conversations', icon: MessageSquare, label: 'Sources' },
+  { to: '/search', icon: Search, label: 'Global search' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 
 export function Sidebar() {
   const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+  const setSidebarOpen = useAppStore((s) => s.setSidebarOpen);
   const location = useLocation();
   const [pendingReviews, setPendingReviews] = useState(0);
 
@@ -50,13 +39,25 @@ export function Sidebar() {
     return null;
   }
 
+  const closeOnNarrowScreen = () => {
+    if (window.innerWidth < 768) setSidebarOpen(false);
+  };
+
   return (
-    <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+    <>
+      <button
+        type="button"
+        aria-label="Close navigation"
+        onClick={() => setSidebarOpen(false)}
+        className="fixed inset-x-0 bottom-0 top-14 z-30 bg-black/30 md:hidden"
+      />
+      <aside className="fixed bottom-0 left-0 top-14 z-40 flex w-56 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 md:static md:z-auto">
       <nav className="flex-1 p-4 space-y-1">
         {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={closeOnNarrowScreen}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 isActive
@@ -82,6 +83,7 @@ export function Sidebar() {
       <div className="p-4 border-t border-gray-200 dark:border-gray-800">
         <NavLink
           to="/settings"
+          onClick={closeOnNarrowScreen}
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
               isActive
@@ -94,6 +96,7 @@ export function Sidebar() {
           Settings
         </NavLink>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

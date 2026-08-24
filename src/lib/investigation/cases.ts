@@ -6,6 +6,7 @@
 // literal template, notes and questions are human-authored.
 
 import { normalizeSession, type Step } from '../detection/normalize';
+import { db } from '../db/schema';
 import { getMessagesForConversation } from '../db/messages';
 import {
   putInvestigationCase,
@@ -45,7 +46,7 @@ async function requireEditableCase(caseId: string): Promise<InvestigationCase> {
   const row = await getInvestigationCase(caseId);
   if (!row) throw new Error(`Case not found: ${caseId}`);
   if (!EDITABLE_STATES.has(row.state)) {
-    throw new Error(`Case is ${row.state}; adjudicated cases must be reopened first`);
+    throw new Error(`Case is ${row.state}; completed cases must be reopened first`);
   }
   return row;
 }
@@ -71,6 +72,7 @@ export async function startInvestigation(
     conversationId: anchor.conversationId,
     primaryAnchorStableKey: anchor.stableKey,
     linkedAnchorStableKeys: [],
+    kind: 'anchor',
     title: caseTitleTemplate(anchor),
     notes: '',
     state: 'draft',
@@ -80,6 +82,87 @@ export async function startInvestigation(
   };
   await putInvestigationCase(row);
   return row;
+}
+
+export async function startQuestionInvestigation(input: {
+  projectId: string;
+  conversationId: string;
+  question: string;
+}): Promise<InvestigationCase> {
+  const question = input.question.trim();
+  if (!question) throw new Error('Investigation question cannot be empty');
+  const [project, conversation, association] = await Promise.all([
+    db.understandingProjects.get(input.projectId),
+    db.conversations.get(input.conversationId),
+    db.projectAssociations
+      .where('[projectId+conversationId]')
+      .equals([input.projectId, input.conversationId])
+      .first(),
+  ]);
+  if (!project || project.reviewState === 'rejected') {
+    throw new Error(`Project not found: ${input.projectId}`);
+  }
+  if (!conversation) throw new Error(`Conversation not found: ${input.conversationId}`);
+  if (
+    !association ||
+    (association.reviewState !== 'accepted' && association.reviewState !== 'edited')
+  ) {
+    throw new Error('The selected source is not accepted for this project');
+  }
+
+  const now = new Date();
+  const row: InvestigationCase = {
+    id: generateId(),
+    projectId: input.projectId,
+    conversationId: input.conversationId,
+    linkedAnchorStableKeys: [],
+    kind: 'question',
+    title: question,
+    notes: '',
+    state: 'open',
+    searchRecords: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  await putInvestigationCase(row);
+  return row;
+}
+
+export async function completeQuestionInvestigation(
+  caseId: string
+): Promise<InvestigationCase> {
+  const row = await requireEditableCase(caseId);
+  if ((row.kind ?? 'anchor') !== 'question') {
+    throw new Error('Anchor investigations complete through a finalized verdict');
+  }
+  const finalizedFindings = await db.investigationFindings
+    .where('caseId')
+    .equals(caseId)
+    .filter((finding) => finding.state === 'finalized')
+    .count();
+  if (finalizedFindings === 0) {
+    throw new Error('Finalize at least one finding before completing the investigation');
+  }
+  const completed: InvestigationCase = {
+    ...row,
+    state: 'completed',
+    updatedAt: new Date(),
+  };
+  await putInvestigationCase(completed);
+  return completed;
+}
+
+export async function reopenQuestionInvestigation(caseId: string): Promise<InvestigationCase> {
+  const row = await getInvestigationCase(caseId);
+  if (!row) throw new Error(`Case not found: ${caseId}`);
+  if (row.state !== 'completed') throw new Error('Only completed investigations can be reopened');
+  const reopened: InvestigationCase = {
+    ...row,
+    state: 'reopened',
+    updatedAt: new Date(),
+  };
+  await putInvestigationCase(reopened);
+  return reopened;
 }
 
 export async function updateCaseHumanFields(
@@ -435,7 +518,7 @@ export async function getCaseStatesByAnchor(): Promise<Map<string, CaseState>> {
   const cases = await listInvestigationCases();
   const map = new Map<string, CaseState>();
   for (const c of cases) {
-    map.set(c.primaryAnchorStableKey, c.state);
+    if (c.primaryAnchorStableKey) map.set(c.primaryAnchorStableKey, c.state);
     for (const linked of c.linkedAnchorStableKeys) {
       if (!map.has(linked)) map.set(linked, c.state);
     }

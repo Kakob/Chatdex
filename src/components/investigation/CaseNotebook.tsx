@@ -17,6 +17,7 @@ interface CaseNotebookProps {
   focusedStepTextLength: number;
   caseApi: UseInvestigationCaseResult;
   onJumpToStep: (stepIndex: number) => void;
+  investigateBasePath?: string;
 }
 
 const EXHIBIT_KIND_LABELS: Record<CaseExhibit['kind'], string> = {
@@ -32,6 +33,7 @@ export function CaseNotebook({
   focusedStepTextLength,
   caseApi,
   onJumpToStep,
+  investigateBasePath = '/investigate',
 }: CaseNotebookProps) {
   const {
     caseRow,
@@ -323,7 +325,11 @@ export function CaseNotebook({
       </div>
 
       <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
-        <VerdictPanel anchor={anchor} caseApi={caseApi} />
+        <VerdictPanel
+          anchor={anchor}
+          caseApi={caseApi}
+          investigateBasePath={investigateBasePath}
+        />
       </div>
 
       {error && <ErrorLine message={error} onDismiss={clearError} />}

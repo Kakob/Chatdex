@@ -1,4 +1,4 @@
-import { Menu, Sun, Moon, RefreshCw } from 'lucide-react';
+import { Menu, Sun, Moon, ShieldCheck } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 
 export function Header() {
@@ -38,12 +38,12 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Sync data"
+        <span
+          className="hidden sm:flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400"
+          title="Primary history and project artifacts stay in this browser unless encrypted sync is configured"
         >
-          <RefreshCw size={18} className="text-gray-600 dark:text-gray-400" />
-        </button>
+          <ShieldCheck size={14} className="text-emerald-500" /> Local-first
+        </span>
 
         <button
           onClick={toggleTheme}
@@ -55,10 +55,6 @@ export function Header() {
           ) : (
             <Moon size={18} className="text-gray-600 dark:text-gray-400" />
           )}
-        </button>
-
-        <button className="ml-2 px-3 py-1.5 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors">
-          Upgrade to Pro
         </button>
       </div>
     </header>

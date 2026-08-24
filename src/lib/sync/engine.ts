@@ -39,6 +39,8 @@ import {
   envelopeCaseExhibit,
   envelopeReviewScope,
   envelopeVerdictRevision,
+  envelopeInvestigationFinding,
+  envelopePreparedChange,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -58,6 +60,8 @@ import {
   rehydrateCaseExhibit,
   rehydrateReviewScope,
   rehydrateVerdictRevision,
+  rehydrateInvestigationFinding,
+  rehydratePreparedChange,
   type SyncEnvelope,
 } from './serializer';
 
@@ -90,7 +94,7 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
   if (rec.kind === 'metadata' && isDeviceLocalMetadata(rec.id)) return;
   if (rec.deleted) {
     switch (rec.kind) {
-      case 'conversation':
+      case 'conversation': {
         await db.conversations.delete(rec.id);
         await db.messages.where('conversationId').equals(rec.id).delete();
         await db.anchors.where('conversationId').equals(rec.id).delete();
@@ -102,12 +106,20 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         // Investigation records cannot outlive their primary source (spec
         // §14) — mirror the local deleteConversation cascade. Derived
         // investigationAnchors are local-only and cascade here too.
+        const removedCaseIds = await db.investigationCases
+          .where('conversationId')
+          .equals(rec.id)
+          .primaryKeys();
         await db.investigationAnchors.where('conversationId').equals(rec.id).delete();
         await db.investigationCases.where('conversationId').equals(rec.id).delete();
         await db.caseExhibits.where('conversationId').equals(rec.id).delete();
         await db.reviewScopes.where('conversationId').equals(rec.id).delete();
         await db.verdictRevisions.where('conversationId').equals(rec.id).delete();
+        if (removedCaseIds.length > 0) {
+          await db.investigationFindings.where('caseId').anyOf(removedCaseIds).delete();
+        }
         return;
+      }
       case 'message':
         await db.messages.delete(rec.id);
         return;
@@ -156,6 +168,7 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         await db.caseExhibits.where('caseId').equals(rec.id).delete();
         await db.reviewScopes.where('caseId').equals(rec.id).delete();
         await db.verdictRevisions.where('caseId').equals(rec.id).delete();
+        await db.investigationFindings.where('caseId').equals(rec.id).delete();
         return;
       case 'case_exhibit':
         await db.caseExhibits.delete(rec.id);
@@ -165,6 +178,12 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         return;
       case 'verdict_revision':
         await db.verdictRevisions.delete(rec.id);
+        return;
+      case 'investigation_finding':
+        await db.investigationFindings.delete(rec.id);
+        return;
+      case 'prepared_change':
+        await db.preparedChanges.delete(rec.id);
         return;
     }
   }
@@ -225,6 +244,12 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'verdict_revision':
       await db.verdictRevisions.put(rehydrateVerdictRevision(payload));
+      return;
+    case 'investigation_finding':
+      await db.investigationFindings.put(rehydrateInvestigationFinding(payload));
+      return;
+    case 'prepared_change':
+      await db.preparedChanges.put(rehydratePreparedChange(payload));
       return;
   }
 }
@@ -316,6 +341,14 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'verdict_revision': {
       const v = await db.verdictRevisions.get(entry.id);
       return v ? envelopeVerdictRevision(v) : null;
+    }
+    case 'investigation_finding': {
+      const finding = await db.investigationFindings.get(entry.id);
+      return finding ? envelopeInvestigationFinding(finding) : null;
+    }
+    case 'prepared_change': {
+      const change = await db.preparedChanges.get(entry.id);
+      return change ? envelopePreparedChange(change) : null;
     }
   }
 }
@@ -449,6 +482,8 @@ class SyncEngine {
       ['case_exhibit', db.caseExhibits],
       ['review_scope', db.reviewScopes],
       ['verdict_revision', db.verdictRevisions],
+      ['investigation_finding', db.investigationFindings],
+      ['prepared_change', db.preparedChanges],
     ];
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
@@ -550,6 +585,16 @@ class SyncEngine {
     db.verdictRevisions.hook('creating', upsert('verdict_revision'));
     db.verdictRevisions.hook('updating', (_m, k) => upsert('verdict_revision')(k as string));
     db.verdictRevisions.hook('deleting', remove('verdict_revision'));
+
+    db.investigationFindings.hook('creating', upsert('investigation_finding'));
+    db.investigationFindings.hook('updating', (_m, k) =>
+      upsert('investigation_finding')(k as string)
+    );
+    db.investigationFindings.hook('deleting', remove('investigation_finding'));
+
+    db.preparedChanges.hook('creating', upsert('prepared_change'));
+    db.preparedChanges.hook('updating', (_m, k) => upsert('prepared_change')(k as string));
+    db.preparedChanges.hook('deleting', remove('prepared_change'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().

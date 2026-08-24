@@ -25,9 +25,11 @@ const selectClass =
 export function VerdictPanel({
   anchor,
   caseApi,
+  investigateBasePath = '/investigate',
 }: {
   anchor: InvestigationAnchor;
   caseApi: UseInvestigationCaseResult;
+  investigateBasePath?: string;
 }) {
   const { caseRow, revisions, verdictMissing, saveVerdict, finalize, reopen } = caseApi;
   const [continuation, setContinuation] = useState<ContinuationTargets | null>(null);
@@ -103,16 +105,23 @@ export function VerdictPanel({
               <ContinuationLink
                 label="Previous uninvestigated"
                 target={continuation.previousUninvestigated}
+                investigateBasePath={investigateBasePath}
               />
             )}
             {continuation.nextUninvestigated && (
               <ContinuationLink
                 label="Next uninvestigated"
                 target={continuation.nextUninvestigated}
+                investigateBasePath={investigateBasePath}
               />
             )}
             {continuation.sameFile.slice(0, 5).map((a) => (
-              <ContinuationLink key={a.id} label="Same file" target={a} />
+              <ContinuationLink
+                key={a.id}
+                label="Same file"
+                target={a}
+                investigateBasePath={investigateBasePath}
+              />
             ))}
             {!continuation.previousUninvestigated &&
               !continuation.nextUninvestigated &&
@@ -268,13 +277,15 @@ function RevisionList({
 function ContinuationLink({
   label,
   target,
+  investigateBasePath,
 }: {
   label: string;
   target: InvestigationAnchor;
+  investigateBasePath: string;
 }) {
   return (
     <Link
-      to={`/investigate/${encodeURIComponent(target.id)}`}
+      to={`${investigateBasePath}/${encodeURIComponent(target.id)}`}
       className="block text-xs text-violet-600 dark:text-violet-400 hover:underline font-mono truncate"
       title={target.filePaths.join('\n')}
     >

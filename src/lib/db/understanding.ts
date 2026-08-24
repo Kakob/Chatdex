@@ -36,6 +36,27 @@ export async function getAllUnderstandingProjects(): Promise<UnderstandingProjec
   return db.understandingProjects.orderBy('updatedAt').reverse().toArray();
 }
 
+export async function createHumanProject(input: {
+  name: string;
+  description?: string;
+}): Promise<UnderstandingProject> {
+  const name = input.name.trim();
+  if (!name) throw new Error('Project name cannot be empty');
+
+  const now = new Date();
+  const project: UnderstandingProject = {
+    id: generateId(),
+    name,
+    description: input.description?.trim() || undefined,
+    origin: 'user',
+    reviewState: 'accepted',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.understandingProjects.add(project);
+  return project;
+}
+
 export async function setProjectReviewState(id: string, state: ReviewState): Promise<void> {
   await db.understandingProjects.update(id, { reviewState: state, updatedAt: new Date() });
 }
@@ -47,6 +68,54 @@ export async function putProjectAssociation(a: ProjectAssociation): Promise<void
     throw new Error(`Association confidence must be in [0, 1], got ${a.confidence}`);
   }
   await db.projectAssociations.put(a);
+}
+
+export async function associateConversationWithProject(
+  projectId: string,
+  conversationId: string
+): Promise<ProjectAssociation> {
+  const [project, conversation] = await Promise.all([
+    db.understandingProjects.get(projectId),
+    db.conversations.get(conversationId),
+  ]);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  if (project.reviewState === 'rejected') {
+    throw new Error('Rejected projects cannot receive new sources');
+  }
+  if (!conversation) throw new Error(`Conversation not found: ${conversationId}`);
+
+  const existing = await db.projectAssociations
+    .where('[projectId+conversationId]')
+    .equals([projectId, conversationId])
+    .first();
+  if (existing) {
+    if (existing.reviewState !== 'rejected') return existing;
+    const restored: ProjectAssociation = {
+      ...existing,
+      confidence: 1,
+      reason: 'Added by the user',
+      origin: 'user',
+      reviewState: 'accepted',
+      updatedAt: new Date(),
+    };
+    await db.projectAssociations.put(restored);
+    return restored;
+  }
+
+  const now = new Date();
+  const association: ProjectAssociation = {
+    id: generateId(),
+    projectId,
+    conversationId,
+    confidence: 1,
+    reason: 'Added by the user',
+    origin: 'user',
+    reviewState: 'accepted',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.projectAssociations.add(association);
+  return association;
 }
 
 export async function getAssociationsForConversation(

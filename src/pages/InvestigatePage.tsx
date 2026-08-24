@@ -3,9 +3,16 @@
 // literal paths, session, timestamp, case state. Ordering is chronological
 // only — no relevance, importance, or recommendation exists by design.
 
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowDownNarrowWide, ArrowUpNarrowWide, FileSearch, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowDownNarrowWide,
+  ArrowRight,
+  ArrowUpNarrowWide,
+  FileSearch,
+  Plus,
+  RefreshCw,
+} from 'lucide-react';
 import { useInvestigationAnchors } from '../hooks/useInvestigationAnchors';
 import {
   anchorCaseState,
@@ -15,22 +22,104 @@ import {
   type AnchorBrowserFilters,
   type AnchorCaseState,
 } from '../lib/investigation/filter';
-import { getCaseStatesByAnchor, startInvestigation } from '../lib/investigation/cases';
+import {
+  getCaseStatesByAnchor,
+  startInvestigation,
+  startQuestionInvestigation,
+} from '../lib/investigation/cases';
+import { getAssociationsForProject } from '../lib/db/understanding';
+import { getFindingsForCase, listInvestigationCases } from '../lib/db/investigationCases';
+import { db } from '../lib/db/schema';
 import { CoverageView } from '../components/investigation/CoverageView';
+import { useToastStore } from '../stores/toastStore';
 import type {
   CaseState,
   CodeChangeKind,
   InvestigationAnchor,
+  InvestigationCase,
 } from '../types/investigation';
+import type { StoredConversation } from '../types';
 import type { AnchorConversationInfo } from '../hooks/useInvestigationAnchors';
 
 const inputClass =
   'px-2 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100';
 
-export function InvestigatePage() {
+export function InvestigatePage({ projectScoped = false }: { projectScoped?: boolean }) {
+  const { id: routeProjectId } = useParams<{ id: string }>();
+  const projectId = projectScoped ? routeProjectId : undefined;
+  const navigate = useNavigate();
+  const addToast = useToastStore((state) => state.addToast);
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [filters, setFilters] = useState<AnchorBrowserFilters>({});
-  const [view, setView] = useState<'anchors' | 'coverage'>('anchors');
+  const [view, setView] = useState<'questions' | 'anchors' | 'coverage'>(
+    projectScoped ? 'questions' : 'anchors'
+  );
+  const [projectConversationIds, setProjectConversationIds] = useState<string[]>([]);
+  const [projectConversations, setProjectConversations] = useState<StoredConversation[]>([]);
+  const [questionCases, setQuestionCases] = useState<
+    Array<{ investigation: InvestigationCase; sourceName: string; findingCount: number }>
+  >([]);
+  const [question, setQuestion] = useState('');
+  const [questionConversationId, setQuestionConversationId] = useState('');
+  const [isStartingQuestion, setIsStartingQuestion] = useState(false);
+
+  const loadProjectInvestigationData = useCallback(async () => {
+    if (!projectId) return;
+    const associations = await getAssociationsForProject(projectId);
+    const conversationIds = associations
+      .filter(
+        (association) =>
+          association.reviewState === 'accepted' || association.reviewState === 'edited'
+      )
+      .map((association) => association.conversationId);
+    const [conversationRows, cases] = await Promise.all([
+      db.conversations.bulkGet(conversationIds),
+      listInvestigationCases({ projectId }),
+    ]);
+    const conversations = conversationRows.filter(
+      (row): row is StoredConversation => Boolean(row)
+    );
+    const names = new Map(conversations.map((conversation) => [conversation.id, conversation.name]));
+    const questionRows = await Promise.all(
+      cases
+        .filter((investigation) => investigation.kind === 'question')
+        .map(async (investigation) => ({
+          investigation,
+          sourceName: names.get(investigation.conversationId) ?? investigation.conversationId,
+          findingCount: (await getFindingsForCase(investigation.id)).length,
+        }))
+    );
+    setProjectConversationIds(conversationIds);
+    setProjectConversations(conversations);
+    setQuestionCases(questionRows);
+    setQuestionConversationId((current) =>
+      current && conversationIds.includes(current) ? current : (conversationIds[0] ?? '')
+    );
+  }, [projectId]);
+
+  useEffect(() => {
+    void loadProjectInvestigationData();
+  }, [loadProjectInvestigationData]);
+
+  const handleStartQuestion = async () => {
+    if (!projectId || !questionConversationId || !question.trim()) return;
+    setIsStartingQuestion(true);
+    try {
+      const investigation = await startQuestionInvestigation({
+        projectId,
+        conversationId: questionConversationId,
+        question,
+      });
+      addToast('Investigation started');
+      navigate(`/projects/${projectId}/investigate/questions/${investigation.id}`);
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setIsStartingQuestion(false);
+    }
+  };
+
+  const scopedConversationIds = projectScoped ? projectConversationIds : undefined;
   const {
     anchors,
     conversationInfo,
@@ -38,7 +127,7 @@ export function InvestigatePage() {
     runBackfill,
     backfillProgress,
     backfillResult,
-  } = useInvestigationAnchors(order);
+  } = useInvestigationAnchors(order, scopedConversationIds);
 
   const [caseStates, setCaseStates] = useState<Map<string, CaseState>>(new Map());
   useEffect(() => {
@@ -88,17 +177,22 @@ export function InvestigatePage() {
         <div className="flex items-center gap-3 mb-2">
           <FileSearch size={24} className="text-violet-500" />
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Investigate
+            {projectScoped ? 'Investigate History' : 'Investigate'}
           </h1>
         </div>
         <p className="text-gray-600 dark:text-gray-400">
-          Every code-change event from your agent sessions, in chronological order.
-          Anchors are mechanical entry points — not detected decisions.
+          {projectScoped
+            ? 'Read the project’s primary history and open mechanically derived code-change entry points. Nothing here is a generated conclusion.'
+            : 'Every code-change event from your agent sessions, in chronological order. Anchors are mechanical entry points — not detected decisions.'}
         </p>
       </div>
 
       <div className="mb-4 flex gap-1" role="tablist" aria-label="Investigate views">
-        {(['anchors', 'coverage'] as const).map((v) => (
+        {(
+          projectScoped
+            ? (['questions', 'anchors', 'coverage'] as const)
+            : (['anchors', 'coverage'] as const)
+        ).map((v) => (
           <button
             key={v}
             type="button"
@@ -111,13 +205,30 @@ export function InvestigatePage() {
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`}
           >
-            {v === 'anchors' ? 'Anchors' : 'Coverage'}
+            {v === 'questions'
+              ? 'Questions'
+              : v === 'anchors'
+                ? 'Code-change anchors'
+                : 'Coverage'}
           </button>
         ))}
       </div>
 
-      {view === 'coverage' ? (
+      {view === 'questions' && projectId ? (
+        <QuestionInvestigations
+          projectId={projectId}
+          conversations={projectConversations}
+          questionCases={questionCases}
+          question={question}
+          conversationId={questionConversationId}
+          isStarting={isStartingQuestion}
+          onQuestionChange={setQuestion}
+          onConversationChange={setQuestionConversationId}
+          onStart={() => void handleStartQuestion()}
+        />
+      ) : view === 'coverage' ? (
         <CoverageView
+          conversationIds={scopedConversationIds}
           onFilterByPath={(path) => {
             setFilters((f) => ({ ...f, filePathSubstring: path }));
             setView('anchors');
@@ -140,7 +251,7 @@ export function InvestigatePage() {
           ))}
         </select>
 
-        {projects.length > 0 && (
+        {!projectScoped && projects.length > 0 && (
           <select
             className={inputClass}
             value={filters.projectPath ?? ''}
@@ -256,12 +367,12 @@ export function InvestigatePage() {
       ) : anchors.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
           <p className="text-gray-700 dark:text-gray-300 mb-1">
-            No code-change anchors yet.
+            {projectScoped ? 'No code-change anchors in this project yet.' : 'No code-change anchors yet.'}
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Anchors are derived from structured Edit/Write tool calls in imported
-            Claude Code sessions. Import a session, or run “Derive anchors” to
-            process sessions imported before this feature existed.
+            {projectScoped
+              ? 'Attach an imported Claude Code conversation from the project overview, then derive its structured Edit/Write events. You can still investigate any project source from the Questions tab.'
+              : 'Anchors are derived from structured Edit/Write tool calls in imported Claude Code sessions. Import a session, or run “Derive anchors” to process sessions imported before this feature existed.'}
           </p>
         </div>
       ) : (
@@ -276,6 +387,11 @@ export function InvestigatePage() {
                 anchor={anchor}
                 info={conversationInfo.get(anchor.conversationId)}
                 state={anchorCaseState(anchor, caseStates)}
+                investigateBasePath={
+                  projectScoped && projectId
+                    ? `/projects/${projectId}/investigate`
+                    : '/investigate'
+                }
               />
             ))}
           </ul>
@@ -283,6 +399,169 @@ export function InvestigatePage() {
       )}
         </>
       )}
+    </div>
+  );
+}
+
+const QUESTION_STATE: Record<CaseState, { label: string; tone: string }> = {
+  draft: {
+    label: 'Draft',
+    tone: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+  },
+  open: {
+    label: 'In progress',
+    tone: 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  },
+  completed: {
+    label: 'Completed',
+    tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  adjudicated: {
+    label: 'Adjudicated',
+    tone: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  },
+  reopened: {
+    label: 'Reopened',
+    tone: 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  },
+};
+
+function QuestionInvestigations({
+  projectId,
+  conversations,
+  questionCases,
+  question,
+  conversationId,
+  isStarting,
+  onQuestionChange,
+  onConversationChange,
+  onStart,
+}: {
+  projectId: string;
+  conversations: StoredConversation[];
+  questionCases: Array<{
+    investigation: InvestigationCase;
+    sourceName: string;
+    findingCount: number;
+  }>;
+  question: string;
+  conversationId: string;
+  isStarting: boolean;
+  onQuestionChange: (value: string) => void;
+  onConversationChange: (value: string) => void;
+  onStart: () => void;
+}) {
+  return (
+    <div className="space-y-6">
+      <section className="rounded-xl border border-violet-200 bg-violet-50/60 p-5 dark:border-violet-900/60 dark:bg-violet-950/20">
+        <div className="max-w-3xl">
+          <p className="text-sm font-medium text-violet-700 dark:text-violet-300">
+            Start from uncertainty, not a generated answer
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+            What do you need to understand before changing the project?
+          </h2>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Choose one primary source. Chatdex keeps the full chronology visible while you
+            search literally, pin exact evidence, and write the finding yourself.
+          </p>
+        </div>
+
+        {conversations.length === 0 ? (
+          <div className="mt-4 rounded-lg border border-dashed border-violet-300 p-4 text-sm text-gray-600 dark:border-violet-800 dark:text-gray-400">
+            This project has no accepted sources yet.{' '}
+            <Link
+              to={`/projects/${projectId}`}
+              className="font-medium text-violet-700 hover:underline dark:text-violet-300"
+            >
+              Add a source from the project overview
+            </Link>
+            .
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,0.45fr)_auto]">
+            <input
+              value={question}
+              onChange={(event) => onQuestionChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                  event.preventDefault();
+                  onStart();
+                }
+              }}
+              placeholder="Should Slop Connoisseur use contestant-specific judging?"
+              aria-label="Investigation question"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            />
+            <select
+              value={conversationId}
+              onChange={(event) => onConversationChange(event.target.value)}
+              aria-label="Primary source"
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100"
+            >
+              {conversations.map((conversation) => (
+                <option key={conversation.id} value={conversation.id}>
+                  {conversation.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={onStart}
+              disabled={!question.trim() || !conversationId || isStarting}
+              className="flex items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+            >
+              <Plus size={15} /> {isStarting ? 'Starting…' : 'Start'}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="font-semibold text-gray-900 dark:text-white">Investigations</h2>
+          <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
+            {questionCases.length} total
+          </span>
+        </div>
+        {questionCases.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray-300 p-7 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            No project questions yet. Start with one decision you need evidence to clarify.
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {questionCases.map(({ investigation, sourceName, findingCount }) => {
+              const chip = QUESTION_STATE[investigation.state];
+              return (
+                <li key={investigation.id}>
+                  <Link
+                    to={`/projects/${projectId}/investigate/questions/${investigation.id}`}
+                    className="group flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-gray-200 bg-white px-4 py-3 hover:border-violet-300 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-violet-800"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {investigation.title}
+                      </p>
+                      <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+                        Source: {sourceName} · {findingCount} finding
+                        {findingCount === 1 ? '' : 's'} · Updated{' '}
+                        {investigation.updatedAt.toLocaleString()}
+                      </p>
+                    </div>
+                    <span className={`rounded-full px-2 py-0.5 text-xs ${chip.tone}`}>
+                      {chip.label}
+                    </span>
+                    <ArrowRight
+                      size={16}
+                      className="text-gray-300 group-hover:text-violet-500"
+                    />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
@@ -306,13 +585,15 @@ function AnchorRow({
   anchor,
   info,
   state,
+  investigateBasePath,
 }: {
   anchor: InvestigationAnchor;
   info: AnchorConversationInfo | undefined;
   state: AnchorCaseState;
+  investigateBasePath: string;
 }) {
   const navigate = useNavigate();
-  const workbenchPath = `/investigate/${encodeURIComponent(anchor.id)}`;
+  const workbenchPath = `${investigateBasePath}/${encodeURIComponent(anchor.id)}`;
 
   const startAndOpen = async () => {
     await startInvestigation(anchor);

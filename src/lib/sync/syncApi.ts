@@ -30,7 +30,9 @@ export type SyncKind =
   | 'investigation_case'
   | 'case_exhibit'
   | 'review_scope'
-  | 'verdict_revision';
+  | 'verdict_revision'
+  | 'investigation_finding'
+  | 'prepared_change';
 
 export interface PushRecord extends WireSealed {
   id: string;

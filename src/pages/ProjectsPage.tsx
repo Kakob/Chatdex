@@ -1,8 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FolderKanban, HelpCircle, History, Loader2, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  FlaskConical,
+  FolderKanban,
+  HelpCircle,
+  History,
+  Loader2,
+  Plus,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { db, getConversations } from '../lib/db';
-import { setProjectReviewState, setAssociationReviewState } from '../lib/db/understanding';
+import {
+  createHumanProject,
+  setProjectReviewState,
+  setAssociationReviewState,
+} from '../lib/db/understanding';
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
 import type { AuthMode, LLMProviderId } from '../lib/providers';
 import {
@@ -20,12 +33,17 @@ import { OP_LABEL } from '../lib/understanding/livingDocument';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { ProjectReviewCard, type AssociationRow } from '../components/understanding/ProjectReviewCard';
 import { useToastStore } from '../stores/toastStore';
+import {
+  isSampleWorkspaceLoaded,
+  SAMPLE_PROJECT_ID,
+  seedSampleWorkspace,
+} from '../lib/demo/seedWorkspace';
 import type { StoredConversation } from '../types';
 import type { ReviewState } from '../types/understanding';
 
 /** Route target for a change/question: its project panel or the unassigned bucket. */
 const projectRoute = (projectId: string | null) =>
-  projectId === null ? '/projects/unassigned' : `/projects/${projectId}`;
+  projectId === null ? '/projects/unassigned' : `/projects/${projectId}/understanding`;
 
 function OpenQuestionRow({ question }: { question: OverviewQuestion }) {
   return (
@@ -77,6 +95,7 @@ function GlobalChangeRow({ change }: { change: OverviewChange }) {
 
 export function ProjectsPage() {
   const addToast = useToastStore((s) => s.addToast);
+  const navigate = useNavigate();
 
   const [overview, setOverview] = useState<UnderstandingOverview | null>(null);
   const [associationsByProject, setAssociationsByProject] = useState<
@@ -91,12 +110,18 @@ export function ProjectsPage() {
     authMode: AuthMode;
   } | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [sampleLoaded, setSampleLoaded] = useState(false);
+  const [loadingSample, setLoadingSample] = useState(false);
 
   const load = useCallback(async () => {
-    const [loadedOverview, associations, configured] = await Promise.all([
+    const [loadedOverview, associations, configured, hasSample] = await Promise.all([
       loadUnderstandingOverview(),
       db.projectAssociations.toArray(),
       listReadyProviders(),
+      isSampleWorkspaceLoaded(),
     ]);
     const convIds = [...new Set(associations.map((a) => a.conversationId))];
     const convs = await db.conversations.where('id').anyOf(convIds).toArray();
@@ -117,6 +142,7 @@ export function ProjectsPage() {
     setAssociationsByProject(grouped);
     setProviders(configured);
     setProvider((prev) => prev ?? configured[0] ?? null);
+    setSampleLoaded(hasSample);
   }, []);
 
   useEffect(() => {
@@ -171,6 +197,40 @@ export function ProjectsPage() {
     await load();
   };
 
+  const handleCreateProject = async () => {
+    try {
+      const project = await createHumanProject({
+        name: projectName,
+        description: projectDescription,
+      });
+      setProjectName('');
+      setProjectDescription('');
+      setShowCreate(false);
+      addToast('Project created');
+      navigate(`/projects/${project.id}`);
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    }
+  };
+
+  const handleSampleWorkspace = async () => {
+    if (sampleLoaded) {
+      navigate(`/projects/${SAMPLE_PROJECT_ID}`);
+      return;
+    }
+    setLoadingSample(true);
+    try {
+      const result = await seedSampleWorkspace();
+      addToast('Privacy-safe sample workspace loaded');
+      await load();
+      navigate(`/projects/${result.projectId}`);
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setLoadingSample(false);
+    }
+  };
+
   const projects = overview?.projects ?? [];
   const pending = projects.filter((s) => s.project.reviewState === 'pending');
   const reviewed = projects.filter((s) => s.project.reviewState !== 'pending');
@@ -193,6 +253,28 @@ export function ProjectsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleSampleWorkspace()}
+            disabled={loadingSample}
+            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-violet-200 dark:border-violet-900/60 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950/30 disabled:opacity-50"
+            title="Synthetic data only; does not use your conversations"
+          >
+            {loadingSample ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <FlaskConical size={14} />
+            )}
+            {sampleLoaded ? 'Open sample' : 'Load sample workspace'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCreate((visible) => !visible)}
+            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
+          >
+            {showCreate ? <X size={14} /> : <Plus size={14} />}
+            {showCreate ? 'Cancel' : 'New project'}
+          </button>
           {providers.length > 1 && (
             <select
               value={provider ?? ''}
@@ -206,14 +288,7 @@ export function ProjectsPage() {
               ))}
             </select>
           )}
-          {providers.length === 0 ? (
-            <Link
-              to="/settings"
-              className="text-sm text-violet-600 dark:text-violet-400 hover:underline"
-            >
-              Set up an LLM provider in Settings to enable discovery
-            </Link>
-          ) : (
+          {providers.length > 0 && (
             <button
               onClick={() => void handleDiscoverClick()}
               disabled={progress !== null}
@@ -236,6 +311,48 @@ export function ProjectsPage() {
         </div>
       </div>
 
+      {showCreate && (
+        <form
+          className="mb-6 rounded-xl border border-violet-200 dark:border-violet-900/60 bg-white dark:bg-gray-900 p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleCreateProject();
+          }}
+        >
+          <div className="grid gap-3 md:grid-cols-[minmax(12rem,0.7fr)_minmax(18rem,1.3fr)_auto] md:items-end">
+            <label className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="block mb-1 font-medium">Project name</span>
+              <input
+                autoFocus
+                value={projectName}
+                onChange={(event) => setProjectName(event.target.value)}
+                placeholder="Slop Connoisseur"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100"
+              />
+            </label>
+            <label className="text-sm text-gray-700 dark:text-gray-300">
+              <span className="block mb-1 font-medium">Description (optional)</span>
+              <input
+                value={projectDescription}
+                onChange={(event) => setProjectDescription(event.target.value)}
+                placeholder="What this project is trying to become"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={!projectName.trim()}
+              className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50"
+            >
+              Create project
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Human-created projects are accepted immediately. AI discovery remains an optional proposal inbox.
+          </p>
+        </form>
+      )}
+
       {overview === null ? (
         <div className="flex justify-center py-16">
           <Loader2 className="animate-spin text-gray-400" size={24} />
@@ -245,7 +362,12 @@ export function ProjectsPage() {
           <FolderKanban size={48} className="mx-auto mb-4 opacity-50" />
           <p>No projects yet</p>
           <p className="text-sm mt-2">
-            Run discovery to reconstruct projects from your conversation history
+            Create one directly, or run discovery to propose projects from your conversation history
+          </p>
+          <p className="mx-auto mt-3 max-w-lg text-xs text-gray-400">
+            “Load sample workspace” adds clearly labeled synthetic data so you can inspect the full
+            Investigate History → Current Understanding → Prepare Change workflow without importing
+            anything private.
           </p>
         </div>
       ) : (

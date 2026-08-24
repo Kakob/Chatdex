@@ -59,7 +59,8 @@ export interface DerivedFileChange {
 // encrypt and replicate like findings do. They reference anchors by
 // stableKey (which survives re-derivation), never by table row identity.
 
-export type CaseState = 'draft' | 'open' | 'adjudicated' | 'reopened';
+export type CaseState = 'draft' | 'open' | 'completed' | 'adjudicated' | 'reopened';
+export type InvestigationKind = 'anchor' | 'question';
 
 /** Embedded in the case row (spec §21 decision 4) — append-only process
  *  evidence about what the human searched, never about what exists. */
@@ -73,9 +74,14 @@ export interface CaseSearchRecord {
 
 export interface InvestigationCase {
   id: string;
+  /** Present for project-scoped question-first investigations. */
+  projectId?: string;
   conversationId: string;
-  primaryAnchorStableKey: string;
+  /** Missing for question-first investigations that begin from a source. */
+  primaryAnchorStableKey?: string;
   linkedAnchorStableKeys: string[];
+  /** Optional for backwards compatibility; missing rows are anchor cases. */
+  kind?: InvestigationKind;
   /** Human-editable; initialized from a deterministic literal template only. */
   title: string;
   /** Human-authored notes — always labeled as the user's writing in UI. */
@@ -86,6 +92,32 @@ export interface InvestigationCase {
   verdictDraft?: VerdictDraft;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type InvestigationFindingType =
+  | 'belief'
+  | 'decision'
+  | 'constraint'
+  | 'consequence'
+  | 'question';
+
+export type InvestigationFindingState = 'draft' | 'finalized';
+
+export interface InvestigationFinding {
+  id: string;
+  caseId: string;
+  projectId: string;
+  type: InvestigationFindingType;
+  title: string;
+  body?: string;
+  confidence: VerdictConfidence;
+  exhibitIds: string[];
+  reviewScopeIds: string[];
+  state: InvestigationFindingState;
+  promotedUnderstandingObjectId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  finalizedAt?: Date;
 }
 
 // --- Verdicts (spec §8.8–§8.9, §11; DI-3) ---

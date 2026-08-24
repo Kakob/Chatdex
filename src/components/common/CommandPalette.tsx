@@ -2,10 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
-  Clock,
-  BarChart3,
   MessageSquare,
-  Anchor,
+  FolderKanban,
   Upload,
   Settings,
   Command,
@@ -13,11 +11,9 @@ import {
 import { useShortcutStore, type ShortcutEntry } from '../../stores/shortcutStore';
 
 const NAV_ACTIONS = [
-  { id: 'nav-search', label: 'Go to Search', path: '/search', icon: Search },
-  { id: 'nav-timeline', label: 'Go to Timeline', path: '/timeline', icon: Clock },
-  { id: 'nav-analytics', label: 'Go to Analytics', path: '/analytics', icon: BarChart3 },
-  { id: 'nav-browse', label: 'Go to Browse', path: '/conversations', icon: MessageSquare },
-  { id: 'nav-knowledge', label: 'Go to Knowledge', path: '/knowledge', icon: Anchor },
+  { id: 'nav-projects', label: 'Go to Projects', path: '/projects', icon: FolderKanban },
+  { id: 'nav-browse', label: 'Go to Sources', path: '/conversations', icon: MessageSquare },
+  { id: 'nav-search', label: 'Go to Global Search', path: '/search', icon: Search },
   { id: 'nav-import', label: 'Go to Import', path: '/import', icon: Upload },
   { id: 'nav-settings', label: 'Go to Settings', path: '/settings', icon: Settings },
 ];
@@ -66,39 +62,38 @@ export function CommandPalette() {
     return all.filter((item) => item.label.toLowerCase().includes(q));
   }, [query, shortcuts, navigate]);
 
-  // Reset selection when items change
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [items.length]);
-
   // Focus input on open
   useEffect(() => {
-    if (paletteOpen) {
+    if (!paletteOpen) return;
+    const timer = window.setTimeout(() => {
       setQuery('');
       setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 0);
-    }
+      inputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [paletteOpen]);
+
+  const activeIndex = Math.min(selectedIndex, Math.max(items.length - 1, 0));
 
   // Scroll selected item into view
   useEffect(() => {
     if (!listRef.current) return;
-    const el = listRef.current.children[selectedIndex] as HTMLElement | undefined;
+    const el = listRef.current.children[activeIndex] as HTMLElement | undefined;
     el?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
+  }, [activeIndex]);
 
   if (!paletteOpen) return null;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, items.length - 1));
+      if (items.length > 0) setSelectedIndex((i) => Math.min(i + 1, items.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter' && items[selectedIndex]) {
+    } else if (e.key === 'Enter' && items[activeIndex]) {
       e.preventDefault();
-      items[selectedIndex].action();
+      items[activeIndex].action();
       setPaletteOpen(false);
     } else if (e.key === 'Escape') {
       setPaletteOpen(false);
@@ -125,7 +120,10 @@ export function CommandPalette() {
             ref={inputRef}
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSelectedIndex(0);
+            }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command..."
             className="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none text-sm"
@@ -152,7 +150,7 @@ export function CommandPalette() {
                   setPaletteOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                  i === selectedIndex
+                  i === activeIndex
                     ? 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
                     : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                 }`}

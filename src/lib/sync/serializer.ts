@@ -22,8 +22,10 @@ import type {
   ReviewScope,
   CaseSearchRecord,
   VerdictRevision,
+  InvestigationFinding,
 } from '../../types/investigation';
 import type { SyncKind } from './syncApi';
+import type { PreparedChange } from '../../types/preparedChange';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
   kind: TKind;
@@ -400,4 +402,68 @@ export function envelopeVerdictRevision(v: VerdictRevision): SyncEnvelope<'verdi
 export function rehydrateVerdictRevision(payload: unknown): VerdictRevision {
   const p = payload as VerdictRevision & { finalizedAt: string };
   return { ...p, finalizedAt: isoToDate(p.finalizedAt) };
+}
+
+export function envelopeInvestigationFinding(
+  finding: InvestigationFinding
+): SyncEnvelope<'investigation_finding'> {
+  return {
+    kind: 'investigation_finding',
+    parentId: finding.caseId,
+    updatedAt: finding.updatedAt,
+    payload: {
+      ...finding,
+      createdAt: dateToIso(finding.createdAt),
+      updatedAt: dateToIso(finding.updatedAt),
+      ...(finding.finalizedAt ? { finalizedAt: dateToIso(finding.finalizedAt) } : {}),
+    },
+  };
+}
+
+export function rehydrateInvestigationFinding(payload: unknown): InvestigationFinding {
+  const finding = payload as InvestigationFinding & {
+    createdAt: string;
+    updatedAt: string;
+    finalizedAt?: string;
+  };
+  return {
+    ...finding,
+    createdAt: isoToDate(finding.createdAt),
+    updatedAt: isoToDate(finding.updatedAt),
+    ...(finding.finalizedAt
+      ? { finalizedAt: isoToDate(finding.finalizedAt) }
+      : {}),
+  };
+}
+
+// --- prepared changes ---
+
+export function envelopePreparedChange(
+  change: PreparedChange
+): SyncEnvelope<'prepared_change'> {
+  return {
+    kind: 'prepared_change',
+    parentId: change.projectId,
+    updatedAt: change.updatedAt,
+    payload: {
+      ...change,
+      createdAt: dateToIso(change.createdAt),
+      updatedAt: dateToIso(change.updatedAt),
+      ...(change.readyAt ? { readyAt: dateToIso(change.readyAt) } : {}),
+    },
+  };
+}
+
+export function rehydratePreparedChange(payload: unknown): PreparedChange {
+  const change = payload as PreparedChange & {
+    createdAt: string;
+    updatedAt: string;
+    readyAt?: string;
+  };
+  return {
+    ...change,
+    createdAt: isoToDate(change.createdAt),
+    updatedAt: isoToDate(change.updatedAt),
+    ...(change.readyAt ? { readyAt: isoToDate(change.readyAt) } : {}),
+  };
 }

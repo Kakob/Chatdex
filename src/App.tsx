@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from './components/layout';
+import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import {
   SearchPage,
   AnalyticsPage,
@@ -9,9 +9,12 @@ import {
   KnowledgePage,
   InvestigatePage,
   InvestigationWorkbenchPage,
+  QuestionInvestigationPage,
   LedgerPage,
   ProjectsPage,
   ProjectUnderstandingPage,
+  ProjectOverviewPage,
+  PrepareChangePage,
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
@@ -22,7 +25,7 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/search" replace />} />
+          <Route index element={<Navigate to="/projects" replace />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
@@ -36,7 +39,24 @@ export function App() {
           <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
           <Route path="ledger" element={<LedgerPage />} />
           <Route path="projects" element={<ProjectsPage />} />
-          <Route path="projects/:id" element={<ProjectUnderstandingPage />} />
+          <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
+          <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
+            <Route index element={<ProjectOverviewPage />} />
+            <Route path="investigate" element={<InvestigatePage projectScoped />} />
+            <Route
+              path="investigate/questions/:caseId"
+              element={<QuestionInvestigationPage />}
+            />
+            <Route
+              path="investigate/:anchorId"
+              element={<InvestigationWorkbenchPage projectScoped />}
+            />
+            <Route
+              path="understanding"
+              element={<ProjectUnderstandingPage workspaceMode />}
+            />
+            <Route path="prepare" element={<PrepareChangePage />} />
+          </Route>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="how-detection-works" element={<HowDetectionWorksPage />} />

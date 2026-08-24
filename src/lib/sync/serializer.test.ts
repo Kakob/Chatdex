@@ -8,7 +8,13 @@ import {
   rehydrateUnderstandingObject,
   envelopeUnderstandingEvent,
   rehydrateUnderstandingEvent,
+  envelopePreparedChange,
+  rehydratePreparedChange,
+  envelopeInvestigationFinding,
+  rehydrateInvestigationFinding,
 } from './serializer';
+import type { PreparedChange } from '../../types/preparedChange';
+import type { InvestigationFinding } from '../../types/investigation';
 import type {
   UnderstandingProject,
   ProjectAssociation,
@@ -138,5 +144,63 @@ describe('understanding sync serializers', () => {
     expect(rehydrated.origin).toBe('ai');
     expect(rehydrated.reviewState).toBe('accepted');
     expect(rehydrated.updatedAt).toBeUndefined();
+  });
+});
+
+describe('prepared change sync serializer', () => {
+  it('round-trips human-authored handoffs with readiness timestamps', () => {
+    const change: PreparedChange = {
+      id: 'pc-1',
+      projectId: 'up-1',
+      title: 'Contestant judging',
+      state: 'ready',
+      desiredOutcome: 'Use contestant ballots.',
+      rationale: 'Taste should remain plural.',
+      nonGoals: ['Matchmaking'],
+      constraints: ['Keep identities hidden'],
+      acceptanceCriteria: ['Reveal after all ballots'],
+      openImplementationChoices: ['Tie aggregation'],
+      understandingPointIds: ['uo-1'],
+      investigationFindingIds: [],
+      evidenceRefs: [
+        {
+          understandingPointId: 'uo-1',
+          conversationId: 'conv-1',
+          messageIds: ['m-1'],
+        },
+      ],
+      createdAt,
+      updatedAt,
+      readyAt: updatedAt,
+    };
+    const env = envelopePreparedChange(change);
+    expect(env.kind).toBe('prepared_change');
+    expect(env.parentId).toBe('up-1');
+    expect(throughWire(env.payload, rehydratePreparedChange)).toEqual(change);
+  });
+});
+
+describe('investigation finding sync serializer', () => {
+  it('round-trips finalized human findings and their evidence links', () => {
+    const finding: InvestigationFinding = {
+      id: 'if-1',
+      caseId: 'case-1',
+      projectId: 'up-1',
+      type: 'constraint',
+      title: 'Keep ballots hidden until everyone votes',
+      body: 'Early reveals would bias later contestants.',
+      confidence: 'high',
+      exhibitIds: ['exhibit-1'],
+      reviewScopeIds: ['scope-1'],
+      state: 'finalized',
+      promotedUnderstandingObjectId: 'uo-1',
+      createdAt,
+      updatedAt,
+      finalizedAt: updatedAt,
+    };
+    const env = envelopeInvestigationFinding(finding);
+    expect(env.kind).toBe('investigation_finding');
+    expect(env.parentId).toBe('case-1');
+    expect(throughWire(env.payload, rehydrateInvestigationFinding)).toEqual(finding);
   });
 });

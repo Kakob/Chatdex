@@ -42,6 +42,12 @@ export interface ChatProviderMeta {
 }
 
 const CHAT_NAME_MAX = 60;
+let latestChatActivityMs = 0;
+
+function nextChatActivityTime(minimumMs = 0): Date {
+  latestChatActivityMs = Math.max(Date.now(), minimumMs, latestChatActivityMs + 1);
+  return new Date(latestChatActivityMs);
+}
 
 /** First user message, first line, ellipsized — the chat's display name. */
 export function chatNameFromMessage(text: string): string {
@@ -64,7 +70,7 @@ export interface CreateChatOptions {
  * with the project association when started from a project.
  */
 export async function createChat(options: CreateChatOptions): Promise<StoredConversation> {
-  const now = new Date();
+  const now = nextChatActivityTime();
   const meta: ChatProviderMeta = {
     provider: options.provider,
     ...(options.projectId ? { projectId: options.projectId } : {}),
@@ -140,7 +146,7 @@ export async function appendChatMessage(
     // strictly increasing per conversation.
     const existing = await getMessagesForConversation(conversationId);
     const lastAt = existing[existing.length - 1]?.createdAt.getTime() ?? 0;
-    const now = new Date(Math.max(Date.now(), lastAt + 1));
+    const now = nextChatActivityTime(lastAt + 1);
     const row: StoredMessage = {
       id: crypto.randomUUID(),
       conversationId,

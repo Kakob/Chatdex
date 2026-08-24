@@ -29,7 +29,8 @@ export interface UseInvestigationAnchorsResult {
 }
 
 export function useInvestigationAnchors(
-  order: 'asc' | 'desc'
+  order: 'asc' | 'desc',
+  conversationIds?: string[]
 ): UseInvestigationAnchorsResult {
   const [anchors, setAnchors] = useState<InvestigationAnchor[]>([]);
   const [conversationInfo, setConversationInfo] = useState<
@@ -42,7 +43,7 @@ export function useInvestigationAnchors(
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const rows = await listInvestigationAnchors({ order });
+      const rows = await listInvestigationAnchors({ order, conversationIds });
       const convIds = [...new Set(rows.map((a) => a.conversationId))];
       const convs = await db.conversations.bulkGet(convIds);
       const info = new Map<string, AnchorConversationInfo>();
@@ -62,7 +63,7 @@ export function useInvestigationAnchors(
     } finally {
       setIsLoading(false);
     }
-  }, [order]);
+  }, [order, conversationIds]);
 
   useEffect(() => {
     void refresh();

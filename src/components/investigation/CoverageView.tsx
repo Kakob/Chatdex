@@ -10,21 +10,23 @@ import {
 
 export function CoverageView({
   onFilterByPath,
+  conversationIds,
 }: {
   /** Jump back to the anchor list filtered to this literal path. */
   onFilterByPath: (path: string) => void;
+  conversationIds?: string[];
 }) {
   const [coverage, setCoverage] = useState<InvestigationCoverage | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void getInvestigationCoverage().then((c) => {
+    void getInvestigationCoverage({ conversationIds }).then((c) => {
       if (!cancelled) setCoverage(c);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [conversationIds]);
 
   if (!coverage) {
     return <p className="text-gray-500 dark:text-gray-400">Computing coverage…</p>;

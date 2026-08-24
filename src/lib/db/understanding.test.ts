@@ -3,9 +3,11 @@ import { db } from './schema';
 import { clearAllData } from './index';
 import {
   putUnderstandingProject,
+  createHumanProject,
   getAllUnderstandingProjects,
   setProjectReviewState,
   putProjectAssociation,
+  associateConversationWithProject,
   getAssociationsForConversation,
   getAssociationsForProject,
   setAssociationReviewState,
@@ -75,9 +77,60 @@ describe('understanding projects', () => {
     expect(stored?.reviewState).toBe('accepted');
     expect(stored!.updatedAt.getTime()).toBeGreaterThan(p.updatedAt.getTime());
   });
+
+  it('creates human projects as accepted without an LLM review step', async () => {
+    const project = await createHumanProject({
+      name: '  Slop Connoisseur  ',
+      description: '  A game about human and AI taste.  ',
+    });
+    expect(project).toMatchObject({
+      name: 'Slop Connoisseur',
+      description: 'A game about human and AI taste.',
+      origin: 'user',
+      reviewState: 'accepted',
+    });
+    expect(await db.understandingProjects.get(project.id)).toEqual(project);
+  });
+
+  it('rejects empty human project names', async () => {
+    await expect(createHumanProject({ name: '   ' })).rejects.toThrow(/name/);
+  });
 });
 
 describe('project associations', () => {
+  it('lets a user attach an imported conversation to a project', async () => {
+    const project = await createHumanProject({ name: 'Slop Connoisseur' });
+    const now = new Date('2026-08-01T00:00:00Z');
+    await db.conversations.add({
+      id: 'conv-1',
+      source: 'chatgpt',
+      name: 'Contestant judging discussion',
+      summary: null,
+      createdAt: now,
+      updatedAt: now,
+      importedAt: now,
+      messageCount: 0,
+      userMessageCount: 0,
+      assistantMessageCount: 0,
+      estimatedTokens: 0,
+      fullText: '',
+    });
+
+    const association = await associateConversationWithProject(project.id, 'conv-1');
+    expect(association).toMatchObject({
+      projectId: project.id,
+      conversationId: 'conv-1',
+      origin: 'user',
+      reviewState: 'accepted',
+      confidence: 1,
+    });
+
+    // The user action is idempotent rather than creating duplicate rows.
+    const second = await associateConversationWithProject(project.id, 'conv-1');
+    expect(second.id).toBe(association.id);
+    expect(await getAssociationsForProject(project.id)).toHaveLength(1);
+  });
+
   it('a conversation can associate with multiple projects (PRD §6)', async () => {
     await putProjectAssociation(makeAssociation('proj-1', 'conv-1', { confidence: 0.94 }));
     await putProjectAssociation(makeAssociation('proj-2', 'conv-1', { confidence: 0.21 }));

@@ -8,6 +8,8 @@ export interface SourceMeta {
   activeButtonClass: string;
 }
 
+// Shared rendering metadata intentionally lives beside SourceIcon.
+// eslint-disable-next-line react-refresh/only-export-components
 export const SOURCE_META: Record<DataSource, SourceMeta> = {
   'claude.ai': {
     label: 'Claude.ai',

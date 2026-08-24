@@ -26,7 +26,9 @@ import type {
   CaseExhibit,
   ReviewScope,
   VerdictRevision,
+  InvestigationFinding,
 } from '../../types/investigation';
+import type { PreparedChange } from '../../types/preparedChange';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -56,6 +58,8 @@ export class ChatdexDB extends Dexie {
   caseExhibits!: Table<CaseExhibit, string>;
   reviewScopes!: Table<ReviewScope, string>;
   verdictRevisions!: Table<VerdictRevision, string>;
+  preparedChanges!: Table<PreparedChange, string>;
+  investigationFindings!: Table<InvestigationFinding, string>;
 
   constructor() {
     super('chatdex');
@@ -128,6 +132,27 @@ export class ChatdexDB extends Dexie {
     this.version(8).stores({
       verdictRevisions: '&id, caseId, conversationId, &[caseId+revisionNumber]',
     });
+    // v9: project-scoped implementation handoffs. These are human-authored
+    // records; source material remains canonical in conversations/messages.
+    this.version(9).stores({
+      preparedChanges: '&id, projectId, state, updatedAt, [projectId+updatedAt]',
+    });
+    // v10: question-first project investigations and their human findings.
+    // Existing anchor cases remain intact and backfill their discriminator.
+    this.version(10)
+      .stores({
+        investigationCases:
+          '&id, projectId, conversationId, primaryAnchorStableKey, kind, state, updatedAt, [projectId+updatedAt]',
+        investigationFindings: '&id, caseId, projectId, state, updatedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('investigationCases')
+          .toCollection()
+          .modify((row: Partial<InvestigationCase>) => {
+            row.kind = row.kind ?? 'anchor';
+          });
+      });
   }
 }
 
