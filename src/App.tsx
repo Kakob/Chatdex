@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import {
+  LandingPage,
   SearchPage,
   AnalyticsPage,
   TimelinePage,
@@ -24,8 +25,8 @@ export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/projects" replace />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route element={<Layout />}>
           <Route path="search" element={<SearchPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="analytics" element={<AnalyticsPage />} />

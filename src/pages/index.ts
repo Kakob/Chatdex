@@ -1,3 +1,4 @@
+export { LandingPage } from './LandingPage';
 export { SearchPage } from './SearchPage';
 export { AnalyticsPage } from './AnalyticsPage';
 export { TimelinePage } from './TimelinePage';
