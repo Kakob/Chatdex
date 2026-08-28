@@ -24,6 +24,7 @@ import { LearnedSection } from '../components/prepare/LearnedSection';
 import { PromoteSection } from '../components/prepare/PromoteSection';
 import { QuestionsSection } from '../components/prepare/QuestionsSection';
 import { WorkspaceTimeline } from '../components/prepare/WorkspaceTimeline';
+import { AssistedSection } from '../components/prepare/AssistedSection';
 import { useToastStore } from '../stores/toastStore';
 import type { PreparedChange } from '../types/preparedChange';
 import type { UnderstandingObject, UnderstandingProject } from '../types/understanding';
@@ -328,6 +329,11 @@ export function PrepareChangePage() {
                     <div id={sectionAnchor('questions')}>
                       <QuestionsSection key={`questions:${selectedChange.id}:${selectedChange.updatedAt.toISOString()}`} change={selectedChange} onChanged={onChanged} />
                     </div>
+                    {data.project && (
+                      <div id="ws-assisted">
+                        <AssistedSection change={selectedChange} project={data.project} onChanged={onChanged} />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

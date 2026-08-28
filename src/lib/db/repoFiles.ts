@@ -40,3 +40,12 @@ export async function evictRepo(repoKey: RepoKey): Promise<number> {
 export async function clearRepoFileCache(): Promise<void> {
   await db.repoFiles.clear();
 }
+
+/** The most recently fetched sha cached for a repository, if any. */
+export async function latestCachedSnapshot(repoKey: RepoKey): Promise<string | null> {
+  const rows = await db.repoFiles.where('repoKey').equals(repoKey).toArray();
+  if (rows.length === 0) return null;
+  let best = rows[0];
+  for (const row of rows) if (row.fetchedAt > best.fetchedAt) best = row;
+  return best.sha;
+}
