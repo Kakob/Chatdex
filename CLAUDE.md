@@ -44,6 +44,7 @@ These are non-negotiable. Violating any of them is a bug even if the feature "wo
    - **Backend relay is transit-only.** The Chatdex backend may proxy provider calls (streaming, rate limiting), but must never persist or log request/response content. Relay handlers must not write conversation plaintext to the database, log lines, or error traces.
    - **Cross-provider disclosure is explicit.** Sending one provider's history to a different provider (e.g., ChatGPT conversations to Anthropic) is a new disclosure; the UI must state which provider will receive which sources before the first such call.
    - **Synthesis outputs are user data.** Understanding objects derived from LLM calls store like everything else: plaintext in IndexedDB, ciphertext in sync.
+   - **Repository excerpts follow the same rule (Intent Trace, 2026-08-28).** File and spec-document excerpts fetched read-only from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only conditions — the disclosure must say repository excerpts are being sent. The GitHub token is device-local, goes only to api.github.com, and never enters a relay body or a prompt (`docs/SPEC-intent-trace.md` §13).
 
 ## Tech stack
 

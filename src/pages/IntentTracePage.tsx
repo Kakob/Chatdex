@@ -18,7 +18,7 @@ import {
 } from '../lib/understanding/intents/intentMatrix';
 import { getIntentExtractableConversations, runIntentExtraction } from '../lib/understanding/intents/runExtraction';
 import type { HeuristicMode } from '../lib/understanding/intents/heuristic';
-import { planTrace, runTrace, type TracePlan } from '../lib/understanding/trace/runTrace';
+import { planTrace, runTrace, type TracePlan, type TraceConfig } from '../lib/understanding/trace/runTrace';
 import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
 import { listReadyProviders, getProviderInfo, getProviderAuthMode } from '../lib/providers';
 import type { AuthMode, LLMProviderId } from '../lib/providers';
@@ -44,6 +44,8 @@ type PendingTrace = {
   disclosure: DisclosureSummary;
   authMode: AuthMode;
   plan: TracePlan;
+  /** Set for a single-intent (re-)trace so the run uses the same selection. */
+  config: TraceConfig;
 };
 
 const SELECT =
@@ -147,16 +149,25 @@ export function IntentTracePage() {
     });
   };
 
-  const handleTraceClick = async () => {
+  const handleTraceClick = async (intentObjectId?: string, extraPath?: string) => {
     if (!provider || !projectId) return;
     setProgress({ label: 'Planning trace', done: 0, total: 1 });
+    const config: TraceConfig = {
+      provider,
+      ...(intentObjectId ? { intentObjectIds: [intentObjectId] } : {}),
+      ...(intentObjectId && extraPath
+        ? { extraPaths: { [intentObjectId]: [{ path: extraPath, reason: 'manual' as const }] } }
+        : {}),
+    };
     try {
-      const plan = await planTrace(projectId, { provider });
+      const plan = await planTrace(projectId, config);
       if (plan.intents.length === 0) {
         addToast(
-          data?.latestRepoRef
-            ? 'Every intent already has a trace at this commit'
-            : 'No intents to trace yet — extract intents first'
+          intentObjectId
+            ? 'That intent is not traceable (rejected or missing)'
+            : data?.latestRepoRef
+              ? 'Every intent already has a trace at this commit'
+              : 'No intents to trace yet — extract intents first'
         );
         setWarnings(plan.warnings);
         return;
@@ -169,6 +180,7 @@ export function IntentTracePage() {
         disclosure: buildDisclosure(conversations, provider),
         authMode: await getProviderAuthMode(provider),
         plan,
+        config,
       });
     } catch (err) {
       addToast(`Cannot trace: ${(err as Error).message}`, 'error');
@@ -199,12 +211,9 @@ export function IntentTracePage() {
         setWarnings(outcome.warnings);
       } else {
         setProgress({ label: 'Tracing intents', done: 0, total: run.plan.intents.length });
-        const outcome = await runTrace(
-          projectId,
-          run.plan,
-          { provider },
-          { onProgress: (done, total) => setProgress({ label: 'Tracing intents', done, total }) }
-        );
+        const outcome = await runTrace(projectId, run.plan, run.config, {
+          onProgress: (done, total) => setProgress({ label: 'Tracing intents', done, total }),
+        });
         addToast(
           `Trace: ${outcome.traced} traced, ${outcome.errored} errored` +
             (outcome.aborted ? ' — stopped by GitHub rate limit' : '') +
@@ -402,6 +411,8 @@ export function IntentTracePage() {
           sourcesByConversation={sourcesByConversation}
           onReview={(objectId, state) => void handleReview(objectId, state)}
           onOpenHistory={setHistoryObjectId}
+          onTrace={(objectId, extraPath) => void handleTraceClick(objectId, extraPath)}
+          traceDisabledReason={progress ? 'A run is in progress' : traceDisabledReason}
         />
       )}
 

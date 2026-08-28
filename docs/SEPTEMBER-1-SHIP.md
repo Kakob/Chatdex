@@ -39,7 +39,7 @@ The reviewer should be able to verify:
 
 - Generated summaries or verdicts
 - Semantic/vector search and scoring
-- Repository cloning, writes, or deployment from Chatdex
+- Repository cloning, writes, or deployment from Chatdex (read-only inspection through the GitHub API — Intent Trace — is allowed and stays read-only)
 - New connectors, databases, or hosted services
 - Generalized knowledge graphs or task management
 - Reworking optional passkey sync unless a deployment already depends on it

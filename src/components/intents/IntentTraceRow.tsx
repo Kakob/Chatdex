@@ -3,7 +3,7 @@
 // the isGitHubWebUrl allowlist (audit S6).
 
 import { useState } from 'react';
-import { ChevronDown, ChevronRight, ExternalLink, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, ExternalLink, History, RefreshCw } from 'lucide-react';
 import { SourceIcon } from '../common/sourceMeta';
 import { EvidenceLinks } from '../understanding/EvidenceLinks';
 import { ReviewButtons } from '../understanding/ReviewButtons';
@@ -73,16 +73,29 @@ export function IntentTraceRow({
   sources,
   onReview,
   onOpenHistory,
+  onTrace,
+  traceDisabledReason,
 }: {
   row: IntentRow;
   /** Sources of the row's evidence conversations, for the chip. */
   sources: DataSource[];
   onReview: (objectId: string, state: ReviewState) => void;
   onOpenHistory: (objectId: string) => void;
+  /** Trace (or re-trace) this one intent, optionally with an extra file to check. */
+  onTrace?: (objectId: string, extraPath?: string) => void;
+  traceDisabledReason?: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [extraPath, setExtraPath] = useState('');
   const { object, latestTrace: trace } = row;
   const pending = object.reviewState === 'pending';
+  const canTrace = Boolean(onTrace) && !traceDisabledReason;
+  const traceOne = () => {
+    if (!onTrace) return;
+    const path = extraPath.trim();
+    onTrace(object.id, path || undefined);
+    setExtraPath('');
+  };
 
   return (
     <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -163,7 +176,20 @@ export function IntentTraceRow({
                 </button>
               </>
             ) : (
-              <StatusChip status="untraced" label="not traced" />
+              <>
+                <StatusChip status="untraced" label="not traced" />
+                {onTrace && (
+                  <button
+                    type="button"
+                    onClick={traceOne}
+                    disabled={!canTrace}
+                    title={traceDisabledReason ?? 'Trace this intent'}
+                    className="inline-flex items-center gap-1 text-xs text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50 disabled:no-underline"
+                  >
+                    <RefreshCw size={12} /> Trace this intent
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -236,6 +262,29 @@ export function IntentTraceRow({
           <div className="text-xs text-gray-400">
             Checked: {trace.fetchedPaths.length ? trace.fetchedPaths.join(', ') : 'nothing'}
           </div>
+          {onTrace && (
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={extraPath}
+                onChange={(e) => setExtraPath(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') traceOne();
+                }}
+                placeholder="add a file to check (repo path)"
+                aria-label={`Add a file to check for ${object.title}`}
+                className="min-w-64 flex-1 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+              />
+              <button
+                type="button"
+                onClick={traceOne}
+                disabled={!canTrace}
+                title={traceDisabledReason ?? 'Re-trace this intent at the current commit'}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-violet-300 dark:border-violet-800 text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50"
+              >
+                <RefreshCw size={12} /> Re-trace
+              </button>
+            </div>
+          )}
           {trace.warnings.length > 0 && (
             <ul className="list-disc pl-4 text-xs text-amber-700 dark:text-amber-400">
               {trace.warnings.map((w, i) => (

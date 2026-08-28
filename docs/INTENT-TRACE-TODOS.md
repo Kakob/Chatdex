@@ -42,8 +42,8 @@ Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. T
 
 ### IT-5 — UI
 - [x] `IntentTracePage`, table/row, tab + route, `DisclosureModal.title`, RTL tests (S6)
-- [ ] guard test (S10) — import-boundary test (IT-6)
+- [x] guard test (S10) — import-boundary test (IT-6)
 
 ### IT-6 — polish + docs
-- [ ] Commit evidence, re-trace / add-file, warnings panel
-- [ ] `CLAUDE.md` invariant-6 wording, `docs/SEPTEMBER-1-SHIP.md` wording, `docs/INTENT-TRACE-BUILD-LOG.md` rows
+- [x] Commit evidence, re-trace / add-file, warnings panel
+- [x] `CLAUDE.md` invariant-6 wording, `docs/SEPTEMBER-1-SHIP.md` wording, `docs/INTENT-TRACE-BUILD-LOG.md` rows

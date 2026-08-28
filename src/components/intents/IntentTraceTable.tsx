@@ -8,11 +8,15 @@ export function IntentTraceTable({
   sourcesByConversation,
   onReview,
   onOpenHistory,
+  onTrace,
+  traceDisabledReason,
 }: {
   rows: IntentRow[];
   sourcesByConversation: Map<string, DataSource>;
   onReview: (objectId: string, state: ReviewState) => void;
   onOpenHistory: (objectId: string) => void;
+  onTrace?: (objectId: string, extraPath?: string) => void;
+  traceDisabledReason?: string | null;
 }) {
   return (
     <div className="space-y-3" data-testid="intent-matrix">
@@ -34,6 +38,8 @@ export function IntentTraceTable({
           ]}
           onReview={onReview}
           onOpenHistory={onOpenHistory}
+          onTrace={onTrace}
+          traceDisabledReason={traceDisabledReason}
         />
       ))}
     </div>

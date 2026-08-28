@@ -15,6 +15,7 @@ tests green.
 | IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 | IT-4 | 2026-08-28 | `628e00a` | Trace engine: spec-doc retrieval, candidate files (mentioned > anchor > keyword), fetch gate (sensitive denylist, excluded dirs, secret scrubber, `assertNoSecrets`), judge with verbatim-quote verification + recomputed lines + downgrades, `planTrace` (pre-LLM disclosure plan) / `runTrace` (per-intent isolation, rate-limit abort, commit evidence) |
 | IT-5 | 2026-08-28 | `6e0e8a8` | Intent Trace tab (`/projects/:id/intents`): matrix rows with origin/polarity/status chips, evidence deep links, review, history; expandable spec/impl evidence with validated blob links + commit evidence; filters; Extract / Trace runs with their two disclosures; `DisclosureModal.title` |
+| IT-6 | 2026-08-28 | _pending_ | Per-row "Trace this intent" / Re-trace with "add a file to check" (through the same disclosure); S10 import-boundary guard test; `CLAUDE.md` invariant-6 amendment + `SEPTEMBER-1-SHIP.md` wording |
 
 ---
 
@@ -296,3 +297,38 @@ All under `src/lib/understanding/trace/`; pure except `runTrace.ts`.
   shown; origin filter narrows + "1 of 2", accept flips review state and
   clears the pending chip; malformed owner ⇒ no link; bound repo ⇒ Trace
   enabled + last-traced line.
+
+### IT-6 — Ergonomics, guard test, docs (2026-08-28)
+
+- **Per-row trace.** `IntentTraceRow` gains "Trace this intent" (untraced
+  rows) and, in the expanded evidence section, an "add a file to check"
+  input + "Re-trace". Both call the page's `handleTraceClick(intentId,
+  extraPath?)`, which plans with `intentObjectIds: [id]` and
+  `extraPaths: { [id]: [{ path, reason: 'manual' }] }` — the manual path
+  goes through the same fetch gate as everything else — and then shows the
+  same repository-excerpts `DisclosureModal` before anything is sent; the
+  run reuses that config. Disabled with a reason while a run is in
+  progress or the repo is unbound. Commit evidence, rate-limit remaining,
+  and the warnings panel had already landed in IT-4/IT-5.
+- **Boundary guard (audit S10)** —
+  `src/lib/understanding/trace/boundary.test.ts` walks `src/lib/detection`
+  and `src/lib/investigation` and fails if any file imports the GitHub
+  client, the intent/trace modules, or the LLM providers; and checks the
+  reverse direction touches detection only via `normalizeSession` and
+  investigation only via anchor reads.
+- **Docs** — `CLAUDE.md` invariant 6 gains the repository-excerpts bullet
+  (same user-initiated / disclosed / transit-only rule; token device-local,
+  api.github.com only, never in a relay body or prompt);
+  `docs/SEPTEMBER-1-SHIP.md` deferral now reads "…(read-only inspection
+  through the GitHub API — Intent Trace — is allowed and stays
+  read-only)"; `README.md`'s "repository mutation" line stays true and is
+  untouched.
+- Tests: 2 more page tests — a typed extra path reaches `planTrace` as a
+  manual candidate, `runTrace` is not called until "Send and trace" is
+  confirmed, the disclosure names repository excerpts with counts, and the
+  outcome toast shows GitHub requests remaining; Cancel sends nothing.
+  Boundary guard: 3.
+
+**IT-0…IT-6 complete in code.** Remaining is human: Jacob's §16 browser
+scenario (`docs/INTENT-TRACE-TODOS.md`), then fixes from that pass and the
+§18 deferred list.
