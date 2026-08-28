@@ -15,7 +15,7 @@ tests green.
 | IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 | IT-4 | 2026-08-28 | `628e00a` | Trace engine: spec-doc retrieval, candidate files (mentioned > anchor > keyword), fetch gate (sensitive denylist, excluded dirs, secret scrubber, `assertNoSecrets`), judge with verbatim-quote verification + recomputed lines + downgrades, `planTrace` (pre-LLM disclosure plan) / `runTrace` (per-intent isolation, rate-limit abort, commit evidence) |
 | IT-5 | 2026-08-28 | `6e0e8a8` | Intent Trace tab (`/projects/:id/intents`): matrix rows with origin/polarity/status chips, evidence deep links, review, history; expandable spec/impl evidence with validated blob links + commit evidence; filters; Extract / Trace runs with their two disclosures; `DisclosureModal.title` |
-| IT-6 | 2026-08-28 | _pending_ | Per-row "Trace this intent" / Re-trace with "add a file to check" (through the same disclosure); S10 import-boundary guard test; `CLAUDE.md` invariant-6 amendment + `SEPTEMBER-1-SHIP.md` wording |
+| IT-6 | 2026-08-28 | `4682bb6` | Per-row "Trace this intent" / Re-trace with "add a file to check" (through the same disclosure); S10 import-boundary guard test; `CLAUDE.md` invariant-6 amendment + `SEPTEMBER-1-SHIP.md` wording |
 
 ---
 
