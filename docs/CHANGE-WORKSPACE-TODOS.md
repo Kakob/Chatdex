@@ -55,7 +55,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 
 ### CW-4 — verification
 - [x] `verification.ts` (`deriveVerificationHint`, summary, session test-run discovery, manual/transcript `test_runtime` evidence), `VerificationSection` matrix, `markVerified` gate, tests
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`8cdfc86`)
 
 ### CW-5 — learned, promote, questions
 - [ ] Promotion → understanding object + event with `codeEvidence`; questions; `closeWorkspace`; tests
