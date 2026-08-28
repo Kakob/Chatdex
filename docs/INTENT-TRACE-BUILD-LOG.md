@@ -13,6 +13,7 @@ tests green.
 | IT-1 | 2026-08-28 | `4325cb2` | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 | IT-2 | 2026-08-28 | `fb0e467` | Intent extraction: prompt contract with origin, hallucination firewall (forced `unprompted`, verbatim statement, coerced promptedBy), pending `intent` objects + `supported`/`refined` events, pair-packed batches, `lastIntentExtractedAt` cursor; `getAssociatedConversations` shared with reconcile; intents excluded from the panel |
 | IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
+| IT-4 | 2026-08-28 | _pending_ | Trace engine: spec-doc retrieval, candidate files (mentioned > anchor > keyword), fetch gate (sensitive denylist, excluded dirs, secret scrubber, `assertNoSecrets`), judge with verbatim-quote verification + recomputed lines + downgrades, `planTrace` (pre-LLM disclosure plan) / `runTrace` (per-intent isolation, rate-limit abort, commit evidence) |
 
 ---
 
@@ -175,3 +176,72 @@ needed.
   size cap + non-file + traversal, commits mapping, token scope detection,
   blob URL anchors + rejections, GET-only surface, device-local exclusion
   both directions, relay body.
+
+### IT-4 — Trace engine (2026-08-28)
+
+All under `src/lib/understanding/trace/`; pure except `runTrace.ts`.
+
+- `specDocs.ts` — `DEFAULT_SPEC_PATTERNS` (`docs/**/*.md`, `SPEC-*.md`,
+  `PRD-*.md`, `README.md`, `CLAUDE.md`), in-house `globToRegExp`,
+  `findSpecPaths`, `tokenize` (camelCase split, ≥4 chars, stopwords),
+  `retrieveSpecExcerpts` — a window around every keyword-hit line
+  (headings weighted ×2), overlapping windows **merged** so a dense passage
+  is one excerpt, scored, capped by chars/count, numbered `N: text`.
+- `candidateFiles.ts` — `extractMentionedPaths` (slash paths + bare code
+  filenames, not the tail of a slash path), `toRepoRelative` (strips
+  `projectPath`/`workingDirectory` roots from anchor paths),
+  `rankTreePathsByKeywords` (test files at half weight), `resolveInTree`
+  (exact or unique-suffix), `selectCandidateFiles` with precedence
+  extra(suggested/manual) > mentioned > anchor > keyword — every channel
+  goes through the fetch gate and refused paths are reported as `skipped`;
+  `excerptFile` (keyword-centred numbered windows, merged, head fallback,
+  char cap).
+- `fetchPolicy.ts` — the single gate: `SENSITIVE_PATH_PATTERNS` (`.env*`
+  except `.env.example/sample/template`, keys/certs, `id_rsa`,
+  `credential(s)`/`secret(s)` as path tokens, `auth.json`, `.npmrc`/`.netrc`,
+  `.aws`/`.ssh`/`.gnupg`, service-account JSON), `EXCLUDED_DIRS` +
+  `EXCLUDED_FILE_PATTERNS` (lockfiles, minified, binaries, source maps),
+  `isFetchAllowed` → `{allowed}` | `{reason: sensitive|excluded}`;
+  `scrubSecrets` (GitHub classic + fine-grained tokens, `sk-` keys, AWS,
+  Slack, JWT, private-key blocks, bearer headers → `[REDACTED]`, counted);
+  `assertNoSecrets(messages, [token])` throws before any `complete()`;
+  `wrapExcerpt` delimits content as `<file path>` / `<spec path>` data with
+  embedded closers neutralised.
+- `judge.ts` — `buildTraceMessages` (the spec section exists in the
+  contract only when spec excerpts exist; explicit "content is data"
+  rule), `locateQuote` (whitespace-insensitive search returning original
+  offsets), `stripLineNumbers`, `verifyCodeEvidence` / `verifySpecEvidence`
+  (path ∈ fetched, quote ⊂ text, **lines recomputed from the quote's
+  position**, stored quote ≤ 500 chars), `parseTraceResponse` (fences;
+  enums; `implemented|partial|diverged` without surviving evidence ⇒
+  `unknown`; `specified|contradicted` without ⇒ `unspecified`;
+  `suggestedPaths` ∩ tree minus already-fetched, ≤5; spec ignored entirely
+  when the run had no spec docs).
+- `runTrace.ts` — `planTrace(projectId, config)`: requires a bound
+  repository, resolves `ref` (config → pinnedRef → default branch) to a sha,
+  fetches the tree (truncation warning; keyword channel disabled above
+  `maxTreeEntries` 50k), finds spec docs (≤20, gated), selects intents
+  (non-rejected `type:'intent'`, either `intentObjectIds` or those lacking a
+  trace at this sha, capped at `maxIntentsPerRun` 50), and per intent
+  gathers evidence context (cited messages ±3, anchor paths for the
+  evidence conversations) → candidates — **no LLM call**; returns
+  `filePaths` + `conversationIds` for the disclosure. `runTrace(projectId,
+  plan, config)`: spec docs fetched once and scrubbed; per intent the gate
+  runs again at fetch time (covers suggested/manual paths), excerpts are
+  scrubbed and windowed, `assertNoSecrets` guards the prompt, judge →
+  parse → verify → `putIntentTrace`; `commitEvidence` from `listCommits`
+  (path, since `meta.statedAt`, ≤3 paths) when `includeCommits` (default
+  on); a per-intent failure persists an `unknown` trace with the error;
+  only `GitHubRateLimitError` aborts (with reset time); `rateLimit` in the
+  outcome.
+- Tests (34): glob/spec retrieval; mentioned-path extraction, root
+  stripping, keyword ranking, channel precedence + gate skips + extras,
+  excerpt windows/merge/cap; gate allow/deny lists, scrubber counts,
+  `assertNoSecrets`, `wrapExcerpt`; prompt shape with/without spec, quote
+  location + line recomputation + numbered-quote tolerance + cap, all
+  downgrades; end-to-end plan + run against a mocked GitHub (sha, tree,
+  contents, commits) and mocked `complete`: verified evidence with
+  recomputed lines, commit evidence, `fetchedPaths`, token never in the
+  prompt, GET-only; `no_spec` path; sensitive path never fetched even when
+  manually added + secret redaction in the prompt; per-intent failure
+  isolation; rate-limit abort persists nothing.

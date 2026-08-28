@@ -38,7 +38,7 @@ Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. T
 - [x] `github/credentials.ts` (device-local: `isDeviceLocalMetadata` matches `github.`), `github/client.ts`, `GitHubSection`, `RepoBindingCard`, tests (S1/S2)
 
 ### IT-4 — trace engine
-- [ ] `trace/specDocs.ts`, `candidateFiles.ts`, `fetchPolicy.ts`, `judge.ts`, `runTrace.ts`, tests (S3/S4/S5/S7)
+- [x] `trace/specDocs.ts`, `candidateFiles.ts`, `fetchPolicy.ts`, `judge.ts`, `runTrace.ts`, tests (S3/S4/S5/S7)
 
 ### IT-5 — UI
 - [ ] `IntentTracePage`, table/row, tab + route, `DisclosureModal.title`, RTL tests (S6), guard test (S10)
