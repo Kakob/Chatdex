@@ -63,7 +63,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 
 ### CW-6 — sections, Guided menu, history, inspections
 - [x] Page split into sections + `WorkspaceRail`; `IntentSection`; `GuidedActionMenu` + `guided.ts` + `prepareWorkspaceStore`; `WorkspaceTimeline` + Investigate History tab; `FromWorkspaceLine`; inspection writes; Guided constraint test; RTL page test
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`c21c670`)
 
 ### CW-7 — Assisted mode
 - [ ] Actions + disclosures; `aiSuggested`; tests (S3, S5)
