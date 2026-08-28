@@ -1,6 +1,6 @@
 # Chatdex Change Workspace — Specification
 
-**Status:** Approved for build (v1), 2026-08-28
+**Status:** Built — CW-0…CW-8 committed 2026-08-28 (see build log); §18 manual acceptance passes pending
 **Source PRD:** `docs/PRD-code-ownership-loop.md` (Jacob's "Code Ownership & Understanding Loop" draft, verbatim). References below to "PRD §n" point there.
 **Area:** Prepare Change / Current Understanding / Investigate History
 **Companions:** `docs/CHANGE-WORKSPACE-BUILD-LOG.md` (what was built per milestone), `docs/CHANGE-WORKSPACE-TODOS.md` (Jacob's actions + engineering checklist)

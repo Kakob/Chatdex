@@ -71,4 +71,4 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 
 ### CW-8 — local directory
 - [x] `localDirSource.ts` + `localDir.ts`, `LocalRepositorySection`, Evidence source toggle, device-local `repo.*` keys, `CLAUDE.md` §2.5 sentence, tests (S11)
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`c9a5658`)

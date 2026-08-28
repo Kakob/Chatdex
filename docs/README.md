@@ -26,7 +26,7 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 | **[SPEC-decision-investigation.md](./SPEC-decision-investigation.md)** | Decision Investigation: human-only provenance workbench, cases, exhibits, verdicts | MVP code-complete |
 | **[PRD-shared-understanding-workspace.md](./PRD-shared-understanding-workspace.md)** | Shared Understanding Workspace PRD (stages U0–U6) | Built |
 | **[SPEC-intent-trace.md](./SPEC-intent-trace.md)** | Intent Trace: extract stated intents (unprompted vs reply-to-AI) from chats, trace against spec docs and GitHub code | In progress — see [INTENT-TRACE-BUILD-LOG.md](./INTENT-TRACE-BUILD-LOG.md) |
-| **[SPEC-change-workspace.md](./SPEC-change-workspace.md)** | Change Workspace: intent → evidence → trace → hypothesis → implementation → verification → learned → promote; Guided / Assisted modes (PRD: [PRD-code-ownership-loop.md](./PRD-code-ownership-loop.md)) | In progress — see [CHANGE-WORKSPACE-BUILD-LOG.md](./CHANGE-WORKSPACE-BUILD-LOG.md) |
+| **[SPEC-change-workspace.md](./SPEC-change-workspace.md)** | Change Workspace: intent → evidence → trace → hypothesis → implementation → verification → learned → promote; Guided / Assisted modes (PRD: [PRD-code-ownership-loop.md](./PRD-code-ownership-loop.md)) | Built (CW-0…CW-8) — see [CHANGE-WORKSPACE-BUILD-LOG.md](./CHANGE-WORKSPACE-BUILD-LOG.md); manual §18 passes pending |
 
 ### Vision & Background
 
