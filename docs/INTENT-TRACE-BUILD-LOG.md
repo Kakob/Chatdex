@@ -14,6 +14,7 @@ tests green.
 | IT-2 | 2026-08-28 | `fb0e467` | Intent extraction: prompt contract with origin, hallucination firewall (forced `unprompted`, verbatim statement, coerced promptedBy), pending `intent` objects + `supported`/`refined` events, pair-packed batches, `lastIntentExtractedAt` cursor; `getAssociatedConversations` shared with reconcile; intents excluded from the panel |
 | IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 | IT-4 | 2026-08-28 | `628e00a` | Trace engine: spec-doc retrieval, candidate files (mentioned > anchor > keyword), fetch gate (sensitive denylist, excluded dirs, secret scrubber, `assertNoSecrets`), judge with verbatim-quote verification + recomputed lines + downgrades, `planTrace` (pre-LLM disclosure plan) / `runTrace` (per-intent isolation, rate-limit abort, commit evidence) |
+| IT-5 | 2026-08-28 | _pending_ | Intent Trace tab (`/projects/:id/intents`): matrix rows with origin/polarity/status chips, evidence deep links, review, history; expandable spec/impl evidence with validated blob links + commit evidence; filters; Extract / Trace runs with their two disclosures; `DisclosureModal.title` |
 
 ---
 
@@ -245,3 +246,53 @@ All under `src/lib/understanding/trace/`; pure except `runTrace.ts`.
   prompt, GET-only; `no_spec` path; sensitive path never fetched even when
   manually added + secret redaction in the prompt; per-intent failure
   isolation; rate-limit abort persists nothing.
+
+### IT-5 — Intent Trace tab (2026-08-28)
+
+- `src/lib/understanding/intents/intentMatrix.ts` — read model:
+  `assembleIntentRows(objects, events, traces, conversationNames)` (pure;
+  rejected intents excluded; evidence = union of the object's non-rejected
+  events via `mergeEvidence`; newest trace + trace count per intent; rows
+  newest-stated first) and `loadIntentMatrix(projectId)`; label maps
+  `POLARITY_LABEL` / `ORIGIN_LABEL` / `SPEC_STATUS_LABEL` /
+  `IMPL_STATUS_LABEL` live here (not in a component file — fast-refresh
+  rule).
+- `src/pages/IntentTracePage.tsx` (route `/projects/:id/intents`; fourth
+  workspace tab **Intent Trace** between Current Understanding and Prepare
+  Change): header copy states the origin semantics and that the matrix is
+  triage, not verdict; "Last traced against owner/repo@sha" with a stale
+  hint when the default branch head has moved (cheap `resolveRef`, failure
+  tolerated, skipped for pinned refs); provider select (when >1 ready),
+  reply-filter select (`lenient` / `strict` / `off` = "Send all replies");
+  **Extract intents** (cursor → auto-disclosed full re-run when nothing is
+  new; `DisclosureModal` with `actionLabel="Intent extraction"`) and
+  **Trace against repo** (disabled with a stated reason until a repository
+  is bound / a provider is ready; `planTrace` first — no LLM — then a
+  `DisclosureModal` titled "Send repository excerpts to {provider}?" whose
+  `sendsDescription` states intent count, file count, repo@sha, spec-doc
+  count, and that excerpts are stored encrypted; the conversation list still
+  flags cross-provider transfer); progress line; outcome toasts (extraction
+  counts incl. replies sent/considered; trace counts, rate-limit remaining,
+  abort); collapsible warnings panel; filters for origin / polarity / spec
+  / implementation (incl. "not traced") / review state with an "n of m"
+  count; `RepoBindingCard` shown inline when unbound; token / OpenAI
+  overhead hints; `HistoryDrawer` per row.
+- `src/components/intents/IntentTraceTable.tsx` + `IntentTraceRow.tsx` —
+  columns Stated (source chips, origin chip, polarity chip, pending chip,
+  stated date, title, verbatim body, `EvidenceLinks`, `ReviewButtons`,
+  history) / Spec (status chip) / Implementation (status chip + "evidence"
+  expander with trace count). Expanded: repo@sha + date + model, spec
+  rationale + evidence, implementation rationale + evidence with
+  `path L{a}–L{b}` links, "Not checked: …" suggestions, commits touching
+  the file after the intent was stated, "Checked: …" fetched paths, trace
+  warnings. **Link hygiene (audit S6):** every link is built by `blobUrl`
+  (a malformed owner/sha yields plain text, never a link), commit URLs pass
+  `isGitHubWebUrl`, all external links carry `rel="noopener noreferrer"`,
+  and quotes/paths render as text nodes.
+- `DisclosureModal` gains an optional `title` prop.
+- Tests: `src/pages/IntentTracePage.test.tsx` (4, RTL): chips/statuses
+  render, `<script>` in a quote is text, Trace disabled + binding card when
+  unbound, blob link href/rel from the validated builder, suggestions
+  shown; origin filter narrows + "1 of 2", accept flips review state and
+  clears the pending chip; malformed owner ⇒ no link; bound repo ⇒ Trace
+  enabled + last-traced line.

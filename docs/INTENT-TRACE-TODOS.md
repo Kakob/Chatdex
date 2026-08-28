@@ -41,7 +41,8 @@ Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. T
 - [x] `trace/specDocs.ts`, `candidateFiles.ts`, `fetchPolicy.ts`, `judge.ts`, `runTrace.ts`, tests (S3/S4/S5/S7)
 
 ### IT-5 — UI
-- [ ] `IntentTracePage`, table/row, tab + route, `DisclosureModal.title`, RTL tests (S6), guard test (S10)
+- [x] `IntentTracePage`, table/row, tab + route, `DisclosureModal.title`, RTL tests (S6)
+- [ ] guard test (S10) — import-boundary test (IT-6)
 
 ### IT-6 — polish + docs
 - [ ] Commit evidence, re-trace / add-file, warnings panel

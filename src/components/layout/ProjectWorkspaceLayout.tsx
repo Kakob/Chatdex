@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom';
-import { FolderKanban, History, Lightbulb, PencilRuler } from 'lucide-react';
+import { FolderKanban, GitCompare, History, Lightbulb, PencilRuler } from 'lucide-react';
 import { getUnderstandingProject, getAssociationsForProject } from '../../lib/db/understanding';
 import { countPendingForProject } from '../../lib/understanding/pendingReviews';
 import type { UnderstandingProject } from '../../types/understanding';
@@ -8,6 +8,7 @@ import type { UnderstandingProject } from '../../types/understanding';
 const WORKFLOW_TABS = [
   { segment: 'investigate', label: 'Investigate History', icon: History },
   { segment: 'understanding', label: 'Current Understanding', icon: Lightbulb },
+  { segment: 'intents', label: 'Intent Trace', icon: GitCompare },
   { segment: 'prepare', label: 'Prepare Change', icon: PencilRuler },
 ] as const;
 
