@@ -105,7 +105,9 @@ export function assembleCurrentUnderstanding(
 ): CurrentUnderstanding {
   const recentLimit = options.recentLimit ?? DEFAULT_RECENT_LIMIT;
 
-  const included = objects.filter((o) => o.reviewState !== 'rejected');
+  // Intents (SPEC-intent-trace) have their own tab; keeping them out here
+  // also keeps their events out of the recent-changes stream.
+  const included = objects.filter((o) => o.reviewState !== 'rejected' && o.type !== 'intent');
   const includedIds = new Set(included.map((o) => o.id));
   // Rejected events are kept in Dexie as audit trail but assert nothing:
   // they contribute no evidence and don't appear in recent changes. Pending

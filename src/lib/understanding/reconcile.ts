@@ -305,6 +305,27 @@ function isFreshlyReconciledChat(c: StoredConversation): boolean {
  * both filters (true full re-run). Exported so the UI can disclose exactly
  * this set.
  */
+/**
+ * Conversations linked to a project through non-rejected associations,
+ * optionally narrowed to `conversationIds`. Unordered; the shared base for
+ * reconciliation and intent extraction (SPEC-intent-trace §7.4), which apply
+ * their own cursors on top.
+ */
+export async function getAssociatedConversations(
+  projectId: string,
+  conversationIds?: string[]
+): Promise<StoredConversation[]> {
+  const associations = (await getAssociationsForProject(projectId)).filter(
+    (a) => a.reviewState !== 'rejected'
+  );
+  let convIds = [...new Set(associations.map((a) => a.conversationId))];
+  if (conversationIds) {
+    const scope = new Set(conversationIds);
+    convIds = convIds.filter((id) => scope.has(id));
+  }
+  return db.conversations.where('id').anyOf(convIds).toArray();
+}
+
 export async function getReconcilableConversations(
   projectId: string,
   ignoreCursor = false,
@@ -314,15 +335,7 @@ export async function getReconcilableConversations(
   if (!project) {
     throw new Error(`Cannot reconcile: project ${projectId} not found`);
   }
-  const associations = (await getAssociationsForProject(projectId)).filter(
-    (a) => a.reviewState !== 'rejected'
-  );
-  let convIds = [...new Set(associations.map((a) => a.conversationId))];
-  if (conversationIds) {
-    const scope = new Set(conversationIds);
-    convIds = convIds.filter((id) => scope.has(id));
-  }
-  return (await db.conversations.where('id').anyOf(convIds).toArray())
+  return (await getAssociatedConversations(projectId, conversationIds))
     .filter(
       (c) =>
         ignoreCursor ||
