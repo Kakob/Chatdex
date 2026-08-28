@@ -29,7 +29,7 @@ Companion to `docs/SPEC-intent-trace.md`. Two lists: things **Jacob** has to do 
 - [x] Build-log row
 
 ### IT-1 — pairs + heuristic
-- [ ] `intents/pairs.ts`, `intents/heuristic.ts`, fixtures, recall + timing tests (S8)
+- [x] `intents/pairs.ts`, `intents/heuristic.ts`, fixtures, recall + timing tests (S8)
 
 ### IT-2 — extraction
 - [ ] `intents/extraction.ts`, `intents/runExtraction.ts`, `getAssociatedConversations` refactor, panel exclusion, tests

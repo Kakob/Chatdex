@@ -30,6 +30,7 @@ phase, plus operational notes that affect deployment.
 | U4.4 | 2026-08-09 | `640f076` | Map spike: chain-lane timeline view (SVG, no graph lib); §13 coverage review recorded — cross-project recurrence parked as list candidate |
 | Intent Trace spec | 2026-08-28 | `708929b` | `docs/SPEC-intent-trace.md`: intents (unprompted vs reply-to-AI) traced against spec docs + GitHub code; security audit S1–S10 |
 | IT-0 | 2026-08-28 | `b7fd63f` | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
+| IT-1 | 2026-08-28 | _pending_ | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 
 ---
 
@@ -711,3 +712,34 @@ the backend before the frontend** — a frontend that pushes a trace to an
 older backend gets a 400 on the whole push batch (same failure shape as the
 U1.1 kind-widening note above). `'intent_trace'` is 12 chars, within the
 varchar(32) already applied to Neon; no migration needed.
+
+### IT-1 — Deterministic pair selection + heuristic (2026-08-28)
+
+- `src/lib/understanding/intents/pairs.ts` — `selectIntentPairs(conversationId,
+  messages, config)`: runs `normalizeSession` (read-only reuse of the
+  detection substrate, §2.5), groups `user_msg` steps per message, and walks
+  **backward** over `tool_call`/`tool_result` steps to the nearest
+  `agent_text`, gathering every text step of that assistant message (Claude
+  Code splits one message's text around its tool blocks). `promptI` /
+  `replyI` are positions in the full stored message list — the same `i`
+  convention as discovery digests. `promptI: null` when nothing from the
+  assistant directly precedes (opening message, or a second consecutive user
+  message) — the §2.2 forced-`unprompted` case. Prompt text kept from the
+  tail (600 chars), reply from the head (800), previous user message as
+  context (200); `promptedByQuestion` is a deterministic hint (trailing `?`,
+  `?` in the last 300 chars, or an options list). Pasted logs/code are
+  skipped (`looksPasted`: ≥70% machine-shaped lines, or >4000 chars with no
+  first-person verb). Cap 60 pairs per conversation, most recent win.
+  Tool-result-only user messages never form pairs.
+- `src/lib/understanding/intents/heuristic.ts` — `INTENT_PATTERNS` (desire /
+  modal / reaction / directive / product, all linear — audit S8),
+  `scoreIntentReply` → `{ keep, matched }`, `filterPairs`. Modes: `lenient`
+  (default; also keeps any reply ≤400 chars that answers a question),
+  `strict` (patterns only), `off` (send everything — the UI's "send all
+  replies").
+- Tests (24): plain and Claude Code fixtures, consecutive user messages,
+  system messages skipped but indexes preserved, pasted-trace skip with
+  context carry-over, tail/head truncation, per-conversation cap; heuristic
+  recall ≥95% on 26 hand-labelled casual intents **by pattern alone**
+  (`promptedByQuestion` off), short-answer rule, strict/off behaviour,
+  linear-pattern guard, and a 10 KB adversarial timing test.
