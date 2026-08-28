@@ -30,7 +30,7 @@ phase, plus operational notes that affect deployment.
 | U4.4 | 2026-08-09 | `640f076` | Map spike: chain-lane timeline view (SVG, no graph lib); §13 coverage review recorded — cross-project recurrence parked as list candidate |
 | Intent Trace spec | 2026-08-28 | `708929b` | `docs/SPEC-intent-trace.md`: intents (unprompted vs reply-to-AI) traced against spec docs + GitHub code; security audit S1–S10 |
 | IT-0 | 2026-08-28 | `b7fd63f` | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
-| IT-1 | 2026-08-28 | _pending_ | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
+| IT-1 | 2026-08-28 | `4325cb2` | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 
 ---
 
