@@ -14,7 +14,7 @@ tests green.
 | IT-2 | 2026-08-28 | `fb0e467` | Intent extraction: prompt contract with origin, hallucination firewall (forced `unprompted`, verbatim statement, coerced promptedBy), pending `intent` objects + `supported`/`refined` events, pair-packed batches, `lastIntentExtractedAt` cursor; `getAssociatedConversations` shared with reconcile; intents excluded from the panel |
 | IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 | IT-4 | 2026-08-28 | `628e00a` | Trace engine: spec-doc retrieval, candidate files (mentioned > anchor > keyword), fetch gate (sensitive denylist, excluded dirs, secret scrubber, `assertNoSecrets`), judge with verbatim-quote verification + recomputed lines + downgrades, `planTrace` (pre-LLM disclosure plan) / `runTrace` (per-intent isolation, rate-limit abort, commit evidence) |
-| IT-5 | 2026-08-28 | _pending_ | Intent Trace tab (`/projects/:id/intents`): matrix rows with origin/polarity/status chips, evidence deep links, review, history; expandable spec/impl evidence with validated blob links + commit evidence; filters; Extract / Trace runs with their two disclosures; `DisclosureModal.title` |
+| IT-5 | 2026-08-28 | `6e0e8a8` | Intent Trace tab (`/projects/:id/intents`): matrix rows with origin/polarity/status chips, evidence deep links, review, history; expandable spec/impl evidence with validated blob links + commit evidence; filters; Extract / Trace runs with their two disclosures; `DisclosureModal.title` |
 
 ---
 
