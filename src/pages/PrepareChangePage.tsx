@@ -494,7 +494,7 @@ function PreparedChangeBuilder({
 
 function StateChip({ state }: { state: PreparedChange['state'] }) {
   const tone =
-    state === 'ready'
+    state === 'ready' || state === 'verified' || state === 'closed'
       ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
       : state === 'superseded'
         ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'

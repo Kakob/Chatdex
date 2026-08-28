@@ -216,6 +216,71 @@ describe('prepared change sync serializer', () => {
     expect(env.parentId).toBe('up-1');
     expect(throughWire(env.payload, rehydratePreparedChange)).toEqual(change);
   });
+
+  it('round-trips a fully populated Change Workspace and keeps sections out of the cleartext envelope (S9)', () => {
+    const iso = '2026-08-28T10:00:00.000Z';
+    const change: PreparedChange = {
+      id: 'pc-2',
+      projectId: 'up-1',
+      title: 'Search result scrolls to the match',
+      state: 'closed',
+      desiredOutcome: 'Opens and scrolls.',
+      rationale: 'Search is navigation.',
+      nonGoals: [],
+      constraints: [],
+      acceptanceCriteria: ['The match enters the viewport.'],
+      openImplementationChoices: [],
+      understandingPointIds: [],
+      investigationFindingIds: [],
+      evidenceRefs: [],
+      intent: { currentBehavior: 'Opens only.', desiredBehavior: 'Opens and scrolls.', whyItMatters: 'Search is navigation.' },
+      criteria: [{ id: 'c1', text: 'The match enters the viewport.', createdAt: iso }],
+      evidence: [
+        {
+          id: 'e1', kind: 'code', createdAt: iso, origin: 'user', addedVia: 'search',
+          repoKey: 'gh:Kakob/Chatdex', sha: 'a'.repeat(40), path: 'src/pages/SearchPage.tsx',
+          startLine: 10, endLine: 12, quote: 'navigate(...)', quoteHash: 'deadbeef',
+        },
+        {
+          id: 'e2', kind: 'ai_inference', createdAt: iso, origin: 'ai', addedVia: 'assisted',
+          runId: 'run-1', provider: 'anthropic', promptDigest: 'abc', text: 'Maybe here.', checkedAgainst: ['e1'],
+        },
+      ],
+      trace: {
+        nodes: [
+          { id: 'n1', label: 'SearchPage', kind: 'component', evidenceIds: ['e1'], order: 0 },
+          { id: 'n2', label: '???', kind: 'unknown', evidenceIds: [], order: 1 },
+        ],
+        edges: [{ id: 'x1', from: 'n1', to: 'n2', claim: 'navigates', evidenceIds: [], origin: 'user' }],
+      },
+      hypotheses: [{ id: 'h1', text: 'Only the conversation id survives.', createdAt: iso, frozenAt: iso, origin: 'user' }],
+      implementation: {
+        source: 'claude_code_session', provenance: 'ai', conversationId: 'conv-1',
+        files: [{ path: 'src/pages/ConversationsPage.tsx', additions: 12, deletions: 3 }], attachedAt: iso,
+      },
+      implementationHistory: [],
+      verification: [{ criterionId: 'c1', evidenceIds: ['e1'], status: 'supported', updatedAt: iso }],
+      learned: { text: 'Scrolling belongs to ConversationsPage.', createdAt: iso, updatedAt: iso, aiSuggested: 'draft' },
+      promotions: [{ evidenceIds: ['e1'], understandingObjectId: 'uo-9', promotedAt: iso }],
+      questionIds: ['uo-q1'],
+      mode: 'guided',
+      modeHistory: [{ mode: 'guided', at: iso }],
+      originRef: { kind: 'manual' },
+      createdAt,
+      updatedAt,
+      readyAt: updatedAt,
+      implementingAt: updatedAt,
+      verifiedAt: updatedAt,
+      closedAt: updatedAt,
+    };
+    const env = envelopePreparedChange(change);
+    expect(Object.keys(env).sort()).toEqual(['kind', 'parentId', 'payload', 'updatedAt']);
+    const revived = throughWire(env.payload, rehydratePreparedChange);
+    expect(revived).toEqual(change);
+    for (const key of ['implementingAt', 'verifiedAt', 'closedAt'] as const) {
+      expect(revived[key]).toBeInstanceOf(Date);
+    }
+  });
 });
 
 describe('investigation finding sync serializer', () => {

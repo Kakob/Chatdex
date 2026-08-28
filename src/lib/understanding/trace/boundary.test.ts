@@ -25,11 +25,21 @@ function importsOf(file: string): string[] {
   return [...text.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
 }
 
-const FORBIDDEN = [/\/github(\/|$)/, /\/understanding\/intents(\/|$)/, /\/understanding\/trace(\/|$)/, /\/providers(\/|$)/];
+// SPEC-change-workspace §2.6 adds prepare/ and repo/ to the forbidden set
+// (audit S10): the workspace may read investigation types/db helpers, never
+// the reverse.
+const FORBIDDEN = [
+  /\/github(\/|$)/,
+  /\/understanding\/intents(\/|$)/,
+  /\/understanding\/trace(\/|$)/,
+  /\/providers(\/|$)/,
+  /\/prepare(\/|$)/,
+  /\/repo(\/|$)/,
+];
 
 describe('boundary law (§2.5)', () => {
   for (const layer of ['lib/detection', 'lib/investigation']) {
-    it(`${layer} never imports the GitHub client, intent/trace modules, or the LLM providers`, () => {
+    it(`${layer} never imports the GitHub client, intent/trace modules, the LLM providers, or the Change Workspace`, () => {
       const offenders: string[] = [];
       for (const file of walk(join(ROOT, layer))) {
         for (const spec of importsOf(file)) {

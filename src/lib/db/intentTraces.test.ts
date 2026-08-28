@@ -36,8 +36,9 @@ function makeTrace(overrides: Partial<IntentTrace> = {}): IntentTrace {
 }
 
 describe('intentTraces table (Dexie v11)', () => {
-  it('is at schema version 11 and round-trips Date fields', async () => {
-    expect(db.verno).toBe(11);
+  it('is at or past schema version 11 and round-trips Date fields', async () => {
+    // v12 added the Change Workspace local-only tables (localOnly.test.ts pins it).
+    expect(db.verno).toBeGreaterThanOrEqual(11);
     const trace = makeTrace({
       commitEvidence: [
         {

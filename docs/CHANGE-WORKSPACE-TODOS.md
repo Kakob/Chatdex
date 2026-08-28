@@ -28,16 +28,16 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build log + this file
 
 ### CW-0 — types, lifecycle, local-only tables
-- [ ] `src/types/evidence.ts` (`EvidenceKind`, `EvidenceItem` union, caps)
-- [ ] `src/types/preparedChange.ts` — widened `state`, optional sections, `Criterion` / `TraceNode` / `TraceEdge` / `Hypothesis` / `Implementation` / `VerificationRow`, top-level lifecycle Dates
-- [ ] `src/types/understanding.ts` — `UnderstandingEvent.codeEvidence?`
-- [ ] `src/types/repo.ts` — `RepoFileRow`, `InspectionRow`
-- [ ] `src/lib/prepare/editability.ts`, `src/lib/prepare/lifecycle.ts`
-- [ ] `src/lib/prepare/changes.ts` — relaxed creation, either/or validation, draft patch for `intent` / `criteria`
-- [ ] Dexie v12 `repoFiles` + `inspections`; `src/lib/db/repoFiles.ts`, `src/lib/db/inspections.ts`; `clearAllData()`
-- [ ] `src/lib/sync/serializer.ts` — revive `implementingAt` / `verifiedAt` / `closedAt`
-- [ ] Boundary guard extended (S10)
-- [ ] Tests: lifecycle, editability, changes, serializer identity + S9, Dexie v12 + S1
+- [x] `src/types/evidence.ts` (`EvidenceKind`, `EvidenceItem` union, caps)
+- [x] `src/types/preparedChange.ts` — widened `state`, optional sections, `Criterion` / `TraceNode` / `TraceEdge` / `Hypothesis` / `Implementation` / `VerificationRow`, top-level lifecycle Dates
+- [x] `src/types/understanding.ts` — `UnderstandingEvent.codeEvidence?`
+- [x] `src/types/repo.ts` — `RepoFileRow`, `InspectionRow`
+- [x] `src/lib/prepare/editability.ts`, `src/lib/prepare/lifecycle.ts`
+- [x] `src/lib/prepare/changes.ts` — relaxed creation, either/or validation, draft patch for `intent` / `criteria`
+- [x] Dexie v12 `repoFiles` + `inspections`; `src/lib/db/repoFiles.ts`, `src/lib/db/inspections.ts`; `clearAllData()`
+- [x] `src/lib/sync/serializer.ts` — revive `implementingAt` / `verifiedAt` / `closedAt`
+- [x] Boundary guard extended (S10)
+- [x] Tests: lifecycle, editability, changes, serializer identity + S9, Dexie v12 + S1
 - [ ] Build-log row + commit hash
 
 ### CW-1 — repository search

@@ -30,6 +30,7 @@ import type {
 } from '../../types/investigation';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { IntentTrace } from '../../types/intentTrace';
+import type { RepoFileRow, InspectionRow } from '../../types/repo';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -62,6 +63,8 @@ export class ChatdexDB extends Dexie {
   preparedChanges!: Table<PreparedChange, string>;
   investigationFindings!: Table<InvestigationFinding, string>;
   intentTraces!: Table<IntentTrace, string>;
+  repoFiles!: Table<RepoFileRow, [string, string, string]>;
+  inspections!: Table<InspectionRow, string>;
 
   constructor() {
     super('chatdex');
@@ -162,6 +165,15 @@ export class ChatdexDB extends Dexie {
     this.version(11).stores({
       intentTraces:
         '&id, projectId, intentObjectId, createdAt, [projectId+createdAt], [intentObjectId+createdAt]',
+    });
+    // v12: Change Workspace local caches (SPEC-change-workspace §7.2).
+    // BOTH LOCAL-ONLY — never hooked into the sync engine (law §2.5, D3, D9):
+    // `repoFiles` holds whole repository files for client-side search (the
+    // synced workspace keeps only capped quotes); `inspections` is the
+    // human view log behind PRD §17 counts.
+    this.version(12).stores({
+      repoFiles: '&[repoKey+sha+path], repoKey, sha, [repoKey+sha]',
+      inspections: '&id, workspaceId, projectId, [projectId+targetKey], at',
     });
   }
 }

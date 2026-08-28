@@ -1,3 +1,5 @@
+import type { EvidenceItem } from './evidence';
+
 // Shared-understanding-workspace entities (PRD-shared-understanding-workspace.md §6-§11).
 // Stored plaintext in IndexedDB, ciphertext in Postgres via the sync layer —
 // same privacy posture as findings/detector runs.
@@ -140,6 +142,11 @@ export interface UnderstandingEvent {
   /** For 'superseded': the object that replaces this one, when known. */
   supersededByObjectId?: string;
   evidence: EvidenceRef[];
+  /**
+   * Code / test evidence promoted from a Change Workspace
+   * (SPEC-change-workspace §8, §12). Unindexed; optional.
+   */
+  codeEvidence?: EvidenceItem[];
   origin: UnderstandingOrigin;
   /** 'pending' events are proposals: recorded, visible, but not yet applied. */
   reviewState: ReviewState;

@@ -149,4 +149,56 @@ describe('Prepared Change', () => {
     expect(json.understanding[0].id).toBe(point.id);
     expect(json.state).toBe('ready');
   });
+
+  it('can start from a stated intent with no accepted understanding (SPEC-change-workspace D7)', async () => {
+    const { project } = await fixture();
+    let change = await createPreparedChange({
+      projectId: project.id,
+      title: 'Search result scrolls to the match',
+      understandingPointIds: [],
+      intent: {
+        currentBehavior: 'Opens the conversation only.',
+        desiredBehavior: 'Opens and scrolls to the match.',
+        whyItMatters: 'Search is navigation.',
+      },
+      originRef: { kind: 'manual' },
+    });
+    expect(change.understandingPointIds).toEqual([]);
+    expect(change.desiredOutcome).toBe('Opens and scrolls to the match.');
+    expect(change.rationale).toBe('Search is navigation.');
+    expect(await validatePreparedChange(change)).toEqual(['At least one acceptance criterion']);
+
+    change = await updatePreparedChangeDraft(change.id, {
+      criteria: [
+        { id: '', text: '  The match enters the viewport. ', createdAt: '' },
+        { id: '', text: 'The match enters the viewport.', createdAt: '' },
+        { id: 'c2', text: 'Works after a cold load.', createdAt: '2026-08-28T00:00:00.000Z' },
+      ],
+    });
+    expect(change.criteria).toHaveLength(2);
+    expect(change.criteria?.[0].id).toBeTruthy();
+    expect(change.criteria?.[1]).toMatchObject({ id: 'c2', createdAt: '2026-08-28T00:00:00.000Z' });
+    expect(change.acceptanceCriteria).toEqual([
+      'The match enters the viewport.',
+      'Works after a cold load.',
+    ]);
+    const ready = await markPreparedChangeReady(change.id);
+    expect(ready.state).toBe('ready');
+    expect(ready.evidenceRefs).toEqual([]);
+  });
+
+  it('still refuses a workspace with neither understanding nor a stated desired behavior', async () => {
+    const { project } = await fixture();
+    const change = await createPreparedChange({
+      projectId: project.id,
+      title: 'Empty',
+      understandingPointIds: [],
+    });
+    expect(await validatePreparedChange(change)).toEqual([
+      'Desired outcome',
+      'Accepted understanding or a stated desired behavior',
+      'At least one acceptance criterion',
+    ]);
+    await expect(markPreparedChangeReady(change.id)).rejects.toThrow(/not ready/);
+  });
 });

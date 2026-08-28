@@ -2,9 +2,12 @@ import { db } from '../db/schema';
 import { getPreparedChange, putPreparedChange } from '../db/preparedChanges';
 import { generateId } from '../utils/ids';
 import type {
+  Criterion,
   PreparedChange,
   PreparedChangeEvidenceRef,
   PreparedChangeRepositoryRef,
+  WorkspaceIntent,
+  WorkspaceOriginRef,
 } from '../../types/preparedChange';
 import type { ReviewState, UnderstandingObject } from '../../types/understanding';
 
@@ -13,7 +16,13 @@ const ACCEPTED_REVIEW_STATES: ReadonlySet<ReviewState> = new Set(['accepted', 'e
 export interface CreatePreparedChangeInput {
   projectId: string;
   title: string;
+  /**
+   * May be empty (SPEC-change-workspace D7): a workspace can start from a
+   * bug, question, or manual intent with no accepted understanding yet.
+   */
   understandingPointIds: string[];
+  intent?: WorkspaceIntent;
+  originRef?: WorkspaceOriginRef;
 }
 
 export type PreparedChangeDraftPatch = Partial<
@@ -28,6 +37,9 @@ export type PreparedChangeDraftPatch = Partial<
     | 'openImplementationChoices'
     | 'understandingPointIds'
     | 'repositoryRef'
+    | 'intent'
+    | 'criteria'
+    | 'originRef'
   >
 >;
 
@@ -49,14 +61,45 @@ function cleanRepositoryRef(
     : undefined;
 }
 
+function cleanIntent(intent: WorkspaceIntent | undefined): WorkspaceIntent | undefined {
+  if (!intent) return undefined;
+  const cleaned: WorkspaceIntent = {
+    currentBehavior: intent.currentBehavior.trim(),
+    desiredBehavior: intent.desiredBehavior.trim(),
+    whyItMatters: intent.whyItMatters.trim(),
+  };
+  return cleaned.currentBehavior || cleaned.desiredBehavior || cleaned.whyItMatters
+    ? cleaned
+    : undefined;
+}
+
+function cleanCriteria(criteria: Criterion[]): Criterion[] {
+  const seenText = new Set<string>();
+  const out: Criterion[] = [];
+  for (const criterion of criteria) {
+    const text = criterion.text.trim();
+    if (!text || seenText.has(text)) continue;
+    seenText.add(text);
+    out.push({
+      id: criterion.id || generateId(),
+      text,
+      createdAt: criterion.createdAt || new Date().toISOString(),
+    });
+  }
+  return out;
+}
+
+/** Structured criteria are the source of truth; the export reads the mirrored strings. */
+function mirrorCriteria(criteria: Criterion[]): string[] {
+  return criteria.map((c) => c.text);
+}
+
 async function requireAcceptedUnderstanding(
   projectId: string,
   ids: string[]
 ): Promise<UnderstandingObject[]> {
   const uniqueIds = [...new Set(ids)];
-  if (uniqueIds.length === 0) {
-    throw new Error('Select at least one accepted Current Understanding point');
-  }
+  if (uniqueIds.length === 0) return [];
   const rows = await db.understandingObjects.bulkGet(uniqueIds);
   return rows.map((row, index) => {
     if (!row) throw new Error(`Understanding point not found: ${uniqueIds[index]}`);
@@ -112,6 +155,13 @@ export async function createPreparedChange(
     createdAt: now,
     updatedAt: now,
   };
+  const intent = cleanIntent(input.intent);
+  if (intent) {
+    change.intent = intent;
+    change.desiredOutcome = intent.desiredBehavior;
+    change.rationale = intent.whyItMatters;
+  }
+  if (input.originRef) change.originRef = input.originRef;
   await putPreparedChange(change);
   return change;
 }
@@ -134,17 +184,32 @@ export async function updatePreparedChangeDraft(
       : [...new Set(patch.understandingPointIds)];
   await requireAcceptedUnderstanding(current.projectId, understandingPointIds);
 
+  // Intent mirrors into the handoff fields unless those are patched explicitly.
+  const intent = patch.intent !== undefined ? cleanIntent(patch.intent) : current.intent;
+  const desiredOutcome =
+    patch.desiredOutcome?.trim() ??
+    (patch.intent !== undefined && intent ? intent.desiredBehavior : current.desiredOutcome);
+  const rationale =
+    patch.rationale?.trim() ??
+    (patch.intent !== undefined && intent ? intent.whyItMatters : current.rationale);
+  const criteria = patch.criteria ? cleanCriteria(patch.criteria) : current.criteria;
+  const acceptanceCriteria = patch.criteria
+    ? mirrorCriteria(criteria ?? [])
+    : patch.acceptanceCriteria
+      ? cleanLines(patch.acceptanceCriteria)
+      : current.acceptanceCriteria;
+
   const updated: PreparedChange = {
     ...current,
     ...patch,
     title: patch.title?.trim() ?? current.title,
-    desiredOutcome: patch.desiredOutcome?.trim() ?? current.desiredOutcome,
-    rationale: patch.rationale?.trim() ?? current.rationale,
+    desiredOutcome,
+    rationale,
+    ...(intent ? { intent } : {}),
+    ...(criteria ? { criteria } : {}),
     nonGoals: patch.nonGoals ? cleanLines(patch.nonGoals) : current.nonGoals,
     constraints: patch.constraints ? cleanLines(patch.constraints) : current.constraints,
-    acceptanceCriteria: patch.acceptanceCriteria
-      ? cleanLines(patch.acceptanceCriteria)
-      : current.acceptanceCriteria,
+    acceptanceCriteria,
     openImplementationChoices: patch.openImplementationChoices
       ? cleanLines(patch.openImplementationChoices)
       : current.openImplementationChoices,
@@ -155,6 +220,8 @@ export async function updatePreparedChangeDraft(
         : current.repositoryRef,
     updatedAt: new Date(),
   };
+  if (!intent) delete updated.intent;
+  if (!criteria) delete updated.criteria;
   await putPreparedChange(updated);
   return updated;
 }
@@ -164,13 +231,17 @@ export async function validatePreparedChange(
 ): Promise<string[]> {
   const missing: string[] = [];
   if (!change.desiredOutcome.trim()) missing.push('Desired outcome');
-  if (change.understandingPointIds.length === 0) missing.push('Accepted understanding');
+  // D7: a workspace is grounded by accepted understanding OR a stated intent.
+  const hasIntent = Boolean(change.intent?.desiredBehavior.trim());
+  if (change.understandingPointIds.length === 0 && !hasIntent) {
+    missing.push('Accepted understanding or a stated desired behavior');
+  }
   if (change.acceptanceCriteria.length === 0) missing.push('At least one acceptance criterion');
 
-  try {
-    await requireAcceptedUnderstanding(change.projectId, change.understandingPointIds);
-  } catch {
-    if (!missing.includes('Accepted understanding')) {
+  if (change.understandingPointIds.length > 0) {
+    try {
+      await requireAcceptedUnderstanding(change.projectId, change.understandingPointIds);
+    } catch {
       missing.push('Accepted understanding that still resolves');
     }
   }

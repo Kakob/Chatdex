@@ -458,6 +458,9 @@ export function envelopePreparedChange(
       createdAt: dateToIso(change.createdAt),
       updatedAt: dateToIso(change.updatedAt),
       ...(change.readyAt ? { readyAt: dateToIso(change.readyAt) } : {}),
+      ...(change.implementingAt ? { implementingAt: dateToIso(change.implementingAt) } : {}),
+      ...(change.verifiedAt ? { verifiedAt: dateToIso(change.verifiedAt) } : {}),
+      ...(change.closedAt ? { closedAt: dateToIso(change.closedAt) } : {}),
     },
   };
 }
@@ -467,12 +470,21 @@ export function rehydratePreparedChange(payload: unknown): PreparedChange {
     createdAt: string;
     updatedAt: string;
     readyAt?: string;
+    implementingAt?: string;
+    verifiedAt?: string;
+    closedAt?: string;
   };
+  // Workspace sections (SPEC-change-workspace §7.1) carry ISO strings inside
+  // (D11) and pass through the spread untouched; only top-level lifecycle
+  // timestamps are revived here.
   return {
     ...change,
     createdAt: isoToDate(change.createdAt),
     updatedAt: isoToDate(change.updatedAt),
     ...(change.readyAt ? { readyAt: isoToDate(change.readyAt) } : {}),
+    ...(change.implementingAt ? { implementingAt: isoToDate(change.implementingAt) } : {}),
+    ...(change.verifiedAt ? { verifiedAt: isoToDate(change.verifiedAt) } : {}),
+    ...(change.closedAt ? { closedAt: isoToDate(change.closedAt) } : {}),
   };
 }
 
