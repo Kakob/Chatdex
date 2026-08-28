@@ -67,7 +67,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 
 ### CW-7 — Assisted mode
 - [x] `assisted.ts` (plan / run / parse firewall / apply), `AssistedSection` with unlock + disclosure, `aiSuggested` + adopt-hypothesis flows; tests (S2, S3, S5)
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`8773ab8`)
 
 ### CW-8 — local directory
 - [ ] `localDirSource.ts`, Settings entry, tests (S11)
