@@ -7,6 +7,7 @@
 // least one EvidenceRef is rejected. User-origin objects may omit evidence
 // (the user asserting something directly is its own provenance).
 
+import type { EvidenceItem } from '../../types/evidence';
 import { db } from './schema';
 import { generateId } from '../utils/ids';
 import type {
@@ -157,6 +158,8 @@ export interface CreateUnderstandingObjectInput {
   occurredAt: Date;
   /** Type-specific scalar attributes (see UnderstandingObject.meta). */
   meta?: UnderstandingObject['meta'];
+  /** Code / test evidence promoted from a Change Workspace (SPEC-change-workspace §12). */
+  codeEvidence?: EvidenceItem[];
 }
 
 /**
@@ -191,6 +194,7 @@ export async function createUnderstandingObject(
     objectId: object.id,
     op: 'introduced',
     evidence: input.evidence,
+    ...(input.codeEvidence && input.codeEvidence.length > 0 ? { codeEvidence: input.codeEvidence } : {}),
     origin: input.origin,
     // The object's own reviewState gates its existence; the introduced event
     // asserts nothing beyond that, so it never needs separate review.

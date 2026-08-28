@@ -58,7 +58,8 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build-log row + commit hash (`8cdfc86`)
 
 ### CW-5 — learned, promote, questions
-- [ ] Promotion → understanding object + event with `codeEvidence`; questions; `closeWorkspace`; tests
+- [x] `promote.ts` (promotion → accepted user object + `introduced` event with `codeEvidence`; questions), `LearnedSection` + Close, `PromoteSection`, `QuestionsSection`, `?question=` seeding, tests
+- [ ] Build-log row + commit hash
 
 ### CW-6 — sections, Guided menu, history, inspections
 - [ ] `src/components/prepare/*Section.tsx` split; Guided action menu; Investigate History timeline; inspection log; Guided constraint test

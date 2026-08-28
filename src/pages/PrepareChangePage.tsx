@@ -16,10 +16,14 @@ import { TraceSection } from '../components/prepare/TraceSection';
 import { HypothesisSection } from '../components/prepare/HypothesisSection';
 import { ImplementationSection } from '../components/prepare/ImplementationSection';
 import { VerificationSection } from '../components/prepare/VerificationSection';
+import { LearnedSection } from '../components/prepare/LearnedSection';
+import { PromoteSection } from '../components/prepare/PromoteSection';
+import { QuestionsSection } from '../components/prepare/QuestionsSection';
 import {
   getPreparedChange,
   listPreparedChangesForProject,
 } from '../lib/db/preparedChanges';
+import { linkQuestion } from '../lib/prepare/lifecycle';
 import {
   createPreparedChange,
   markPreparedChangeReady,
@@ -39,6 +43,7 @@ import type { UnderstandingObject, UnderstandingProject } from '../types/underst
 interface PageData {
   changes: PreparedChange[];
   understanding: UnderstandingObject[];
+  questions: UnderstandingObject[];
   project: UnderstandingProject | null;
 }
 
@@ -63,7 +68,12 @@ export function PrepareChangePage() {
       getObjectsForProject(projectId, 'current'),
       db.understandingProjects.get(projectId),
     ]);
-    setData({ changes, understanding: points.filter(accepted), project: project ?? null });
+    setData({
+      changes,
+      understanding: points.filter(accepted),
+      questions: points.filter((point) => point.type === 'question'),
+      project: project ?? null,
+    });
   }, [projectId]);
 
   useEffect(() => {
@@ -88,8 +98,19 @@ export function PrepareChangePage() {
     const next = new URLSearchParams(searchParams);
     next.set('change', changeId);
     next.delete('understanding');
+    next.delete('question');
     setSearchParams(next);
   };
+
+  const questionId = searchParams.get('question');
+  useEffect(() => {
+    if (!questionId || !data) return;
+    const question = data.questions.find((q) => q.id === questionId);
+    if (question) {
+      setTitle((current) => current || question.title);
+      setShowCreate(true);
+    }
+  }, [questionId, data]);
 
   const handleCreate = async () => {
     if (!projectId) return;
@@ -99,7 +120,9 @@ export function PrepareChangePage() {
         projectId,
         title,
         understandingPointIds: [...selectedPointIds],
+        ...(questionId ? { originRef: { kind: 'question', id: questionId } } : {}),
       });
+      if (questionId) await linkQuestion(change.id, questionId);
       setTitle('');
       setSelectedPointIds(new Set());
       setShowCreate(false);
@@ -299,6 +322,34 @@ export function PrepareChangePage() {
               <VerificationSection
                 change={selectedChange}
                 projectId={projectId}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
+            <div className="mt-6">
+              <LearnedSection
+                change={selectedChange}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
+            <div className="mt-6">
+              <PromoteSection
+                change={selectedChange}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
+            <div className="mt-6">
+              <QuestionsSection
+                key={`questions:${selectedChange.id}:${selectedChange.updatedAt.toISOString()}`}
+                change={selectedChange}
                 onChanged={async (changed) => {
                   await load();
                   openChange(changed.id);
