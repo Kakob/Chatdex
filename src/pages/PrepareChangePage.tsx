@@ -12,6 +12,7 @@ import {
 import { getObjectsForProject } from '../lib/db/understanding';
 import { db } from '../lib/db/schema';
 import { EvidenceSection } from '../components/prepare/EvidenceSection';
+import { TraceSection } from '../components/prepare/TraceSection';
 import {
   getPreparedChange,
   listPreparedChangesForProject,
@@ -260,6 +261,16 @@ export function PrepareChangePage() {
                 />
               </div>
             )}
+            <div className="mt-6">
+              <TraceSection
+                key={`trace:${selectedChange.id}`}
+                change={selectedChange}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
             </div>
           )}
         </div>
