@@ -15,6 +15,7 @@ import { EvidenceSection } from '../components/prepare/EvidenceSection';
 import { TraceSection } from '../components/prepare/TraceSection';
 import { HypothesisSection } from '../components/prepare/HypothesisSection';
 import { ImplementationSection } from '../components/prepare/ImplementationSection';
+import { VerificationSection } from '../components/prepare/VerificationSection';
 import {
   getPreparedChange,
   listPreparedChangesForProject,
@@ -294,6 +295,16 @@ export function PrepareChangePage() {
                 />
               </div>
             )}
+            <div className="mt-6">
+              <VerificationSection
+                change={selectedChange}
+                projectId={projectId}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
             </div>
           )}
         </div>
