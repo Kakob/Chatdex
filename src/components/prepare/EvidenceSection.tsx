@@ -25,6 +25,9 @@ import { addEvidenceItems } from '../../lib/prepare/lifecycle';
 import { canAppend } from '../../lib/prepare/editability';
 import { generateId } from '../../lib/utils/ids';
 import { useToastStore } from '../../stores/toastStore';
+import { usePrepareWorkspaceStore } from '../../stores/prepareWorkspaceStore';
+import { recordInspection } from '../../lib/db/inspections';
+import { GuidedActionMenu } from './GuidedActionMenu';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { UnderstandingProject } from '../../types/understanding';
 import type { EvidenceItem } from '../../types/evidence';
@@ -61,6 +64,8 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [adding, setAdding] = useState<string | null>(null);
   const [manual, setManual] = useState({ path: '', start: '', end: '' });
+  const pendingSearch = usePrepareWorkspaceStore((s) => s.pendingSearch);
+  const consumeSearch = usePrepareWorkspaceStore((s) => s.consumeSearch);
 
   // Resolve the pinned sha + cache count for the banner.
   const refreshCache = useCallback(async (currentSha: string | null) => {
@@ -186,6 +191,35 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
     }
   };
 
+  // A Guided action elsewhere on the page (a trace node, a file) hands us a search.
+  useEffect(() => {
+    if (!pendingSearch || !repoKey || !sha) return;
+    setMode(pendingSearch.mode);
+    setQuery(pendingSearch.query);
+    setPathGlob(pendingSearch.pathGlob ?? '');
+    setRegex(false);
+    consumeSearch();
+    const run = async () => {
+      try {
+        const files = await loadRows();
+        const opts = { pathGlob: pendingSearch.pathGlob || undefined };
+        setResult(
+          pendingSearch.mode === 'grep'
+            ? grep(files, pendingSearch.query, opts)
+            : pendingSearch.mode === 'symbol'
+              ? findSymbol(files, pendingSearch.query, opts)
+              : findReferences(files, pendingSearch.query, opts)
+        );
+        setSearchError(null);
+        document.getElementById('ws-evidence')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch (err) {
+        setSearchError(err instanceof Error ? err.message : String(err));
+      }
+    };
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSearch?.nonce, repoKey, sha]);
+
   const evidence = change.evidence ?? [];
 
   return (
@@ -273,6 +307,9 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
                 adding={adding}
                 appendable={appendable}
                 onAdd={(hit) => void addHit(hit)}
+                projectId={project.id}
+                workspaceId={change.id}
+                onOpen={(path) => void recordInspection({ projectId: project.id, workspaceId: change.id, kind: 'file', targetKey: path })}
               />
             )}
             {appendable && cacheCount > 0 && (
@@ -370,13 +407,16 @@ function IndexBanner({
 }
 
 function SearchResults({
-  result, repository, adding, appendable, onAdd,
+  result, repository, adding, appendable, onAdd, projectId, workspaceId, onOpen,
 }: {
   result: SearchResult;
   repository: { owner: string; repo: string };
   adding: string | null;
   appendable: boolean;
   onAdd: (hit: SearchHit) => void;
+  projectId: string;
+  workspaceId: string;
+  onOpen: (path: string) => void;
 }) {
   const grouped = useMemo(() => {
     const byPath = new Map<string, SearchHit[]>();
@@ -396,7 +436,10 @@ function SearchResults({
           <div key={path} className="p-3">
             <div className="flex items-center gap-2 text-xs">
               <span className="font-mono text-gray-700 dark:text-gray-300">{path}</span>
-              <SafeBlobLink repository={repository} sha={hits[0].sha} path={path} />
+              <span onClick={() => onOpen(path)}>
+                <SafeBlobLink repository={repository} sha={hits[0].sha} path={path} />
+              </span>
+              <GuidedActionMenu projectId={projectId} workspaceId={workspaceId} repository={repository} path={path} sha={hits[0].sha} compact />
             </div>
             <ul className="mt-2 space-y-2">
               {hits.map((hit) => {

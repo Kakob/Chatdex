@@ -1,3 +1,4 @@
+import { FromWorkspaceLine } from '../components/prepare/FromWorkspaceLine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
@@ -110,6 +111,7 @@ function ObjectCard({
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{object.body}</p>
           )}
           <EvidenceLinks evidence={item.evidence} />
+          <FromWorkspaceLine object={object} />
         </div>
         {object.reviewState === 'pending' && (
           <span onClick={(e) => e.stopPropagation()}>

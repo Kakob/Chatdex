@@ -9,6 +9,7 @@ import { HelpCircle, Loader2, Plus } from 'lucide-react';
 import { createWorkspaceQuestion, questionsForWorkspace } from '../../lib/prepare/promote';
 import { canAppend } from '../../lib/prepare/editability';
 import { useToastStore } from '../../stores/toastStore';
+import { usePrepareWorkspaceStore } from '../../stores/prepareWorkspaceStore';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { UnderstandingObject } from '../../types/understanding';
 
@@ -24,6 +25,15 @@ export function QuestionsSection({ change, onChanged }: Props) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
+  const pendingQuestion = usePrepareWorkspaceStore((s) => s.pendingQuestion);
+  const consumeQuestion = usePrepareWorkspaceStore((s) => s.consumeQuestion);
+
+  useEffect(() => {
+    if (!pendingQuestion) return;
+    setTitle(pendingQuestion.title);
+    consumeQuestion();
+    document.getElementById('ws-questions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [pendingQuestion, consumeQuestion]);
 
   useEffect(() => {
     let cancelled = false;

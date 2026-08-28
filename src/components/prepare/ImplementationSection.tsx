@@ -23,6 +23,7 @@ import {
   type CapReport,
 } from '../../lib/prepare/implementation';
 import { useToastStore } from '../../stores/toastStore';
+import { recordInspection } from '../../lib/db/inspections';
 import type { Implementation, ImplementationProvenance, PreparedChange } from '../../types/preparedChange';
 import type { UnderstandingProject } from '../../types/understanding';
 
@@ -69,6 +70,11 @@ export function ImplementationSection({ change, project, onChanged }: Props) {
       cancelled = true;
     };
   }, [project.id]);
+
+  useEffect(() => {
+    if (!change.implementation) return;
+    void recordInspection({ projectId: project.id, workspaceId: change.id, kind: 'diff', targetKey: `${change.implementation.source}:${change.implementation.attachedAt}` });
+  }, [project.id, change.id, change.implementation]);
 
   useEffect(() => {
     // Sensible default per source: a Claude Code session is the agent's work.

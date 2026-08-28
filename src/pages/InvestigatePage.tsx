@@ -4,6 +4,8 @@
 // only — no relevance, importance, or recommendation exists by design.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { listPreparedChangesForProject } from '../lib/db/preparedChanges';
+import type { PreparedChange } from '../types/preparedChange';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowDownNarrowWide,
@@ -51,7 +53,7 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
   const addToast = useToastStore((state) => state.addToast);
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [filters, setFilters] = useState<AnchorBrowserFilters>({});
-  const [view, setView] = useState<'questions' | 'anchors' | 'coverage'>(
+  const [view, setView] = useState<'questions' | 'workspaces' | 'anchors' | 'coverage'>(
     projectScoped ? 'questions' : 'anchors'
   );
   const [projectConversationIds, setProjectConversationIds] = useState<string[]>([]);
@@ -190,7 +192,7 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
       <div className="mb-4 flex gap-1" role="tablist" aria-label="Investigate views">
         {(
           projectScoped
-            ? (['questions', 'anchors', 'coverage'] as const)
+            ? (['questions', 'workspaces', 'anchors', 'coverage'] as const)
             : (['anchors', 'coverage'] as const)
         ).map((v) => (
           <button
@@ -207,6 +209,8 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
           >
             {v === 'questions'
               ? 'Questions'
+              : v === 'workspaces'
+                ? 'Change workspaces'
               : v === 'anchors'
                 ? 'Code-change anchors'
                 : 'Coverage'}
@@ -226,6 +230,8 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
           onConversationChange={setQuestionConversationId}
           onStart={() => void handleStartQuestion()}
         />
+      ) : view === 'workspaces' && projectId ? (
+        <ChangeWorkspaces projectId={projectId} />
       ) : view === 'coverage' ? (
         <CoverageView
           conversationIds={scopedConversationIds}
@@ -666,4 +672,52 @@ function fromDateInput(value: string): Date | undefined {
   if (!value) return undefined;
   const [y, m, day] = value.split('-').map(Number);
   return new Date(y, m - 1, day);
+}
+
+/**
+ * Every Change Workspace is part of Investigate History (SPEC-change-workspace
+ * §14, PRD §18): intent → evidence → hypothesis → implementation →
+ * verification → resulting understanding, reconstructed read-only.
+ */
+function ChangeWorkspaces({ projectId }: { projectId: string }) {
+  const [changes, setChanges] = useState<PreparedChange[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void listPreparedChangesForProject(projectId).then((rows) => !cancelled && setChanges(rows));
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+  if (!changes) return null;
+  if (changes.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-sm text-gray-500 dark:text-gray-400">
+        No change workspaces yet.{' '}
+        <Link to={`/projects/${projectId}/prepare`} className="text-violet-600 dark:text-violet-400 hover:underline">
+          Start one in Prepare Change
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <ul className="space-y-2" data-testid="change-workspaces">
+      {changes.map((change) => (
+        <li key={change.id} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">{change.title}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {change.state} · {change.implementation ? `implementation by ${change.implementation.provenance.replace('_', ' + ')}` : 'no implementation attached'} ·{' '}
+              {(change.promotions?.length ?? 0)} promoted · {(change.questionIds?.length ?? 0)} open question(s) · updated {change.updatedAt.toLocaleDateString()}
+            </p>
+          </div>
+          <Link
+            to={`/projects/${projectId}/prepare?change=${encodeURIComponent(change.id)}&view=timeline`}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"
+          >
+            Reconstruct
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
 }

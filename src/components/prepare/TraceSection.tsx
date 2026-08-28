@@ -27,12 +27,15 @@ import { updateTrace } from '../../lib/prepare/lifecycle';
 import { evidenceLabel } from '../../lib/prepare/evidenceLabel';
 import { canAppend } from '../../lib/prepare/editability';
 import { useToastStore } from '../../stores/toastStore';
+import { recordInspection } from '../../lib/db/inspections';
+import { GuidedActionMenu } from './GuidedActionMenu';
 import type { PreparedChange, TraceEdge, TraceNode, TraceNodeKind, WorkspaceTrace } from '../../types/preparedChange';
 import type { EvidenceItem } from '../../types/evidence';
 
 interface Props {
   change: PreparedChange;
   onChanged: (change: PreparedChange) => Promise<void>;
+  projectId?: string;
 }
 
 const CHIP: Record<EdgeVerification, string> = {
@@ -43,7 +46,7 @@ const CHIP: Record<EdgeVerification, string> = {
   unknown: 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
 };
 
-export function TraceSection({ change, onChanged }: Props) {
+export function TraceSection({ change, onChanged, projectId }: Props) {
   const addToast = useToastStore((s) => s.addToast);
   const evidence = useMemo(() => change.evidence ?? [], [change.evidence]);
   const editable = canAppend(change, 'trace');
@@ -139,6 +142,8 @@ export function TraceSection({ change, onChanged }: Props) {
                   node={node}
                   evidence={evidence}
                   editable={editable}
+                  projectId={projectId ?? change.projectId}
+                  workspaceId={change.id}
                   onChange={(patch) => apply((t) => updateNode(t, node.id, patch))}
                   onMove={(dir) => apply((t) => moveNode(t, node.id, dir))}
                   onRemove={() => apply((t) => removeNode(t, node.id))}
@@ -202,11 +207,13 @@ export function TraceSection({ change, onChanged }: Props) {
 }
 
 function NodeRow({
-  node, evidence, editable, onChange, onMove, onRemove, onAddAfter, onAddBranch,
+  node, evidence, editable, projectId, workspaceId, onChange, onMove, onRemove, onAddAfter, onAddBranch,
 }: {
   node: TraceNode;
   evidence: EvidenceItem[];
   editable: boolean;
+  projectId: string;
+  workspaceId: string;
   onChange: (patch: Partial<Pick<TraceNode, 'label' | 'kind' | 'evidenceIds'>>) => void;
   onMove: (direction: 'up' | 'down') => void;
   onRemove: () => void;
@@ -239,6 +246,7 @@ function NodeRow({
         <span className={`px-1.5 py-0.5 rounded text-[10px] ${CHIP[support]}`} title="What supports this node">
           {EDGE_VERIFICATION_LABEL[support].toLowerCase()}
         </span>
+        {node.kind !== 'unknown' && <GuidedActionMenu projectId={projectId} workspaceId={workspaceId} label={node.label} compact />}
         {editable && (
           <div className="flex items-center gap-1">
             <IconButton label="Move up" onClick={() => onMove('up')}><ArrowUp size={12} /></IconButton>
@@ -255,6 +263,7 @@ function NodeRow({
         evidence={evidence}
         editable={editable}
         onChange={(evidenceIds) => onChange({ evidenceIds })}
+        onOpen={() => void recordInspection({ projectId, workspaceId, kind: 'node', targetKey: node.id })}
       />
     </div>
   );
@@ -325,13 +334,14 @@ function EdgeRow({
 }
 
 function EvidencePicker({
-  label, selected, evidence, editable, onChange,
+  label, selected, evidence, editable, onChange, onOpen,
 }: {
   label: string;
   selected: string[];
   evidence: EvidenceItem[];
   editable: boolean;
   onChange: (ids: string[]) => void;
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const chosen = new Set(selected);
@@ -340,7 +350,10 @@ function EvidencePicker({
     <div className="text-xs">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          if (!open) onOpen?.();
+          setOpen((o) => !o);
+        }}
         aria-label={label}
         className="text-gray-500 dark:text-gray-400 underline decoration-dotted"
       >

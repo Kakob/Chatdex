@@ -62,7 +62,8 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build-log row + commit hash (`48c989e`)
 
 ### CW-6 — sections, Guided menu, history, inspections
-- [ ] `src/components/prepare/*Section.tsx` split; Guided action menu; Investigate History timeline; inspection log; Guided constraint test
+- [x] Page split into sections + `WorkspaceRail`; `IntentSection`; `GuidedActionMenu` + `guided.ts` + `prepareWorkspaceStore`; `WorkspaceTimeline` + Investigate History tab; `FromWorkspaceLine`; inspection writes; Guided constraint test; RTL page test
+- [ ] Build-log row + commit hash
 
 ### CW-7 — Assisted mode
 - [ ] Actions + disclosures; `aiSuggested`; tests (S3, S5)
