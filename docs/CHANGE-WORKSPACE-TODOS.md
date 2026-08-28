@@ -38,7 +38,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] `src/lib/sync/serializer.ts` — revive `implementingAt` / `verifiedAt` / `closedAt`
 - [x] Boundary guard extended (S10)
 - [x] Tests: lifecycle, editability, changes, serializer identity + S9, Dexie v12 + S1
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`a704ee0`)
 
 ### CW-1 — repository search
 - [ ] `src/lib/repo/{sources,githubSource,index,search}.ts` + tests (S8)

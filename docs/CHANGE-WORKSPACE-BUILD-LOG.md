@@ -9,7 +9,7 @@ tests green.
 | Milestone | Date | Commit | Summary |
 |---|---|---|---|
 | Spec | 2026-08-28 | `4425b0b` | `docs/SPEC-change-workspace.md` (laws §2, data model §7–§12, audit §15 S1–S12, milestones CW-0…CW-8, decisions D1–D11); `docs/PRD-code-ownership-loop.md` (Jacob's draft, verbatim); README + CLAUDE.md pointers; this log + todos |
-| CW-0 | 2026-08-28 | _pending_ | Workspace schema: `EvidenceItem` union (`src/types/evidence.ts`), `PreparedChange` sections + widened `state` (draft→ready→implementing→verified→closed), `UnderstandingEvent.codeEvidence?`, per-section editability table, lifecycle (`attachImplementation` freezes the open hypothesis, `markVerified` gate, `closeWorkspace`), relaxed creation (intent OR accepted understanding, D7), criteria↔acceptanceCriteria mirror, Dexie v12 LOCAL-ONLY `repoFiles` + `inspections` with helpers, serializer revives lifecycle Dates (nested ISO, D11), S10 guard extended, S1 sync-absence test |
+| CW-0 | 2026-08-28 | `a704ee0` | Workspace schema: `EvidenceItem` union (`src/types/evidence.ts`), `PreparedChange` sections + widened `state` (draft→ready→implementing→verified→closed), `UnderstandingEvent.codeEvidence?`, per-section editability table, lifecycle (`attachImplementation` freezes the open hypothesis, `markVerified` gate, `closeWorkspace`), relaxed creation (intent OR accepted understanding, D7), criteria↔acceptanceCriteria mirror, Dexie v12 LOCAL-ONLY `repoFiles` + `inspections` with helpers, serializer revives lifecycle Dates (nested ISO, D11), S10 guard extended, S1 sync-absence test |
 
 ---
 
