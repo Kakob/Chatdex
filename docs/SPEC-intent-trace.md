@@ -405,7 +405,7 @@ Not addressed here (pre-existing): CSP/hardening of the hosted origin; at-rest e
 Extraction and tracing require the relay and GitHub; the matrix, filters, review actions, and evidence links work offline from IndexedDB. Detection remains network-independent (untouched).
 
 ### 13.3 Invariant-6 amendment (to be applied to `CLAUDE.md` in IT-6)
-"Repository file excerpts fetched from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only rule as conversation content. The GitHub token is sent only to api.github.com, never to the relay." `docs/SEPTEMBER-1-SHIP.md`: "Repository cloning, writes, or deployment from Chatdex (read-only inspection via the GitHub API is allowed)."
+"Repository file excerpts fetched from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only rule as conversation content. The GitHub token is sent only to api.github.com, never to the relay." The same read-only rule ("Repository cloning, writes, or deployment from Chatdex remain out of scope; read-only inspection via the GitHub API is allowed") now lives in `SPEC-change-workspace.md` §3 — the former `SEPTEMBER-1-SHIP.md` was retired 2026-08-28.
 
 ---
 
@@ -458,7 +458,7 @@ The qualitative question the scenario must answer: does the matrix surface at le
 - §16 scenario passed in a browser on real data.
 - Every AI-produced row in the tab is pending until reviewed; every status has verifiable evidence or is `unknown` / `unspecified` / `no_spec`.
 - The GitHub token is device-local, reaches only api.github.com, and is absent from every relay body and prompt (tests S1/S2).
-- `docs/INTENT-TRACE-BUILD-LOG.md` has IT-0…IT-6 rows; `CLAUDE.md` and `docs/SEPTEMBER-1-SHIP.md` carry the §13.3 wording.
+- `docs/INTENT-TRACE-BUILD-LOG.md` has IT-0…IT-6 rows; `CLAUDE.md` carries the §13.3 wording.
 
 ---
 

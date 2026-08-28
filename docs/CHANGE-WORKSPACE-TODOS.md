@@ -13,8 +13,8 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [ ] **CW-6 — run the human-led §18 scenario** end-to-end on real data and answer the qualitative question: a week later, can you answer PRD §2's ten questions from the workspace alone?
 - [ ] **CW-6 — second-device check**: the workspace syncs; `repoFiles` and `inspections` must **not** appear on the other device.
 - [ ] **Decision — sync the inspection log?** v1 is local-only (D9). After using it, decide whether PRD §17 counts should follow you across devices (that's a new disclosure — behavioral data in ciphertext).
-- [ ] **Decision — CW-7 timing.** Assisted mode is gated to after the September 1 ship (D10). Say when to unblock it.
-- [ ] **CW-7 — run the AI-led §18 scenario** (after unblocking).
+- [x] **Decision — CW-7 timing.** The Sept-1 ship doc was retired 2026-08-28; CW-7 is no longer gated (D10 superseded).
+- [ ] **CW-7 — run the AI-led §18 scenario.**
 - [ ] **CW-8 — local directory (Chrome only).** Pick a local clone via Settings; confirm "Forget directory" works and that the picker refuses oversized roots (don't pick `~`).
 - [ ] **Later — CSP for the hosted origin** (audit S1; shared with Intent Trace S1). Still the real fix for credentials-at-rest and cached-files-at-rest on Vercel.
 
@@ -59,7 +59,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 ### CW-6 — sections, Guided menu, history, inspections
 - [ ] `src/components/prepare/*Section.tsx` split; Guided action menu; Investigate History timeline; inspection log; Guided constraint test
 
-### CW-7 — Assisted mode *(post-Sept-1)*
+### CW-7 — Assisted mode
 - [ ] Actions + disclosures; `aiSuggested`; tests (S3, S5)
 
 ### CW-8 — local directory

@@ -82,7 +82,7 @@ WEBAUTHN_RP_ID=chatdex.example.com
 WEBAUTHN_ORIGIN=https://chatdex.example.com
 ```
 
-The frontend-only deployment is the recommended September 1 portfolio scope. The optional backend should not block the public product story.
+The frontend-only deployment is the recommended portfolio scope. The optional backend should not block the public product story.
 
 ## Local development with sync
 
@@ -110,4 +110,4 @@ backend/                           optional auth/sync/LLM relay service
 docs/                              product specifications and build history
 ```
 
-See [docs/SEPTEMBER-1-SHIP.md](./docs/SEPTEMBER-1-SHIP.md) for the release boundary and deployment checklist.
+See [docs/README.md](./docs/README.md) for the current specs and build logs.

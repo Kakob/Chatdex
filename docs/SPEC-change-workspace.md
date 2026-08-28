@@ -14,7 +14,7 @@ Same discipline as `SPEC-intent-trace.md` §0:
 - One milestone (§17) per session. Typecheck + lint + `npm run test:all` green before a row lands in the build log; the build log row and the todos checklist are updated in the same session as the code.
 - If a request conflicts with §2, say so and ask rather than silently diverging.
 - Do not touch `src/lib/crypto/`, `src/lib/detection/`, or `src/lib/investigation/` (boundary law §2.6). Reading their **types** and **db helpers** from `src/lib/prepare/` is allowed; importing the other direction is not.
-- Nothing in this feature makes an LLM call in Guided mode. Assisted mode (CW-7) is gated to after the September 1 ship.
+- Nothing in this feature makes an LLM call in Guided mode. Assisted mode (CW-7) is opt-in and disclosed (§2.7).
 
 ---
 
@@ -67,7 +67,7 @@ Nothing enters Current Understanding from a workspace without an explicit per-it
 - `src/types/investigation.ts`: `CaseExhibit` (`code_span` + `selectedContentHash` integrity pattern), `DerivedFileChange` (edits extracted from Claude Code tool events, with `contentHash`), `InvestigationFinding.promotedUnderstandingObjectId`.
 - `src/lib/fs/directoryPicker.ts`: File System Access API pick / remember / permission helpers.
 - Dexie at v11. Sync `KindSchema` in `backend/src/routes/sync.ts` + `src/lib/sync/syncApi.ts`; serializer revives **top-level** Dates only (`rehydratePreparedChange`).
-- `docs/SEPTEMBER-1-SHIP.md` defers "generated summaries or verdicts" and cloning. Guided mode and all deterministic sections are ship-safe; Assisted mode (CW-7) is post-Sept-1.
+- Cloning, repository writes, and deployment from Chatdex remain out of scope (read-only inspection via the GitHub API is allowed). The former `SEPTEMBER-1-SHIP.md` boundary was retired on 2026-08-28; its still-valid deferrals are folded into §5.2.
 
 ---
 
@@ -296,7 +296,7 @@ Search (once cached), trace, hypothesis, verification, learned, promote, questio
 | **CW-4** | Verification matrix + `markVerified`. | Criteria × evidence with human statuses; AI-only rows blocked. |
 | **CW-5** | Learned + Promote + Questions; `codeEvidence` on events; `closeWorkspace`. | Promoted object appears in Current Understanding with code-evidence links. |
 | **CW-6** | Page split into sections; Guided action menu everywhere; Investigate History timeline; inspection log + per-object "from workspace" line; Guided constraint test. | §18 human-led scenario passes. |
-| **CW-7** *(post-Sept-1)* | Assisted mode actions + disclosures; `aiSuggested` slots; "Challenge my explanation". | §18 AI-led scenario passes; every AI output is `ai_inference`. |
+| **CW-7** | Assisted mode actions + disclosures; `aiSuggested` slots; "Challenge my explanation". | §18 AI-led scenario passes; every AI output is `ai_inference`. |
 | **CW-8** | Local-directory source (Chrome), Settings entry, S11 controls. | The same searches work on a local clone without GitHub. |
 
 ---
@@ -333,14 +333,14 @@ None of these may weaken the laws in §2.
 
 | # | Decision | Why |
 |---|---|---|
-| D1 | The workspace *is* an extended `PreparedChange`; sections embedded; no new sync kind. | Jacob's choice; keeps the Sept-1 golden path and the handoff export; no backend deploy ordering. |
+| D1 | The workspace *is* an extended `PreparedChange`; sections embedded; no new sync kind. | Jacob's choice; keeps the Slop Connoisseur golden path and the handoff export; no backend deploy ordering. |
 | D2 | Repo search = GitHub file cache first; local directory later (CW-8). | Jacob's choice; sha-pinned and consistent with Intent Trace; tarball / zipball blocked by CORS in the browser; the code-search API is not sha-pinned. |
 | D3 | Whole files cached LOCAL-ONLY (Dexie table never hooked into sync). | Search needs bodies; synced records keep the ≤ 500-char-quote posture (S1 / S7). |
 | D4 | Edge verification is derived from evidence kinds, with one human override (`contradicted`). | Enforces law 2.2 mechanically rather than by UI discipline. |
-| D5 | Guided mode makes zero provider calls. | The only way progressive disclosure is leak-proof; also ship-safe under the Sept-1 deferrals. |
+| D5 | Guided mode makes zero provider calls. | The only way progressive disclosure is leak-proof. |
 | D6 | Implementation attaches from GitHub compare / PR, ingested Claude Code sessions, or a pasted diff; Chatdex never reads a local git. | PRD §25 — integrate, don't replace; `DerivedFileChange` already exists. |
 | D7 | Creation no longer requires accepted understanding points. | PRD §4 origins include bugs, questions, and manual intent. |
 | D8 | Questions are `UnderstandingObject` `type: 'question'`. | Reuses existing question handling in Current Understanding and Investigate. |
 | D9 | Inspection log is local-only in v1. | PRD §17 needs it from day one; syncing behavioral data is a separate disclosure decision. |
-| D10 | Assisted mode is CW-7, after September 1. | `SEPTEMBER-1-SHIP.md` defers generated summaries / verdicts. |
+| D10 | ~~Assisted mode is CW-7, after September 1.~~ **Superseded 2026-08-28:** the ship doc was retired; CW-7 is ordered last only because it depends on CW-1…CW-6. | — |
 | D11 | Nested section timestamps are ISO strings; only top-level lifecycle timestamps are `Date`. | The serializer revives top-level Dates only; nested Dates would silently degrade to strings after a resync. |
