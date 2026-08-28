@@ -219,3 +219,78 @@ describe('resyncAll', () => {
     expect(ids.filter((id) => id.startsWith('sync.'))).toEqual([]);
   });
 });
+
+describe('intent traces (SPEC-intent-trace §11.4)', () => {
+  it('pushes local traces as intent_trace records and pulls them back', async () => {
+    const traceId = crypto.randomUUID();
+    await db.intentTraces.put({
+      id: traceId,
+      projectId: 'up-1',
+      intentObjectId: 'uo-1',
+      repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: 'e'.repeat(40) },
+      specStatus: 'no_spec',
+      specEvidence: [],
+      implStatus: 'unknown',
+      implEvidence: [],
+      fetchedPaths: [],
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      warnings: [],
+      createdAt: new Date('2026-08-28T10:00:00Z'),
+    });
+    await syncEngine.tick();
+    const pushed = pushedRecords().find((r) => r.id === traceId);
+    expect(pushed?.kind).toBe('intent_trace');
+    expect(pushed?.parentId).toBe('uo-1');
+  });
+
+  it('deleting an understanding object from the server cascades to its traces', async () => {
+    const objectId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
+    await db.understandingObjects.put({
+      id: objectId,
+      projectId: 'up-1',
+      type: 'intent',
+      title: 'x',
+      status: 'current',
+      origin: 'ai',
+      reviewState: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.intentTraces.put({
+      id: traceId,
+      projectId: 'up-1',
+      intentObjectId: objectId,
+      repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: 'f'.repeat(40) },
+      specStatus: 'no_spec',
+      specEvidence: [],
+      implStatus: 'unknown',
+      implEvidence: [],
+      fetchedPaths: [],
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      warnings: [],
+      createdAt: new Date(),
+    });
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: objectId,
+          kind: 'understanding_object',
+          parentId: 'up-1',
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await db.understandingObjects.get(objectId)).toBeUndefined();
+    expect(await db.intentTraces.get(traceId)).toBeUndefined();
+  });
+});

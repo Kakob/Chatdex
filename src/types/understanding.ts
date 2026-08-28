@@ -26,6 +26,18 @@ export interface EvidenceRef {
   note?: string;
 }
 
+/**
+ * GitHub repository a project is bound to for Intent Trace
+ * (SPEC-intent-trace §8.3). Read-only; traces pin to a resolved commit sha.
+ */
+export interface ProjectRepository {
+  owner: string;
+  repo: string;
+  defaultBranch?: string;
+  /** Branch, tag, or sha to trace against instead of the default branch head. */
+  pinnedRef?: string;
+}
+
 /** A project reconstructed from conversation history (PRD §6). */
 export interface UnderstandingProject {
   id: string;
@@ -33,6 +45,15 @@ export interface UnderstandingProject {
   description?: string;
   origin: UnderstandingOrigin;
   reviewState: ReviewState;
+  /** Intent Trace repository binding (SPEC-intent-trace §8.3). Unindexed. */
+  repository?: ProjectRepository;
+  /**
+   * Intent-extraction cursor (SPEC-intent-trace §7.4): the latest conversation
+   * `updatedAt` an extraction run has processed. Same caveat as
+   * lastReconciledAt — a conversation associated later with an older
+   * updatedAt is skipped until a full re-run.
+   */
+  lastIntentExtractedAt?: Date;
   /**
    * Reconciliation cursor (U3.2): the latest conversation `updatedAt` a
    * reconcile run has processed. Runs only consider conversations newer than
@@ -83,6 +104,12 @@ export interface UnderstandingObject {
   status: UnderstandingStatus;
   origin: UnderstandingOrigin;
   reviewState: ReviewState;
+  /**
+   * Type-specific scalar attributes, unindexed. Intents (SPEC-intent-trace
+   * §11.1) carry polarity, origin, promptedByQuestion, statedAt (ISO), and
+   * confidence here rather than overloading `type` or `body`.
+   */
+  meta?: Record<string, string | number | boolean>;
   createdAt: Date;
   updatedAt: Date;
 }

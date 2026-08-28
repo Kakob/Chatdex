@@ -41,6 +41,7 @@ import {
   envelopeVerdictRevision,
   envelopeInvestigationFinding,
   envelopePreparedChange,
+  envelopeIntentTrace,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -62,6 +63,7 @@ import {
   rehydrateVerdictRevision,
   rehydrateInvestigationFinding,
   rehydratePreparedChange,
+  rehydrateIntentTrace,
   type SyncEnvelope,
 } from './serializer';
 
@@ -159,6 +161,7 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       case 'understanding_object':
         await db.understandingObjects.delete(rec.id);
         await db.understandingEvents.where('objectId').equals(rec.id).delete();
+        await db.intentTraces.where('intentObjectId').equals(rec.id).delete();
         return;
       case 'understanding_event':
         await db.understandingEvents.delete(rec.id);
@@ -184,6 +187,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
         return;
       case 'prepared_change':
         await db.preparedChanges.delete(rec.id);
+        return;
+      case 'intent_trace':
+        await db.intentTraces.delete(rec.id);
         return;
     }
   }
@@ -250,6 +256,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'prepared_change':
       await db.preparedChanges.put(rehydratePreparedChange(payload));
+      return;
+    case 'intent_trace':
+      await db.intentTraces.put(rehydrateIntentTrace(payload));
       return;
   }
 }
@@ -349,6 +358,10 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
     case 'prepared_change': {
       const change = await db.preparedChanges.get(entry.id);
       return change ? envelopePreparedChange(change) : null;
+    }
+    case 'intent_trace': {
+      const trace = await db.intentTraces.get(entry.id);
+      return trace ? envelopeIntentTrace(trace) : null;
     }
   }
 }
@@ -484,6 +497,7 @@ class SyncEngine {
       ['verdict_revision', db.verdictRevisions],
       ['investigation_finding', db.investigationFindings],
       ['prepared_change', db.preparedChanges],
+      ['intent_trace', db.intentTraces],
     ];
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
@@ -595,6 +609,10 @@ class SyncEngine {
     db.preparedChanges.hook('creating', upsert('prepared_change'));
     db.preparedChanges.hook('updating', (_m, k) => upsert('prepared_change')(k as string));
     db.preparedChanges.hook('deleting', remove('prepared_change'));
+
+    db.intentTraces.hook('creating', upsert('intent_trace'));
+    db.intentTraces.hook('updating', (_m, k) => upsert('intent_trace')(k as string));
+    db.intentTraces.hook('deleting', remove('intent_trace'));
 
     // Dexie hooks have no portable unsubscribe; stop() relies on the engine
     // being long-lived for the page lifetime. Tests should not call start().

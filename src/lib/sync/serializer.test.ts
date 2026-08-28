@@ -12,7 +12,10 @@ import {
   rehydratePreparedChange,
   envelopeInvestigationFinding,
   rehydrateInvestigationFinding,
+  envelopeIntentTrace,
+  rehydrateIntentTrace,
 } from './serializer';
+import type { IntentTrace } from '../../types/intentTrace';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { InvestigationFinding } from '../../types/investigation';
 import type {
@@ -49,6 +52,41 @@ describe('understanding sync serializers', () => {
     expect(env.parentId).toBeNull();
     expect(env.updatedAt).toEqual(updatedAt);
     expect(throughWire(env.payload, rehydrateUnderstandingProject)).toEqual(p);
+  });
+
+  it('round-trips a project with a repository binding and both cursors', () => {
+    const p: UnderstandingProject = {
+      id: 'up-2',
+      name: 'Chatdex',
+      origin: 'user',
+      reviewState: 'accepted',
+      repository: { owner: 'Kakob', repo: 'Chatdex', defaultBranch: 'main', pinnedRef: 'v1' },
+      lastReconciledAt: createdAt,
+      lastIntentExtractedAt: updatedAt,
+      createdAt,
+      updatedAt,
+    };
+    const env = envelopeUnderstandingProject(p);
+    const back = throughWire(env.payload, rehydrateUnderstandingProject);
+    expect(back).toEqual(p);
+    expect(back.lastIntentExtractedAt).toBeInstanceOf(Date);
+  });
+
+  it('round-trips objects carrying intent meta', () => {
+    const o: UnderstandingObject = {
+      id: 'uo-intent',
+      projectId: 'up-1',
+      type: 'intent',
+      title: 'Badge on the sidebar',
+      body: 'I want the badge on the sidebar',
+      status: 'current',
+      origin: 'ai',
+      reviewState: 'pending',
+      meta: { polarity: 'want', origin: 'unprompted', promptedByQuestion: false, confidence: 0.8 },
+      createdAt,
+      updatedAt,
+    };
+    expect(throughWire(envelopeUnderstandingObject(o).payload, rehydrateUnderstandingObject)).toEqual(o);
   });
 
   it('round-trips associations; parentId is the conversation', () => {
@@ -202,5 +240,66 @@ describe('investigation finding sync serializer', () => {
     expect(env.kind).toBe('investigation_finding');
     expect(env.parentId).toBe('case-1');
     expect(throughWire(env.payload, rehydrateInvestigationFinding)).toEqual(finding);
+  });
+});
+
+describe('intent trace sync serializer', () => {
+  const trace: IntentTrace = {
+    id: 'it-1',
+    projectId: 'up-1',
+    intentObjectId: 'uo-intent',
+    repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: 'c'.repeat(40), ref: 'main' },
+    specStatus: 'specified',
+    specEvidence: [{ path: 'docs/SPEC-x.md', startLine: 10, endLine: 12, quote: 'The badge lives in the sidebar.' }],
+    specRationale: 'Spec names the sidebar.',
+    implStatus: 'implemented',
+    implEvidence: [{ path: 'src/Sidebar.tsx', startLine: 40, endLine: 44, quote: '<Badge count={pending} />' }],
+    implRationale: 'Badge rendered from pending count.',
+    suggestedPaths: ['src/pendingReviews.ts'],
+    commitEvidence: [
+      { sha: 'd'.repeat(40), path: 'src/Sidebar.tsx', message: 'feat: badge', authoredAt: createdAt, url: 'https://github.com/Kakob/Chatdex/commit/' + 'd'.repeat(40) },
+    ],
+    fetchedPaths: ['src/Sidebar.tsx', 'docs/SPEC-x.md'],
+    provider: 'anthropic',
+    model: 'claude-opus-5',
+    warnings: [],
+    createdAt: updatedAt,
+  };
+
+  it('round-trips traces incl. nested commit dates; parentId is the intent object', () => {
+    const env = envelopeIntentTrace(trace);
+    expect(env.kind).toBe('intent_trace');
+    expect(env.parentId).toBe('uo-intent');
+    expect(env.updatedAt).toEqual(trace.createdAt);
+    const back = throughWire(env.payload, rehydrateIntentTrace);
+    expect(back).toEqual(trace);
+    expect(back.commitEvidence?.[0].authoredAt).toBeInstanceOf(Date);
+  });
+
+  it('round-trips traces without optional fields', () => {
+    const minimal: IntentTrace = {
+      ...trace,
+      specStatus: 'no_spec',
+      specEvidence: [],
+      specRationale: undefined,
+      implStatus: 'unknown',
+      implEvidence: [],
+      implRationale: undefined,
+      suggestedPaths: undefined,
+      commitEvidence: undefined,
+      warnings: ['no candidate files'],
+    };
+    const back = throughWire(envelopeIntentTrace(minimal).payload, rehydrateIntentTrace);
+    expect(back.commitEvidence).toBeUndefined();
+    expect(back.warnings).toEqual(['no candidate files']);
+  });
+
+  it('keeps repository details out of the cleartext envelope (audit S9)', () => {
+    const env = envelopeIntentTrace(trace);
+    // Only kind / parentId / updatedAt are visible to the server; everything
+    // else — owner, repo, sha, paths, quotes — is inside `payload`, which is
+    // what gets encrypted.
+    expect(Object.keys(env).sort()).toEqual(['kind', 'parentId', 'payload', 'updatedAt']);
+    expect(JSON.stringify({ kind: env.kind, parentId: env.parentId, updatedAt: env.updatedAt })).not.toContain('Kakob');
   });
 });

@@ -155,6 +155,8 @@ export interface CreateUnderstandingObjectInput {
   evidence: EvidenceRef[];
   /** Source-timeline moment the understanding was introduced. */
   occurredAt: Date;
+  /** Type-specific scalar attributes (see UnderstandingObject.meta). */
+  meta?: UnderstandingObject['meta'];
 }
 
 /**
@@ -180,6 +182,7 @@ export async function createUnderstandingObject(
     status: 'current',
     origin: input.origin,
     reviewState: input.origin === 'ai' ? 'pending' : 'accepted',
+    ...(input.meta ? { meta: input.meta } : {}),
     createdAt: now,
     updatedAt: now,
   };

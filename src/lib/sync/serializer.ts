@@ -26,6 +26,7 @@ import type {
 } from '../../types/investigation';
 import type { SyncKind } from './syncApi';
 import type { PreparedChange } from '../../types/preparedChange';
+import type { IntentTrace, CommitEvidence } from '../../types/intentTrace';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
   kind: TKind;
@@ -220,6 +221,9 @@ export function envelopeUnderstandingProject(
       createdAt: dateToIso(p.createdAt),
       updatedAt: dateToIso(p.updatedAt),
       ...(p.lastReconciledAt ? { lastReconciledAt: dateToIso(p.lastReconciledAt) } : {}),
+      ...(p.lastIntentExtractedAt
+        ? { lastIntentExtractedAt: dateToIso(p.lastIntentExtractedAt) }
+        : {}),
     },
   };
 }
@@ -229,12 +233,16 @@ export function rehydrateUnderstandingProject(payload: unknown): UnderstandingPr
     createdAt: string;
     updatedAt: string;
     lastReconciledAt?: string;
+    lastIntentExtractedAt?: string;
   };
   return {
     ...p,
     createdAt: isoToDate(p.createdAt),
     updatedAt: isoToDate(p.updatedAt),
     ...(p.lastReconciledAt ? { lastReconciledAt: isoToDate(p.lastReconciledAt) } : {}),
+    ...(p.lastIntentExtractedAt
+      ? { lastIntentExtractedAt: isoToDate(p.lastIntentExtractedAt) }
+      : {}),
   };
 }
 
@@ -465,5 +473,54 @@ export function rehydratePreparedChange(payload: unknown): PreparedChange {
     createdAt: isoToDate(change.createdAt),
     updatedAt: isoToDate(change.updatedAt),
     ...(change.readyAt ? { readyAt: isoToDate(change.readyAt) } : {}),
+  };
+}
+
+// --- intent traces (SPEC-intent-trace §11.4) ---
+// Append-only: createdAt is the row's only write moment. The cleartext
+// envelope carries only kind / parentId (the intent object) / updatedAt —
+// repoRef, paths, and quotes stay inside the ciphertext (audit S9).
+
+type WireCommitEvidence = Omit<CommitEvidence, 'authoredAt'> & { authoredAt: string };
+
+export function envelopeIntentTrace(t: IntentTrace): SyncEnvelope<'intent_trace'> {
+  return {
+    kind: 'intent_trace',
+    parentId: t.intentObjectId,
+    updatedAt: t.createdAt,
+    payload: {
+      ...t,
+      createdAt: dateToIso(t.createdAt),
+      ...(t.commitEvidence
+        ? {
+            commitEvidence: t.commitEvidence.map((c) => ({
+              ...c,
+              authoredAt: dateToIso(c.authoredAt),
+            })),
+          }
+        : {}),
+    },
+  };
+}
+
+export function rehydrateIntentTrace(payload: unknown): IntentTrace {
+  const { createdAt, commitEvidence, ...rest } = payload as Omit<
+    IntentTrace,
+    'createdAt' | 'commitEvidence'
+  > & {
+    createdAt: string;
+    commitEvidence?: WireCommitEvidence[];
+  };
+  return {
+    ...rest,
+    createdAt: isoToDate(createdAt),
+    ...(commitEvidence
+      ? {
+          commitEvidence: commitEvidence.map((c) => ({
+            ...c,
+            authoredAt: isoToDate(c.authoredAt),
+          })),
+        }
+      : {}),
   };
 }

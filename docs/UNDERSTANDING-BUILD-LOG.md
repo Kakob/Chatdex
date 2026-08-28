@@ -28,6 +28,8 @@ phase, plus operational notes that affect deployment.
 | U4.1 | 2026-08-09 | `4851906` | Understanding overview on /projects: per-project stats, open-questions rollup, global recent-changes stream |
 | U4.3 | 2026-08-09 | `aec1e8f` | History drawer: per-object audit-trail stream (rejected included), status replay, supersession-chain navigation |
 | U4.4 | 2026-08-09 | `640f076` | Map spike: chain-lane timeline view (SVG, no graph lib); §13 coverage review recorded — cross-project recurrence parked as list candidate |
+| Intent Trace spec | 2026-08-28 | `708929b` | `docs/SPEC-intent-trace.md`: intents (unprompted vs reply-to-AI) traced against spec docs + GitHub code; security audit S1–S10 |
+| IT-0 | 2026-08-28 | _pending_ | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
 
 ---
 
@@ -664,3 +666,48 @@ loop. Not yet browser-exercised (U6.1 + U6.2 together): chat about a
 project past 4 messages → nudge appears → Reconcile → chip badge + sidebar
 badge light up → review strip (bulk-accept supports if present) → next
 send's context carries accepted changes.
+
+---
+
+## Intent Trace (SPEC-intent-trace.md)
+
+Fourth track, PRD §19's chats → understanding → spec → code loop. Milestones
+IT-0…IT-6, one per session; the spec's §2 laws and §13 audit are binding.
+User-side actions live in `docs/INTENT-TRACE-TODOS.md`.
+
+### IT-0 — Schema, types, sync plumbing (2026-08-28)
+
+- `src/types/intentTrace.ts` — `IntentTrace` (append-only judgement of one
+  intent against one commit; `repoRef`, spec/impl status + verbatim evidence,
+  `fetchedPaths` audit list, `commitEvidence`) plus the `IntentPolarity` /
+  `IntentOrigin` / `SpecStatus` / `ImplStatus` enums.
+- `src/types/understanding.ts` — `UnderstandingObject.meta?` (type-specific
+  scalars; intents carry polarity / origin / promptedByQuestion / statedAt /
+  confidence here), `UnderstandingProject.repository?` (`ProjectRepository`)
+  and `lastIntentExtractedAt?` (extraction cursor, same caveat as
+  `lastReconciledAt`). All unindexed — no Dexie change for these;
+  `createUnderstandingObject` passes `meta` through.
+- Dexie **v11**: `intentTraces` (`&id, projectId, intentObjectId, createdAt,
+  [projectId+createdAt], [intentObjectId+createdAt]`); helpers in
+  `src/lib/db/intentTraces.ts` (`put`, `get`, per-project / per-intent lists
+  newest-first, `getLatestTraceByIntent`) — deliberately no update/delete.
+- Sync kind `intent_trace`: `SyncKind`, `envelopeIntentTrace` /
+  `rehydrateIntentTrace` (parentId = intent object id, `updatedAt =
+  createdAt`; nested `commitEvidence[].authoredAt` ISO-encoded; cleartext
+  envelope is exactly kind / parentId / updatedAt — audit S9), engine
+  apply / delete / dirty-envelope / resync / hooks, cascade delete of traces
+  when an `understanding_object` is deleted, backend `KindSchema` entry.
+  Project envelope carries `lastIntentExtractedAt`.
+- Tests: `src/lib/db/intentTraces.test.ts` (v11 round trip incl. nested
+  Dates, ordering, latest-per-intent, `meta` passthrough + omission),
+  serializer round trips (project with repository + cursors, object with
+  meta, trace with/without optionals, cleartext-envelope check), engine
+  push kind/parent + server-side object delete cascade.
+
+### ⚠ Deploy order for IT-0
+
+`backend/src/routes/sync.ts` `KindSchema` gains `'intent_trace'`. **Deploy
+the backend before the frontend** — a frontend that pushes a trace to an
+older backend gets a 400 on the whole push batch (same failure shape as the
+U1.1 kind-widening note above). `'intent_trace'` is 12 chars, within the
+varchar(32) already applied to Neon; no migration needed.

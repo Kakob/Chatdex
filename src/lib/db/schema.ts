@@ -29,6 +29,7 @@ import type {
   InvestigationFinding,
 } from '../../types/investigation';
 import type { PreparedChange } from '../../types/preparedChange';
+import type { IntentTrace } from '../../types/intentTrace';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -60,6 +61,7 @@ export class ChatdexDB extends Dexie {
   verdictRevisions!: Table<VerdictRevision, string>;
   preparedChanges!: Table<PreparedChange, string>;
   investigationFindings!: Table<InvestigationFinding, string>;
+  intentTraces!: Table<IntentTrace, string>;
 
   constructor() {
     super('chatdex');
@@ -153,6 +155,14 @@ export class ChatdexDB extends Dexie {
             row.kind = row.kind ?? 'anchor';
           });
       });
+    // v11: intent traces (SPEC-intent-trace §11.3) — append-only synthesis
+    // output, one row per (intent, commit); synced as ciphertext. The intent
+    // objects themselves are understandingObjects rows (type 'intent') whose
+    // new optional `meta` field needs no schema change (unindexed).
+    this.version(11).stores({
+      intentTraces:
+        '&id, projectId, intentObjectId, createdAt, [projectId+createdAt], [intentObjectId+createdAt]',
+    });
   }
 }
 
