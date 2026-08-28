@@ -28,9 +28,6 @@ phase, plus operational notes that affect deployment.
 | U4.1 | 2026-08-09 | `4851906` | Understanding overview on /projects: per-project stats, open-questions rollup, global recent-changes stream |
 | U4.3 | 2026-08-09 | `aec1e8f` | History drawer: per-object audit-trail stream (rejected included), status replay, supersession-chain navigation |
 | U4.4 | 2026-08-09 | `640f076` | Map spike: chain-lane timeline view (SVG, no graph lib); §13 coverage review recorded — cross-project recurrence parked as list candidate |
-| Intent Trace spec | 2026-08-28 | `708929b` | `docs/SPEC-intent-trace.md`: intents (unprompted vs reply-to-AI) traced against spec docs + GitHub code; security audit S1–S10 |
-| IT-0 | 2026-08-28 | `b7fd63f` | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
-| IT-1 | 2026-08-28 | `4325cb2` | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 
 ---
 
@@ -670,76 +667,8 @@ send's context carries accepted changes.
 
 ---
 
-## Intent Trace (SPEC-intent-trace.md)
+## Intent Trace
 
-Fourth track, PRD §19's chats → understanding → spec → code loop. Milestones
-IT-0…IT-6, one per session; the spec's §2 laws and §13 audit are binding.
-User-side actions live in `docs/INTENT-TRACE-TODOS.md`.
-
-### IT-0 — Schema, types, sync plumbing (2026-08-28)
-
-- `src/types/intentTrace.ts` — `IntentTrace` (append-only judgement of one
-  intent against one commit; `repoRef`, spec/impl status + verbatim evidence,
-  `fetchedPaths` audit list, `commitEvidence`) plus the `IntentPolarity` /
-  `IntentOrigin` / `SpecStatus` / `ImplStatus` enums.
-- `src/types/understanding.ts` — `UnderstandingObject.meta?` (type-specific
-  scalars; intents carry polarity / origin / promptedByQuestion / statedAt /
-  confidence here), `UnderstandingProject.repository?` (`ProjectRepository`)
-  and `lastIntentExtractedAt?` (extraction cursor, same caveat as
-  `lastReconciledAt`). All unindexed — no Dexie change for these;
-  `createUnderstandingObject` passes `meta` through.
-- Dexie **v11**: `intentTraces` (`&id, projectId, intentObjectId, createdAt,
-  [projectId+createdAt], [intentObjectId+createdAt]`); helpers in
-  `src/lib/db/intentTraces.ts` (`put`, `get`, per-project / per-intent lists
-  newest-first, `getLatestTraceByIntent`) — deliberately no update/delete.
-- Sync kind `intent_trace`: `SyncKind`, `envelopeIntentTrace` /
-  `rehydrateIntentTrace` (parentId = intent object id, `updatedAt =
-  createdAt`; nested `commitEvidence[].authoredAt` ISO-encoded; cleartext
-  envelope is exactly kind / parentId / updatedAt — audit S9), engine
-  apply / delete / dirty-envelope / resync / hooks, cascade delete of traces
-  when an `understanding_object` is deleted, backend `KindSchema` entry.
-  Project envelope carries `lastIntentExtractedAt`.
-- Tests: `src/lib/db/intentTraces.test.ts` (v11 round trip incl. nested
-  Dates, ordering, latest-per-intent, `meta` passthrough + omission),
-  serializer round trips (project with repository + cursors, object with
-  meta, trace with/without optionals, cleartext-envelope check), engine
-  push kind/parent + server-side object delete cascade.
-
-### ⚠ Deploy order for IT-0
-
-`backend/src/routes/sync.ts` `KindSchema` gains `'intent_trace'`. **Deploy
-the backend before the frontend** — a frontend that pushes a trace to an
-older backend gets a 400 on the whole push batch (same failure shape as the
-U1.1 kind-widening note above). `'intent_trace'` is 12 chars, within the
-varchar(32) already applied to Neon; no migration needed.
-
-### IT-1 — Deterministic pair selection + heuristic (2026-08-28)
-
-- `src/lib/understanding/intents/pairs.ts` — `selectIntentPairs(conversationId,
-  messages, config)`: runs `normalizeSession` (read-only reuse of the
-  detection substrate, §2.5), groups `user_msg` steps per message, and walks
-  **backward** over `tool_call`/`tool_result` steps to the nearest
-  `agent_text`, gathering every text step of that assistant message (Claude
-  Code splits one message's text around its tool blocks). `promptI` /
-  `replyI` are positions in the full stored message list — the same `i`
-  convention as discovery digests. `promptI: null` when nothing from the
-  assistant directly precedes (opening message, or a second consecutive user
-  message) — the §2.2 forced-`unprompted` case. Prompt text kept from the
-  tail (600 chars), reply from the head (800), previous user message as
-  context (200); `promptedByQuestion` is a deterministic hint (trailing `?`,
-  `?` in the last 300 chars, or an options list). Pasted logs/code are
-  skipped (`looksPasted`: ≥70% machine-shaped lines, or >4000 chars with no
-  first-person verb). Cap 60 pairs per conversation, most recent win.
-  Tool-result-only user messages never form pairs.
-- `src/lib/understanding/intents/heuristic.ts` — `INTENT_PATTERNS` (desire /
-  modal / reaction / directive / product, all linear — audit S8),
-  `scoreIntentReply` → `{ keep, matched }`, `filterPairs`. Modes: `lenient`
-  (default; also keeps any reply ≤400 chars that answers a question),
-  `strict` (patterns only), `off` (send everything — the UI's "send all
-  replies").
-- Tests (24): plain and Claude Code fixtures, consecutive user messages,
-  system messages skipped but indexes preserved, pasted-trace skip with
-  context carry-over, tail/head truncation, per-conversation cap; heuristic
-  recall ≥95% on 26 hand-labelled casual intents **by pattern alone**
-  (`promptedByQuestion` off), short-answer rule, strict/off behaviour,
-  linear-pattern guard, and a 10 KB adversarial timing test.
+The Intent Trace track (`SPEC-intent-trace.md`) keeps its own build log:
+`INTENT-TRACE-BUILD-LOG.md`. Its `getAssociatedConversations` refactor of
+`reconcile.ts` (IT-2) is the only change it made to understanding-track code.

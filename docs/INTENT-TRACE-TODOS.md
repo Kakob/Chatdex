@@ -1,12 +1,12 @@
 # Intent Trace — TODOs
 
-Companion to `docs/SPEC-intent-trace.md`. Two lists: things **Jacob** has to do (Claude Code can't), and the running engineering checklist per milestone. Check items off in place.
+Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. Two lists: things **Jacob** has to do (Claude Code can't), and the running engineering checklist per milestone. Check items off in place.
 
 ---
 
 ## 🧑 User todos (Jacob)
 
-> ⚠️ **Deploy the backend before the frontend for IT-0.** IT-0 adds `intent_trace` to the backend sync `KindSchema` (`backend/src/routes/sync.ts`). If the frontend ships first, every sync push containing a trace is rejected with **400** — the build log records this exact failure once before (see `docs/UNDERSTANDING-BUILD-LOG.md`, understanding kinds). Order: deploy backend → verify `/api/sync` accepts the new kind → deploy frontend.
+> ⚠️ **Deploy the backend before the frontend for IT-0.** IT-0 adds `intent_trace` to the backend sync `KindSchema` (`backend/src/routes/sync.ts`). If the frontend ships first, every sync push containing a trace is rejected with **400** — the build log records this exact failure once before (see `docs/INTENT-TRACE-BUILD-LOG.md` operational notes). Order: deploy backend → verify `/api/sync` accepts the new kind → deploy frontend.
 
 - [ ] **IT-0 — deploy backend first** (see warning above), then frontend.
 - [ ] **IT-3 — create a GitHub token for Chatdex.** Fine-grained PAT, repository access limited to `Kakob/Chatdex`, permissions **Contents: Read** + **Metadata: Read**, expiry ≤ 90 days. (Quick start: `gh auth token` works but is a classic token and will show the "over-privileged" warning.) Paste it in Settings → GitHub → Test.
@@ -32,7 +32,7 @@ Companion to `docs/SPEC-intent-trace.md`. Two lists: things **Jacob** has to do 
 - [x] `intents/pairs.ts`, `intents/heuristic.ts`, fixtures, recall + timing tests (S8)
 
 ### IT-2 — extraction
-- [ ] `intents/extraction.ts`, `intents/runExtraction.ts`, `getAssociatedConversations` refactor, panel exclusion, tests
+- [x] `intents/extraction.ts`, `intents/runExtraction.ts`, `getAssociatedConversations` refactor, panel exclusion, tests
 
 ### IT-3 — GitHub
 - [ ] `github/credentials.ts` (device-local: `isDeviceLocalMetadata` matches `github.`), `github/client.ts`, `GitHubSection`, `RepoBindingCard`, tests (S1/S2)
@@ -45,4 +45,4 @@ Companion to `docs/SPEC-intent-trace.md`. Two lists: things **Jacob** has to do 
 
 ### IT-6 — polish + docs
 - [ ] Commit evidence, re-trace / add-file, warnings panel
-- [ ] `CLAUDE.md` invariant-6 wording, `docs/SEPTEMBER-1-SHIP.md` wording, build-log rows
+- [ ] `CLAUDE.md` invariant-6 wording, `docs/SEPTEMBER-1-SHIP.md` wording, `docs/INTENT-TRACE-BUILD-LOG.md` rows

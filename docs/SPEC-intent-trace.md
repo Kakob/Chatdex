@@ -18,10 +18,10 @@ Implement this feature inside the existing Chatdex repository. Extend the shared
 
 Before changing code:
 
-1. Read `CLAUDE.md` (hard invariants — especially invariant 6, the AI synthesis boundary), `docs/PRD-shared-understanding-workspace.md` §7, §9, §11, §19, and `docs/UNDERSTANDING-BUILD-LOG.md`.
+1. Read `CLAUDE.md` (hard invariants — especially invariant 6, the AI synthesis boundary), `docs/PRD-shared-understanding-workspace.md` §7, §9, §11, §19, `docs/UNDERSTANDING-BUILD-LOG.md` (how the understanding track was built), and `docs/INTENT-TRACE-BUILD-LOG.md` (this track's progress).
 2. Read the modules this spec reuses (§3, §12): `src/lib/understanding/discovery.ts`, `reconcile.ts`, `runDiscovery.ts`; `src/lib/db/understanding.ts`; `src/lib/detection/normalize.ts`; `src/lib/providers/{relayClient,credentials}.ts`; `src/lib/sync/{serializer,engine,syncApi}.ts`; `src/components/understanding/*`; `src/pages/ProjectUnderstandingPage.tsx`.
 3. Run `npm run typecheck && npm run lint && npm run test:all` and record the baseline.
-4. Build the milestones in §15 in order, **one milestone per session**, each ending with typecheck + lint + tests green and a row in `docs/UNDERSTANDING-BUILD-LOG.md`.
+4. Build the milestones in §15 in order, **one milestone per session**, each ending with typecheck + lint + tests green and a row in `docs/INTENT-TRACE-BUILD-LOG.md`.
 
 The names in this document are semantic contracts; follow repository conventions for file and table names where they differ. Stop and ask only if repository reality makes a required behavior impossible, if a destructive migration would be needed, or if a product law below would have to be broken.
 
@@ -458,7 +458,7 @@ The qualitative question the scenario must answer: does the matrix surface at le
 - §16 scenario passed in a browser on real data.
 - Every AI-produced row in the tab is pending until reviewed; every status has verifiable evidence or is `unknown` / `unspecified` / `no_spec`.
 - The GitHub token is device-local, reaches only api.github.com, and is absent from every relay body and prompt (tests S1/S2).
-- `docs/UNDERSTANDING-BUILD-LOG.md` has IT-0…IT-6 rows; `CLAUDE.md` and `docs/SEPTEMBER-1-SHIP.md` carry the §13.3 wording.
+- `docs/INTENT-TRACE-BUILD-LOG.md` has IT-0…IT-6 rows; `CLAUDE.md` and `docs/SEPTEMBER-1-SHIP.md` carry the §13.3 wording.
 
 ---
 

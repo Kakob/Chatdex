@@ -25,7 +25,7 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 | **[SPEC-agent-observability.md](./SPEC-agent-observability.md)** | Agent observability layer: loop / verification-absence / reversion detectors, client-side only | Built (Phases 0–8) |
 | **[SPEC-decision-investigation.md](./SPEC-decision-investigation.md)** | Decision Investigation: human-only provenance workbench, cases, exhibits, verdicts | MVP code-complete |
 | **[PRD-shared-understanding-workspace.md](./PRD-shared-understanding-workspace.md)** | Shared Understanding Workspace PRD (stages U0–U6) | Built |
-| **[SPEC-intent-trace.md](./SPEC-intent-trace.md)** | Intent Trace: extract stated intents (unprompted vs reply-to-AI) from chats, trace against spec docs and GitHub code | Spec approved 2026-08-28; IT-0…IT-6 pending |
+| **[SPEC-intent-trace.md](./SPEC-intent-trace.md)** | Intent Trace: extract stated intents (unprompted vs reply-to-AI) from chats, trace against spec docs and GitHub code | In progress — see [INTENT-TRACE-BUILD-LOG.md](./INTENT-TRACE-BUILD-LOG.md) |
 
 ### Vision & Background
 

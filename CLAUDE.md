@@ -18,7 +18,7 @@ Chatdex is a **local-first AI-conversation workspace**. It ingests conversation 
 - `SPEC-agent-observability.md` — what to build and why
 - `IMPLEMENTATION_PLAN.md` — phase order, acceptance criteria, testing strategy
 
-**Next up (approved 2026-08-28):** the Intent Trace feature — `docs/SPEC-intent-trace.md`. Extracts the user's stated intents from chats (recording whether each was unprompted or a reply to the AI) and traces them against spec docs and GitHub code. Milestones IT-0…IT-6, one per session; the spec's §2 laws and §13 security audit are binding.
+**Next up (approved 2026-08-28):** the Intent Trace feature — `docs/SPEC-intent-trace.md`. Extracts the user's stated intents from chats (recording whether each was unprompted or a reply to the AI) and traces them against spec docs and GitHub code. Milestones IT-0…IT-6, one per session, logged in `docs/INTENT-TRACE-BUILD-LOG.md`; the spec's §2 laws and §13 security audit are binding.
 
 If a request conflicts with the spec, say so and ask rather than silently diverging.
 
