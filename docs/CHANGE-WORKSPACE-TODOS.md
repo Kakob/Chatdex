@@ -47,7 +47,7 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 
 ### CW-2 — trace
 - [x] `src/lib/prepare/trace.ts` (`deriveEdgeVerification`, `traceSummary`, structure ops), `TraceSection` list editor, RTL tests (S6)
-- [ ] Build-log row + commit hash
+- [x] Build-log row + commit hash (`3e1d106`)
 
 ### CW-3 — hypothesis + implementation
 - [ ] Hypothesis section with freeze; `compareCommits` / `getPullFiles`; Claude Code session attach; pasted diff; tests (S2)
