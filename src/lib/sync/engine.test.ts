@@ -106,6 +106,39 @@ describe('device-local sync state exclusion', () => {
     expect(ids.filter((id) => id.startsWith('sync.'))).toEqual([]);
   });
 
+  it('never pushes github.* metadata (device-local GitHub token — SPEC-intent-trace §8.1)', async () => {
+    await setMetadata('github.token', 'github_pat_secret');
+    await setMetadata('llm.apiKey.anthropic', 'sk-ant-synced');
+
+    await syncEngine.tick();
+
+    const ids = pushedIds();
+    expect(ids).toContain('llm.apiKey.anthropic');
+    expect(ids.filter((id) => id.startsWith('github.'))).toEqual([]);
+    expect(JSON.stringify(pushedRecords())).not.toContain('github_pat_secret');
+  });
+
+  it('ignores incoming github.* metadata records from the server', async () => {
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: 'github.token',
+          kind: 'metadata',
+          parentId: null,
+          iv: btoa('\x01'),
+          ciphertext: btoa(JSON.stringify({ key: 'github.token', value: 'INJECTED' })),
+          updatedAt: new Date().toISOString(),
+          deleted: false,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await getMetadata('github.token')).not.toBe('INJECTED');
+  });
+
   it('does not loop when persisting the dirty queue (regression: metadata hook recursion)', async () => {
     // Any tracked write persists the dirty queue into metadata (sync.dirty),
     // which fires the metadata hook again. Before the fix this re-dirtied the

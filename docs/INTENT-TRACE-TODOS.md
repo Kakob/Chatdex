@@ -35,7 +35,7 @@ Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. T
 - [x] `intents/extraction.ts`, `intents/runExtraction.ts`, `getAssociatedConversations` refactor, panel exclusion, tests
 
 ### IT-3 — GitHub
-- [ ] `github/credentials.ts` (device-local: `isDeviceLocalMetadata` matches `github.`), `github/client.ts`, `GitHubSection`, `RepoBindingCard`, tests (S1/S2)
+- [x] `github/credentials.ts` (device-local: `isDeviceLocalMetadata` matches `github.`), `github/client.ts`, `GitHubSection`, `RepoBindingCard`, tests (S1/S2)
 
 ### IT-4 — trace engine
 - [ ] `trace/specDocs.ts`, `candidateFiles.ts`, `fetchPolicy.ts`, `judge.ts`, `runTrace.ts`, tests (S3/S4/S5/S7)

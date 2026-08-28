@@ -9,6 +9,7 @@ import {
 } from '../lib/db/understanding';
 import { getObjectsForProject } from '../lib/db/understanding';
 import { useToastStore } from '../stores/toastStore';
+import { RepoBindingCard } from '../components/intents/RepoBindingCard';
 import type { StoredConversation } from '../types';
 import type { ProjectAssociation, UnderstandingProject } from '../types/understanding';
 
@@ -137,6 +138,11 @@ export function ProjectOverviewPage() {
           </Link>
         ))}
       </section>
+
+      <RepoBindingCard
+        project={data.project}
+        onSaved={(project) => setData((prev) => (prev ? { ...prev, project } : prev))}
+      />
 
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

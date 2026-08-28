@@ -74,9 +74,11 @@ const DIRTY_KEY = 'sync.dirty'; // queue of { id, kind, deleted? } pending push
 // pull cursor). It must never enter the sync stream: pushing it leaks local
 // state to the server, and because persisting the dirty queue is itself a
 // metadata write, syncing it makes every markDirty re-dirty the queue — an
-// infinite push loop.
+// infinite push loop. The `github.` prefix (Intent Trace token) is likewise
+// device-local by design — SPEC-intent-trace §8.1, audit S1.
+const DEVICE_LOCAL_METADATA_PREFIXES = ['sync.', 'github.'];
 function isDeviceLocalMetadata(key: string): boolean {
-  return key.startsWith('sync.');
+  return DEVICE_LOCAL_METADATA_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 function isSyncableEntry(entry: DirtyEntry): boolean {

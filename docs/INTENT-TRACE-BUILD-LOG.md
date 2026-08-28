@@ -12,6 +12,7 @@ tests green.
 | IT-0 | 2026-08-28 | `b7fd63f` | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
 | IT-1 | 2026-08-28 | `4325cb2` | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 | IT-2 | 2026-08-28 | `fb0e467` | Intent extraction: prompt contract with origin, hallucination firewall (forced `unprompted`, verbatim statement, coerced promptedBy), pending `intent` objects + `supported`/`refined` events, pair-packed batches, `lastIntentExtractedAt` cursor; `getAssociatedConversations` shared with reconcile; intents excluded from the panel |
+| IT-3 | 2026-08-28 | _pending_ | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 
 ---
 
@@ -131,3 +132,46 @@ needed.
   message), `matchesExisting` → refined event + no new object, empty batch
   sends nothing; cursor / scoped / ignoreCursor / heuristic-off /
   first-failure-stops semantics; `packPairBatches`.
+
+### IT-3 — GitHub token, client, repo binding (2026-08-28)
+
+- `src/lib/github/credentials.ts` — `get/set/clear/hasGitHubToken` over
+  metadata key `github.token`. **Device-local:** `src/lib/sync/engine.ts`
+  `isDeviceLocalMetadata` now covers the `github.` prefix alongside
+  `sync.`, so the token never enters the sync stream in either direction
+  (audit S1); tests assert nothing `github.*` is pushed and an incoming
+  `github.token` record is ignored.
+- `src/lib/github/client.ts` — read-only, browser-direct, GET-only.
+  Constant `GITHUB_API_BASE` (no base-URL option — audit S2); token only in
+  `Authorization`, never in a URL; `assertRepoName` / `assertSha` /
+  `encodeRepoPath` (segment-encoded, `..`/empty rejected) guard every URL;
+  errors are content-free (`GitHubError(status)` — response bodies never
+  echoed); 429 or 403-with-zero-remaining ⇒ `GitHubRateLimitError` with
+  `resetAt`; `getLastRateLimit()` for run summaries. Surface: `getRepo`
+  (default branch, private, `canPush`), `resolveRef`, `getTree`
+  (recursive, cached per sha, blobs/trees only), `getFileContent`
+  (contents API at the sha, base64→UTF-8, 200 KB cap, cached),
+  `listCommits` (path/since/sha), `getTokenInfo` (`x-oauth-scopes` →
+  `overPrivileged` for classic `repo`/`write:*`/`admin:*`/`workflow`/
+  `delete_repo`; fine-grained tokens have no scopes header), `blobUrl`
+  (the only link builder; validated, `#L{a}-L{b}`), `isGitHubWebUrl`
+  allowlist, `parseRepoInput` (`owner/repo`, github.com URL, git remote).
+- `src/components/settings/GitHubSection.tsx` (mounted after LLM providers
+  in Settings): save / test / clear; save auto-tests; shows login, marks
+  fine-grained tokens, and warns in amber when a classic token grants write
+  access; guidance text (Contents: Read + Metadata: Read, ≤90-day expiry,
+  public repos work without a token at 60 req/h).
+- `src/components/intents/RepoBindingCard.tsx` (mounted on
+  `ProjectOverviewPage` until the Intent Trace tab exists in IT-5): input
+  accepts `owner/repo` or a URL, optional pinned ref, Validate → `getRepo`
+  (404/401 message points at Settings for private repos; `canPush` warning),
+  Save → `putUnderstandingProject({ repository })`, Unbind (traces kept).
+- `src/lib/providers/relayBody.test.ts` — audit S2 guard: with a GitHub
+  token stored, the exact relay POST body has only provider fields and
+  contains neither `github` nor the token string.
+- Tests (31 across client / credentials / engine / relay-body): parsing +
+  validation, headers + host, no-token path, content-free errors,
+  rate-limit variants, ref → sha, tree cache + filtering, UTF-8 base64 +
+  size cap + non-file + traversal, commits mapping, token scope detection,
+  blob URL anchors + rejections, GET-only surface, device-local exclusion
+  both directions, relay body.
