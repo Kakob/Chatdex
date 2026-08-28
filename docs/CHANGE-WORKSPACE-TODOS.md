@@ -70,4 +70,5 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build-log row + commit hash (`8773ab8`)
 
 ### CW-8 — local directory
-- [ ] `localDirSource.ts`, Settings entry, tests (S11)
+- [x] `localDirSource.ts` + `localDir.ts`, `LocalRepositorySection`, Evidence source toggle, device-local `repo.*` keys, `CLAUDE.md` §2.5 sentence, tests (S11)
+- [ ] Build-log row + commit hash

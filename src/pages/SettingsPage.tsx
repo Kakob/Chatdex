@@ -16,6 +16,7 @@ import { CloudSyncSection } from '../components/settings/CloudSyncSection';
 import { DetectionSettingsSection } from '../components/settings/DetectionSettingsSection';
 import { LLMProvidersSection } from '../components/settings/LLMProvidersSection';
 import { GitHubSection } from '../components/settings/GitHubSection';
+import { LocalRepositorySection } from '../components/settings/LocalRepositorySection';
 
 export function SettingsPage() {
   const { theme, setTheme, conversationCount, messageCount, setStats, isPro, setLicense } = useAppStore();
@@ -165,6 +166,7 @@ export function SettingsPage() {
         {/* LLM provider credentials (understanding synthesis) */}
         <LLMProvidersSection />
         <GitHubSection />
+        <LocalRepositorySection />
 
         {/* License */}
         <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">

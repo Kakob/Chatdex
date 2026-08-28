@@ -10,6 +10,8 @@ import { Database, ExternalLink, FileCode2, Loader2, Plus, RefreshCw, Search, Sh
 import { getGitHubToken } from '../../lib/github/credentials';
 import { blobUrl, resolveRef, GitHubError } from '../../lib/github/client';
 import { createGitHubSource } from '../../lib/repo/githubSource';
+import { LOCAL_SHA, createLocalDirSource, localRepoKey } from '../../lib/repo/localDirSource';
+import { ensureReadPermission, getRememberedLocalDirectory, getRememberedLocalDirectoryName } from '../../lib/repo/localDir';
 import { describeSkips, ensureIndexed, type IndexReport } from '../../lib/repo/index';
 import {
   buildCodeEvidence,
@@ -44,8 +46,10 @@ interface Props {
 export function EvidenceSection({ change, project, onChanged }: Props) {
   const addToast = useToastStore((s) => s.addToast);
   const repository = project.repository;
-  const repoKey = repository ? `gh:${repository.owner}/${repository.repo}` : null;
   const appendable = canAppend(change, 'evidence');
+  const [localName, setLocalName] = useState<string | null>(null);
+  const [sourceKind, setSourceKind] = useState<'github' | 'local'>('github');
+  const repoKey = sourceKind === 'local' ? (localName ? localRepoKey(localName) : null) : repository ? `gh:${repository.owner}/${repository.repo}` : null;
 
   const [token, setToken] = useState<string | undefined>();
   const [sha, setSha] = useState<string | null>(null);
@@ -75,16 +79,27 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    void getRememberedLocalDirectoryName().then((n) => {
+      if (cancelled) return;
+      setLocalName(n);
+      if (n && !repository) setSourceKind('local');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repository]);
+
+  useEffect(() => {
+    let cancelled = false;
     void getGitHubToken().then((t) => !cancelled && setToken(t));
     if (!repository) return;
     const ref = repository.pinnedRef ?? repository.defaultBranch ?? 'HEAD';
-    setShaError(null);
     getGitHubToken()
       .then((t) => resolveRef(repository.owner, repository.repo, ref, { token: t }))
-      .then(async ({ sha: resolved }) => {
+      .then(({ sha: resolved }) => {
         if (cancelled) return;
+        setShaError(null);
         setSha(resolved);
-        await refreshCache(resolved);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -93,22 +108,38 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [repository, refreshCache]);
+  }, [repository]);
+
+  // The effective snapshot: the resolved GitHub sha, or the constant 'local' for a picked directory.
+  const effectiveSha = sourceKind === 'local' ? (localName ? LOCAL_SHA : null) : sha;
+
+  useEffect(() => {
+    void refreshCache(effectiveSha);
+  }, [effectiveSha, refreshCache]);
 
   const runIndex = async () => {
-    if (!repository || !sha) return;
+    if (!effectiveSha) return;
     setConfirmIndex(false);
     setIndexing({ done: 0, total: 0 });
     try {
-      const source = createGitHubSource(repository.owner, repository.repo, { token });
-      const next = await ensureIndexed(source, sha, { onProgress: (p) => setIndexing(p) });
+      let source;
+      if (sourceKind === 'local') {
+        const handle = await getRememberedLocalDirectory();
+        if (!handle) throw new Error('Pick a local directory in Settings first');
+        if (!(await ensureReadPermission(handle))) throw new Error('Read permission for the directory was not granted');
+        source = createLocalDirSource(handle);
+      } else {
+        if (!repository) return;
+        source = createGitHubSource(repository.owner, repository.repo, { token });
+      }
+      const next = await ensureIndexed(source, effectiveSha, { onProgress: (p) => setIndexing(p) });
       setReport(next);
       setRows(null);
-      await refreshCache(sha);
+      await refreshCache(effectiveSha);
       if (next.rateLimitedUntil) {
         addToast(`GitHub rate limit reached — ${next.fetched} files cached; retry after ${next.rateLimitedUntil.toLocaleTimeString()}`, 'error');
       } else {
-        addToast(`Indexed ${next.indexed} files at ${sha.slice(0, 7)}`);
+        addToast(`Indexed ${next.indexed} files at ${effectiveSha === LOCAL_SHA ? 'the local working tree' : effectiveSha.slice(0, 7)}`);
       }
     } catch (err) {
       addToast(err instanceof Error ? err.message : String(err), 'error');
@@ -119,8 +150,8 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
 
   const loadRows = async (): Promise<RepoFileRow[]> => {
     if (rows) return rows;
-    if (!repoKey || !sha) return [];
-    const loaded = await listRepoFiles(repoKey, sha);
+    if (!repoKey || !effectiveSha) return [];
+    const loaded = await listRepoFiles(repoKey, effectiveSha);
     setRows(loaded);
     return loaded;
   };
@@ -193,7 +224,7 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
 
   // A Guided action elsewhere on the page (a trace node, a file) hands us a search.
   useEffect(() => {
-    if (!pendingSearch || !repoKey || !sha) return;
+    if (!pendingSearch || !repoKey || !effectiveSha) return;
     setMode(pendingSearch.mode);
     setQuery(pendingSearch.query);
     setPathGlob(pendingSearch.pathGlob ?? '');
@@ -218,7 +249,7 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
     };
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingSearch?.nonce, repoKey, sha]);
+  }, [pendingSearch?.nonce, repoKey, effectiveSha]);
 
   const evidence = change.evidence ?? [];
 
@@ -233,17 +264,32 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
       </div>
 
       <div className="p-5 space-y-5">
-        {!repository ? (
+        {(repository || localName) && (
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="text-gray-500 dark:text-gray-400">Source</span>
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <button type="button" disabled={!repository} onClick={() => setSourceKind('github')} className={`px-3 py-1.5 ${sourceKind === 'github' ? 'bg-violet-600 text-white' : 'text-gray-600 dark:text-gray-300'} disabled:opacity-40`}>
+                GitHub{repository ? ` · ${repository.owner}/${repository.repo}` : ''}
+              </button>
+              <button type="button" disabled={!localName} onClick={() => setSourceKind('local')} className={`px-3 py-1.5 ${sourceKind === 'local' ? 'bg-violet-600 text-white' : 'text-gray-600 dark:text-gray-300'} disabled:opacity-40`}>
+                Local directory{localName ? ` · ${localName}/` : ' · none picked'}
+              </button>
+            </div>
+            <Link to="/settings" className="underline text-gray-500 dark:text-gray-400">Settings</Link>
+          </div>
+        )}
+        {!repository && !localName ? (
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Bind a GitHub repository to this project to search its code.{' '}
             <Link to={`/projects/${project.id}/intents`} className="text-violet-600 dark:text-violet-400 underline">
               Bind repository
             </Link>
+            {' '}or pick a local directory in <Link to="/settings" className="underline">Settings</Link>.
           </p>
         ) : (
           <IndexBanner
-            label={`${repository.owner}/${repository.repo}`}
-            sha={sha}
+            label={sourceKind === 'local' ? `${localName}/ (local, read-only)` : `${repository!.owner}/${repository!.repo}`}
+            sha={effectiveSha}
             shaError={shaError}
             cacheCount={cacheCount}
             indexing={indexing}
@@ -255,7 +301,7 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
           />
         )}
 
-        {repository && sha && (
+        {effectiveSha && (
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
@@ -303,7 +349,7 @@ export function EvidenceSection({ change, project, onChanged }: Props) {
             {result && (
               <SearchResults
                 result={result}
-                repository={repository}
+                repository={sourceKind === 'github' ? repository : undefined}
                 adding={adding}
                 appendable={appendable}
                 onAdd={(hit) => void addHit(hit)}
@@ -354,7 +400,7 @@ function IndexBanner({
         <span className="font-medium text-gray-900 dark:text-white">{label}</span>
         {sha ? (
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            at <code>{sha.slice(0, 7)}</code> · {cacheCount} file{cacheCount === 1 ? '' : 's'} cached on this device
+            at <code>{sha === 'local' ? 'local working tree' : sha.slice(0, 7)}</code> · {cacheCount} file{cacheCount === 1 ? '' : 's'} cached on this device
           </span>
         ) : shaError ? (
           <span className="text-xs text-amber-700 dark:text-amber-300">could not resolve the commit ({shaError})</span>
@@ -410,7 +456,7 @@ function SearchResults({
   result, repository, adding, appendable, onAdd, projectId, workspaceId, onOpen,
 }: {
   result: SearchResult;
-  repository: { owner: string; repo: string };
+  repository?: { owner: string; repo: string };
   adding: string | null;
   appendable: boolean;
   onAdd: (hit: SearchHit) => void;
@@ -436,9 +482,11 @@ function SearchResults({
           <div key={path} className="p-3">
             <div className="flex items-center gap-2 text-xs">
               <span className="font-mono text-gray-700 dark:text-gray-300">{path}</span>
-              <span onClick={() => onOpen(path)}>
-                <SafeBlobLink repository={repository} sha={hits[0].sha} path={path} />
-              </span>
+              {repository && (
+                <span onClick={() => onOpen(path)}>
+                  <SafeBlobLink repository={repository} sha={hits[0].sha} path={path} />
+                </span>
+              )}
               <GuidedActionMenu projectId={projectId} workspaceId={workspaceId} repository={repository} path={path} sha={hits[0].sha} compact />
             </div>
             <ul className="mt-2 space-y-2">

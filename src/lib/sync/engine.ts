@@ -78,6 +78,9 @@ const DIRTY_KEY = 'sync.dirty'; // queue of { id, kind, deleted? } pending push
 // device-local by design — SPEC-intent-trace §8.1, audit S1.
 const DEVICE_LOCAL_METADATA_PREFIXES = ['sync.', 'github.'];
 function isDeviceLocalMetadata(key: string): boolean {
+  // Change Workspace local-directory handle (SPEC-change-workspace S11): a
+  // FileSystemDirectoryHandle is neither serializable nor another device's.
+  if (key.startsWith('repo.')) return true;
   return DEVICE_LOCAL_METADATA_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
