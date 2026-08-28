@@ -12,7 +12,7 @@ tests green.
 | IT-0 | 2026-08-28 | `b7fd63f` | Intent Trace schema: `IntentTrace` type, `UnderstandingObject.meta`, project `repository` + extraction cursor, Dexie v11 `intentTraces`, sync kind `intent_trace` (frontend + backend) |
 | IT-1 | 2026-08-28 | `4325cb2` | Pair selection (`selectIntentPairs`: user reply + nearest preceding assistant text, tool noise skipped, `promptI:null` ⇒ unprompted) + recall-oriented heuristic (`off`/`lenient`/`strict`); pure, no LLM |
 | IT-2 | 2026-08-28 | `fb0e467` | Intent extraction: prompt contract with origin, hallucination firewall (forced `unprompted`, verbatim statement, coerced promptedBy), pending `intent` objects + `supported`/`refined` events, pair-packed batches, `lastIntentExtractedAt` cursor; `getAssociatedConversations` shared with reconcile; intents excluded from the panel |
-| IT-3 | 2026-08-28 | _pending_ | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
+| IT-3 | 2026-08-28 | `8fd7d30` | GitHub: device-local token (`github.*` excluded from sync), hardened read-only client (constant host, header-only auth, validated owner/repo/sha/path, content-free errors, rate-limit errors, caches), Settings section with over-privilege warning, project repo-binding card |
 
 ---
 
