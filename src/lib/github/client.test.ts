@@ -17,6 +17,11 @@ import {
   isGitHubWebUrl,
   clearGitHubCaches,
   getLastRateLimit,
+  compareCommits,
+  getPullFiles,
+  compareUrl,
+  pullUrl,
+  assertRef,
 } from './client';
 
 type Call = { url: string; init: RequestInit };
@@ -231,5 +236,75 @@ describe('module surface (read-only law §2.4)', () => {
     await getTokenInfo({ token: 't', fetchImpl });
     expect(calls.every((c) => c.init.method === 'GET')).toBe(true);
     expect(vi.isMockFunction(fetch)).toBe(false); // sanity: global fetch untouched by this suite
+  });
+});
+
+describe('compareCommits / getPullFiles (SPEC-change-workspace §11, audit S2/S6)', () => {
+  it('compares two refs through api.github.com only and maps files', async () => {
+    const fetchImpl = fetchWith(() =>
+      jsonResponse({
+        base_commit: { sha: 'b'.repeat(40) },
+        merge_base_commit: { sha: 'b'.repeat(40) },
+        commits: [{ sha: 'c'.repeat(40) }, { sha: 'd'.repeat(40) }],
+        ahead_by: 2,
+        behind_by: 0,
+        total_commits: 2,
+        files: [
+          { filename: 'src/a.ts', status: 'modified', additions: 3, deletions: 1, patch: '@@ -1 +1 @@\n-a\n+b' },
+          { filename: 'img.png', status: 'added', additions: 0, deletions: 0 },
+          { filename: 'src/b.ts', status: 'renamed', additions: 0, deletions: 0, previous_filename: 'src/old.ts' },
+        ],
+      })
+    );
+    const result = await compareCommits('Kakob', 'Chatdex', 'main', 'feature/x', { token: 'ghp_x', fetchImpl });
+    expect(result).toEqual({
+      baseSha: 'b'.repeat(40),
+      headSha: 'd'.repeat(40),
+      aheadBy: 2,
+      behindBy: 0,
+      totalCommits: 2,
+      files: [
+        { path: 'src/a.ts', status: 'modified', additions: 3, deletions: 1, patch: '@@ -1 +1 @@\n-a\n+b' },
+        { path: 'img.png', status: 'added', additions: 0, deletions: 0 },
+        { path: 'src/b.ts', status: 'renamed', additions: 0, deletions: 0, previousPath: 'src/old.ts' },
+      ],
+    });
+    expect(calls[0].url).toBe(`${GITHUB_API_BASE}/repos/Kakob/Chatdex/compare/main...feature%2Fx`);
+    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer ghp_x');
+    expect(JSON.stringify(calls[0].init.body ?? null)).not.toContain('ghp_');
+  });
+
+  it('rejects traversal and junk refs before any request', async () => {
+    const fetchImpl = fetchWith(() => jsonResponse({}));
+    await expect(compareCommits('Kakob', 'Chatdex', '../x', 'main', { fetchImpl })).rejects.toThrow(/Invalid git ref/);
+    await expect(compareCommits('Kakob', 'Chatdex', 'main', 'a b', { fetchImpl })).rejects.toThrow(/Invalid git ref/);
+    expect(() => assertRef('/leading')).toThrow();
+    expect(() => assertRef('refs/heads/main')).not.toThrow();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('fetches PR metadata then files, validating the number and the html link', async () => {
+    const fetchImpl = fetchWith((url) =>
+      url.endsWith('/files?per_page=100')
+        ? jsonResponse([{ filename: 'src/a.ts', status: 'modified', additions: 1, deletions: 1, patch: '@@' }])
+        : jsonResponse({ number: 42, title: 'Scroll to match', html_url: 'https://evil.example/pull/42', base: { sha: 'b'.repeat(40) }, head: { sha: 'h'.repeat(40) } })
+    );
+    const pr = await getPullFiles('Kakob', 'Chatdex', 42, { fetchImpl });
+    expect(pr).toMatchObject({ number: 42, title: 'Scroll to match', baseSha: 'b'.repeat(40), headSha: 'h'.repeat(40) });
+    expect(pr.htmlUrl).toBe('https://github.com/Kakob/Chatdex/pull/42');
+    expect(pr.files).toEqual([{ path: 'src/a.ts', status: 'modified', additions: 1, deletions: 1, patch: '@@' }]);
+    expect(calls.map((c) => c.url)).toEqual([
+      `${GITHUB_API_BASE}/repos/Kakob/Chatdex/pulls/42`,
+      `${GITHUB_API_BASE}/repos/Kakob/Chatdex/pulls/42/files?per_page=100`,
+    ]);
+    await expect(getPullFiles('Kakob', 'Chatdex', 0, { fetchImpl })).rejects.toThrow(/pull request number/);
+    await expect(getPullFiles('Kakob', 'Chatdex', 1.5, { fetchImpl })).rejects.toThrow(/pull request number/);
+  });
+
+  it('builds compare / pull links only from validated parts', () => {
+    expect(compareUrl('Kakob', 'Chatdex', 'main', 'feature/x')).toBe('https://github.com/Kakob/Chatdex/compare/main...feature%2Fx');
+    expect(pullUrl('Kakob', 'Chatdex', 42)).toBe('https://github.com/Kakob/Chatdex/pull/42');
+    expect(() => compareUrl('Kakob', 'Chatdex', 'main', '<script>')).toThrow();
+    expect(() => pullUrl('Kakob', 'Chatdex', -1)).toThrow();
   });
 });

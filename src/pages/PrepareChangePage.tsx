@@ -13,6 +13,8 @@ import { getObjectsForProject } from '../lib/db/understanding';
 import { db } from '../lib/db/schema';
 import { EvidenceSection } from '../components/prepare/EvidenceSection';
 import { TraceSection } from '../components/prepare/TraceSection';
+import { HypothesisSection } from '../components/prepare/HypothesisSection';
+import { ImplementationSection } from '../components/prepare/ImplementationSection';
 import {
   getPreparedChange,
   listPreparedChangesForProject,
@@ -271,6 +273,27 @@ export function PrepareChangePage() {
                 }}
               />
             </div>
+            <div className="mt-6">
+              <HypothesisSection
+                change={selectedChange}
+                onChanged={async (changed) => {
+                  await load();
+                  openChange(changed.id);
+                }}
+              />
+            </div>
+            {data.project && (
+              <div className="mt-6">
+                <ImplementationSection
+                  change={selectedChange}
+                  project={data.project}
+                  onChanged={async (changed) => {
+                    await load();
+                    openChange(changed.id);
+                  }}
+                />
+              </div>
+            )}
             </div>
           )}
         </div>

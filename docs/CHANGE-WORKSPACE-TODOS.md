@@ -50,7 +50,8 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build-log row + commit hash (`3e1d106`)
 
 ### CW-3 — hypothesis + implementation
-- [ ] Hypothesis section with freeze; `compareCommits` / `getPullFiles`; Claude Code session attach; pasted diff; tests (S2)
+- [x] `HypothesisSection` with freeze display; `compareCommits` / `getPullFiles` / `compareUrl` / `pullUrl`; `implementation.ts` (session / PR / compare / pasted diff, `capPatches`); `ImplementationSection`; tests (S2, S4, S6, S7, freeze law)
+- [ ] Build-log row + commit hash
 
 ### CW-4 — verification
 - [ ] Matrix UI, `deriveVerificationHint`, `markVerified` gate, tests

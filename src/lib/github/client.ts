@@ -19,6 +19,8 @@ export const DEFAULT_COMMITS_PER_PAGE = 20;
 
 const NAME_RE = /^[A-Za-z0-9_.-]+$/;
 const SHA_RE = /^[0-9a-f]{7,40}$/;
+/** Branch / tag / sha as used in compare URLs: no spaces, no traversal, bounded. */
+const REF_RE = /^(?!.*\.\.)[A-Za-z0-9_./-]{1,120}$/;
 /** Classic-token scopes that grant more than read access. */
 const OVER_PRIVILEGED_SCOPES = /^(repo|delete_repo|workflow|write:.*|admin:.*)$/;
 
@@ -70,6 +72,10 @@ export function assertSha(sha: string): void {
 }
 
 /** Encode a repo-relative path segment by segment; rejects traversal and empties. */
+export function assertRef(ref: string): void {
+  if (!REF_RE.test(ref) || ref.startsWith('/') || ref.endsWith('/')) throw new Error('Invalid git ref');
+}
+
 export function encodeRepoPath(path: string): string {
   const segments = path.split('/');
   if (segments.some((s) => s === '' || s === '.' || s === '..')) {
@@ -361,4 +367,133 @@ export function blobUrl(
 /** Only github.com links from API payloads are ever rendered (audit S6). */
 export function isGitHubWebUrl(url: string): boolean {
   return url.startsWith(`${GITHUB_WEB_BASE}/`);
+}
+
+// --- diffs (SPEC-change-workspace §11, CW-3). Read-only; patches are returned
+// raw here and capped + secret-scrubbed by src/lib/prepare/implementation.ts
+// before anything is stored (audit S4, S7). ---
+
+export interface DiffFile {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  /** Unified-diff hunk text; absent for binary or very large files. */
+  patch?: string;
+  /** Previous path for renames. */
+  previousPath?: string;
+}
+
+function mapDiffFiles(list: unknown): DiffFile[] {
+  const files = list as Array<{
+    filename: string;
+    status?: string;
+    additions?: number;
+    deletions?: number;
+    patch?: string;
+    previous_filename?: string;
+  }>;
+  return files.map((f) => ({
+    path: f.filename,
+    status: f.status ?? 'modified',
+    additions: f.additions ?? 0,
+    deletions: f.deletions ?? 0,
+    ...(typeof f.patch === 'string' ? { patch: f.patch } : {}),
+    ...(f.previous_filename ? { previousPath: f.previous_filename } : {}),
+  }));
+}
+
+export interface CompareResult {
+  baseSha: string;
+  headSha: string;
+  aheadBy: number;
+  behindBy: number;
+  totalCommits: number;
+  files: DiffFile[];
+}
+
+/** `base...head` comparison. GitHub returns at most 300 files. */
+export async function compareCommits(
+  owner: string,
+  repo: string,
+  base: string,
+  head: string,
+  opts: GitHubClientOptions = {}
+): Promise<CompareResult> {
+  assertRepoName(owner, repo);
+  assertRef(base);
+  assertRef(head);
+  const { data } = await request(
+    `/repos/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`,
+    opts
+  );
+  const d = data as {
+    base_commit: { sha: string };
+    merge_base_commit?: { sha: string };
+    commits: Array<{ sha: string }>;
+    ahead_by?: number;
+    behind_by?: number;
+    total_commits?: number;
+    files?: unknown[];
+  };
+  const headSha = d.commits.length > 0 ? d.commits[d.commits.length - 1].sha : d.base_commit.sha;
+  return {
+    baseSha: d.merge_base_commit?.sha ?? d.base_commit.sha,
+    headSha,
+    aheadBy: d.ahead_by ?? d.commits.length,
+    behindBy: d.behind_by ?? 0,
+    totalCommits: d.total_commits ?? d.commits.length,
+    files: mapDiffFiles(d.files ?? []),
+  };
+}
+
+export function assertPullNumber(n: number): void {
+  if (!Number.isInteger(n) || n <= 0 || n > 10_000_000) throw new Error('Invalid pull request number');
+}
+
+export interface PullSummary {
+  number: number;
+  title: string;
+  baseSha: string;
+  headSha: string;
+  htmlUrl: string;
+  files: DiffFile[];
+}
+
+/** Pull request metadata + changed files (first 100). */
+export async function getPullFiles(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  opts: GitHubClientOptions = {}
+): Promise<PullSummary> {
+  assertRepoName(owner, repo);
+  assertPullNumber(pullNumber);
+  const { data: pr } = await request(`/repos/${owner}/${repo}/pulls/${pullNumber}`, opts);
+  const p = pr as { number: number; title: string; html_url: string; base: { sha: string }; head: { sha: string } };
+  const { data: files } = await request(`/repos/${owner}/${repo}/pulls/${pullNumber}/files`, opts, {
+    per_page: 100,
+  });
+  return {
+    number: p.number,
+    title: p.title,
+    baseSha: p.base.sha,
+    headSha: p.head.sha,
+    htmlUrl: isGitHubWebUrl(p.html_url) ? p.html_url : pullUrl(owner, repo, pullNumber),
+    files: mapDiffFiles(files),
+  };
+}
+
+/** Validated builders only — never interpolate user input into a link elsewhere (audit S6). */
+export function compareUrl(owner: string, repo: string, base: string, head: string): string {
+  assertRepoName(owner, repo);
+  assertRef(base);
+  assertRef(head);
+  return `${GITHUB_WEB_BASE}/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`;
+}
+
+export function pullUrl(owner: string, repo: string, pullNumber: number): string {
+  assertRepoName(owner, repo);
+  assertPullNumber(pullNumber);
+  return `${GITHUB_WEB_BASE}/${owner}/${repo}/pull/${pullNumber}`;
 }
