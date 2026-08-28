@@ -41,8 +41,9 @@ Companion to `docs/SPEC-change-workspace.md` and `docs/CHANGE-WORKSPACE-BUILD-LO
 - [x] Build-log row + commit hash (`a704ee0`)
 
 ### CW-1 — repository search
-- [ ] `src/lib/repo/{sources,githubSource,index,search}.ts` + tests (S8)
-- [ ] Evidence section UI, index banner, Settings "Clear repository cache"
+- [x] `src/lib/repo/{sources,githubSource,index,search}.ts` + tests (S8, S4, S1 gate)
+- [x] Evidence section UI (`src/components/prepare/EvidenceSection.tsx`), index banner + on-device disclosure, Settings "Clear repository cache"
+- [ ] Build-log row + commit hash
 
 ### CW-2 — trace
 - [ ] `src/lib/prepare/trace.ts` (`deriveEdgeVerification`, `traceSummary`), list editor, RTL tests (S6)

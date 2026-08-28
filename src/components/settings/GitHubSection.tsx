@@ -7,6 +7,8 @@ import { useEffect, useState } from 'react';
 import { CheckCircle, CircleAlert, Github, Loader2, Trash2 } from 'lucide-react';
 import { getGitHubToken, setGitHubToken, clearGitHubToken } from '../../lib/github/credentials';
 import { getTokenInfo, GitHubError, type TokenInfo } from '../../lib/github/client';
+import { clearRepoFileCache } from '../../lib/db/repoFiles';
+import { db } from '../../lib/db/schema';
 import { useToastStore } from '../../stores/toastStore';
 
 type TestState = { kind: 'idle' } | { kind: 'testing' } | { kind: 'ok'; info: TokenInfo } | { kind: 'failed'; message: string };
@@ -16,10 +18,18 @@ export function GitHubSection() {
   const [hasToken, setHasToken] = useState(false);
   const [input, setInput] = useState('');
   const [test, setTest] = useState<TestState>({ kind: 'idle' });
+  const [cacheCount, setCacheCount] = useState<number | null>(null);
 
   useEffect(() => {
     void getGitHubToken().then((t) => setHasToken(Boolean(t)));
+    void db.repoFiles.count().then(setCacheCount);
   }, []);
+
+  const handleClearCache = async () => {
+    await clearRepoFileCache();
+    setCacheCount(0);
+    addToast('Repository cache cleared from this device');
+  };
 
   const runTest = async () => {
     const token = await getGitHubToken();
@@ -64,7 +74,7 @@ export function GitHubSection() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">GitHub</h2>
       </div>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Used by Intent Trace to read a project&apos;s repository and check what is implemented.
+        Used by Intent Trace and Change Workspace evidence search to read a project&apos;s repository.
         Read-only. The token stays on this device (it is not synced) and is sent only to
         api.github.com — never to Chatdex&apos;s relay or to an LLM provider.
       </p>
@@ -153,6 +163,22 @@ export function GitHubSection() {
           <span className="font-medium">Metadata: Read</span>, expiring within 90 days. Public
           repositories also work without a token (60 requests/hour).
         </p>
+      </div>
+
+      <div className="mt-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-48 text-xs text-gray-600 dark:text-gray-400">
+          <span className="font-medium text-gray-900 dark:text-white">Repository cache</span> — read-only
+          copies of files that Change Workspace search indexed. Local to this device, never synced or sent
+          anywhere.{' '}
+          {cacheCount === null ? '' : `${cacheCount} file${cacheCount === 1 ? '' : 's'} cached.`}
+        </div>
+        <button
+          onClick={() => void handleClearCache()}
+          disabled={!cacheCount}
+          className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50"
+        >
+          Clear repository cache
+        </button>
       </div>
     </section>
   );

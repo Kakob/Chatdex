@@ -10,6 +10,8 @@ import {
   Save,
 } from 'lucide-react';
 import { getObjectsForProject } from '../lib/db/understanding';
+import { db } from '../lib/db/schema';
+import { EvidenceSection } from '../components/prepare/EvidenceSection';
 import {
   getPreparedChange,
   listPreparedChangesForProject,
@@ -28,11 +30,12 @@ import {
 import { downloadExport } from '../lib/exporters';
 import { useToastStore } from '../stores/toastStore';
 import type { PreparedChange } from '../types/preparedChange';
-import type { UnderstandingObject } from '../types/understanding';
+import type { UnderstandingObject, UnderstandingProject } from '../types/understanding';
 
 interface PageData {
   changes: PreparedChange[];
   understanding: UnderstandingObject[];
+  project: UnderstandingProject | null;
 }
 
 const accepted = (point: UnderstandingObject) =>
@@ -51,11 +54,12 @@ export function PrepareChangePage() {
 
   const load = useCallback(async () => {
     if (!projectId) return;
-    const [changes, points] = await Promise.all([
+    const [changes, points, project] = await Promise.all([
       listPreparedChangesForProject(projectId),
       getObjectsForProject(projectId, 'current'),
+      db.understandingProjects.get(projectId),
     ]);
-    setData({ changes, understanding: points.filter(accepted) });
+    setData({ changes, understanding: points.filter(accepted), project: project ?? null });
   }, [projectId]);
 
   useEffect(() => {
@@ -234,6 +238,7 @@ export function PrepareChangePage() {
             ))}
           </aside>
           {selectedChange && (
+            <div>
             <PreparedChangeBuilder
               key={`${selectedChange.id}:${selectedChange.updatedAt.toISOString()}`}
               change={selectedChange}
@@ -243,6 +248,19 @@ export function PrepareChangePage() {
                 openChange(changed.id);
               }}
             />
+            {data.project && (
+              <div className="mt-6">
+                <EvidenceSection
+                  change={selectedChange}
+                  project={data.project}
+                  onChanged={async (changed) => {
+                    await load();
+                    openChange(changed.id);
+                  }}
+                />
+              </div>
+            )}
+            </div>
           )}
         </div>
       )}
