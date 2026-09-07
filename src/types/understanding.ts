@@ -1,6 +1,6 @@
 import type { EvidenceItem } from './evidence';
 
-// Shared-understanding-workspace entities (PRD-shared-understanding-workspace.md §6-§11).
+// Shared-understanding-workspace entities (docs/tracks/understanding-workspace/PRD.md §6-§11).
 // Stored plaintext in IndexedDB, ciphertext in Postgres via the sync layer —
 // same privacy posture as findings/detector runs.
 //

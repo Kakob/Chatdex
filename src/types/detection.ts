@@ -1,4 +1,4 @@
-// Agent-observability entities (SPEC-agent-observability.md §3).
+// Agent-observability entities (docs/tracks/agent-observability/SPEC.md §3).
 // Stored plaintext in IndexedDB, ciphertext in Postgres via the sync layer.
 //
 // Deviations from the spec's field list, both additive:

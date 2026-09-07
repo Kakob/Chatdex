@@ -169,14 +169,14 @@ What crosses the network, per flow:
 | login | email, assertion | PRF output, unwrapped master key |
 | recover | email, **recovery code in cleartext (twice)** | master key |
 
-⚠️ **The recovery-path asymmetry** [CODE session.ts:163/:240/:262 vs DOC auth-architecture.md:50]: the PRF output genuinely never crosses the network — but the recovery code does, in cleartext, in the same requests that carry (register) or return (recover) `wrappedByRecovery`. A party with server-side visibility at that moment can derive the recovery wrapping key and decrypt the master key. `docs/auth-architecture.md:50` claims "the server never sees either wrapping key or the master key itself" — **true for the passkey wrap, false for the recovery wrap.** No comment anywhere acknowledges this; whether it's an accepted trade-off or an oversight is fog.
+⚠️ **The recovery-path asymmetry** [CODE session.ts:163/:240/:262 vs DOC docs/architecture/auth-architecture.md:50]: the PRF output genuinely never crosses the network — but the recovery code does, in cleartext, in the same requests that carry (register) or return (recover) `wrappedByRecovery`. A party with server-side visibility at that moment can derive the recovery wrapping key and decrypt the master key. `docs/architecture/auth-architecture.md:50` claims "the server never sees either wrapping key or the master key itself" — **true for the passkey wrap, false for the recovery wrap.** No comment anywhere acknowledges this; whether it's an accepted trade-off or an oversight is fog.
 
 Other boundaries: WebAuthn browser API (`navigator.credentials`), localStorage, the Fastify backend (CORS locked to one origin, Bearer-only, no cookies).
 
 ## Decisions embodied by the code
 
 **Decision:** Passkey-PRF-derived wrapping key instead of a password KDF.
-**Evidence:** [DOC auth-architecture.md:16-22, CLAUDE.md "do not reintroduce a password KDF"]; git shows `kdf.ts` added then deleted; `passwordHash.ts` is a renamed survivor of that era, now used only for recovery-code hashing. [CODE git log]
+**Evidence:** [DOC docs/architecture/auth-architecture.md:16-22, CLAUDE.md "do not reintroduce a password KDF"]; git shows `kdf.ts` added then deleted; `passwordHash.ts` is a renamed survivor of that era, now used only for recovery-code hashing. [CODE git log]
 **Consequence:** No password to phish or brute-force; but no PRF support ⇒ no cloud sync at all.
 **Trade-off:** gains phishing-resistance and zero password UX; gives up browser compatibility (PRF support is uneven) and offline unlock.
 
@@ -232,9 +232,9 @@ Other boundaries: WebAuthn browser API (`navigator.credentials`), localStorage, 
 
 ## Doc vs code disagreements
 
-- `auth-architecture.md:50/:63` — "server never sees key material": false for the recovery path. [CODE vs DOC]
-- `auth-architecture.md:111` — claims recover-finish leaves `wrapped_by_recovery_*` unchanged; it **does** overwrite them (`auth.ts:394-395`). [CODE vs DOC]
-- `auth-architecture.md:22` says Firefox can't sync; `CloudSyncSection.tsx:157` says "Firefox 122+" works. Neither is backed by a capability probe — `isPasskeySupported()` only checks `window.PublicKeyCredential`, so Firefox passes the gate and fails later at PRF read. [CODE vs DOC vs CODE]
+- `docs/architecture/auth-architecture.md:50/:63` — "server never sees key material": false for the recovery path. [CODE vs DOC]
+- `docs/architecture/auth-architecture.md:111` — claims recover-finish leaves `wrapped_by_recovery_*` unchanged; it **does** overwrite them (`auth.ts:394-395`). [CODE vs DOC]
+- `docs/architecture/auth-architecture.md:22` says Firefox can't sync; `CloudSyncSection.tsx:157` says "Firefox 122+" works. Neither is backed by a capability probe — `isPasskeySupported()` only checks `window.PublicKeyCredential`, so Firefox passes the gate and fails later at PRF read. [CODE vs DOC vs CODE]
 - `auth.ts:342-344` comment claims recover-finish regenerates the recovery hash; it doesn't. [CODE vs comment]
 - `session.ts:277-287` — a 10-line docstring describing a "rotate recovery code" feature is attached to `logout()`; that feature exists nowhere. [CODE — orphaned doc]
 - `CLAUDE.md` says never touch `src/crypto/`; actual path is `src/lib/crypto/`.

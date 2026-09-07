@@ -12,6 +12,6 @@ Detailed predictions, traces, modifications, verification, mistakes, and conclus
 
 | Exercise | Date | Area | Outcome | Ownership |
 |---|---|---|---|---|
-| [A001](exercises/A001-classify-undefined.md) | IN PROGRESS Sep 7, 2026 | Verification | ✓ Predicted | Predictable |
+| [A001](exercises/A001-classify-undefined-run-outcome.md) | IN PROGRESS Sep 7, 2026 | Verification | ✓ Predicted | Predictable |
 | [A002](exercises/A002-passing-vitest.md) | TODO | Verification |  | |
 | [A003](exercises/A003-zero-failed.md) | TODO | Verification |  |  |

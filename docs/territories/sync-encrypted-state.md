@@ -150,7 +150,7 @@ authStore.syncing/lastSyncAt/syncError   ← DEAD. Setters exist, engine never c
 - `sync.*` metadata must never sync (self-poisoning loop otherwise). [CODE + TEST engine.test.ts:98-133]
 - Client clocks are assumed roughly correct and monotonic — nothing validates `updatedAt` server-side beyond "non-empty string"; an unparseable date is *accepted* (NaN comparisons are false) and poisons ordering. [CODE sync.ts]
 - Re-applying a pulled record must be idempotent (`put`) — the cursor advances per page, so crash recovery replays a page.
-- **Assumed but violated in docs:** `docs/architecture.md` §5 says `kind varchar(20)`, "nine record types". Code says `varchar(32)`, 15 kinds — and **the only checked-in migration still creates `varchar(20)`**, so a DB provisioned via `db:migrate` breaks on `understanding_project` (21 chars). Per the build log, Neon was patched by hand. [CODE vs DOC vs migration — three-way disagreement]
+- **Assumed but violated in docs:** `docs/architecture/architecture.md` §5 says `kind varchar(20)`, "nine record types". Code says `varchar(32)`, 15 kinds — and **the only checked-in migration still creates `varchar(20)`**, so a DB provisioned via `db:migrate` breaks on `understanding_project` (21 chars). Per the build log, Neon was patched by hand. [CODE vs DOC vs migration — three-way disagreement]
 
 ## Failure modes
 

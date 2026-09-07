@@ -1,4 +1,4 @@
-// Decision Recovery entities (docs/specs/SPEC-decision-recovery.md §7).
+// Decision Recovery entities (docs/tracks/decision-recovery/SPEC.md §7).
 //
 // A Decision is an UnderstandingObject of type 'decision' — its scalar meta
 // (madeBy, basis, unsupportedAutonomous, …) lives in UnderstandingObject.meta,

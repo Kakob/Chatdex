@@ -193,4 +193,4 @@ Portfolio-time-versus-value: the syncable-passkey workaround gets ~90% of the re
 ## Related documents
 
 - [`architecture.md`](./architecture.md) — §1 (WebAuthn+PRF ceremony code), §2 (crypto primitives + key lifecycle), §3 (sync engine that consumes the master key)
-- Root [`CLAUDE.md`](../CLAUDE.md) — the invariants that keep the "no plaintext leaves the client" claim honest
+- Root [`CLAUDE.md`](../../CLAUDE.md) — the invariants that keep the "no plaintext leaves the client" claim honest

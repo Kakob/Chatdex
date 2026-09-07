@@ -23,7 +23,7 @@ AIPKMS is built **on top of** the conversation store that the Activity Tracker a
 
 **Source-of-truth docs:**
 - Core platform (search, analytics, export): [chatdex-prd.md](./chatdex-prd.md)
-- Activity Tracker (real-time extension): [PRD activity tracker.md](./PRD%20activity%20tracker.md)
+- Activity Tracker (real-time extension): [docs/tracks/activity-tracker/PRD.md](../tracks/activity-tracker/PRD.md)
 - AIPKMS (this doc): you are here
 
 ---

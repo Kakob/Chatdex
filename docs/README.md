@@ -6,36 +6,25 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 ## Navigation
 
-### For AI Coding Agents (Claude Code / Cursor)
+### For AI coding agents (Claude Code / Cursor)
 
-- **[CLAUDE.md](./CLAUDE.md)** — Primary instructions for AI agents. Read this before working on any part of the codebase. Covers tech stack, commands, project structure, architecture, and coding conventions.
+- **[CLAUDE.md](../CLAUDE.md)** — primary instructions. Read this before working on any part of the codebase: tech stack, commands, structure, architecture invariants, conventions.
 
-### Product Requirements
+### Feature work
 
-| Document | What it covers | Status |
-|---|---|---|
-| **[chatdex-prd.md](./chatdex-prd.md)** | Core platform PRD: search, analytics, export, conversation browser, prompt library | Source of truth |
-| **[prd-aipkms.md](./prd-aipkms.md)** | AIPKMS feature PRD: anchoring, threads, resurfacing, synthesis, workspaces | Source of truth |
-| **[PRD activity tracker.md](./PRD%20activity%20tracker.md)** | Activity Tracker PRD: real-time timeline, token usage, artifact capture | Source of truth |
+- **[tracks/](./tracks/)** — one folder per feature track, holding that track's spec, PRD, plan, build log and todos. **[tracks/README.md](./tracks/README.md)** carries the status table for every track and is the single place track status is recorded.
 
-### Specifications (implementation handoffs)
+### Everything else
 
-| Document | What it covers | Status |
-|---|---|---|
-| **[SPEC-agent-observability.md](./SPEC-agent-observability.md)** | Agent observability layer: loop / verification-absence / reversion detectors, client-side only | Built (Phases 0–8) |
-| **[SPEC-decision-investigation.md](./SPEC-decision-investigation.md)** | Decision Investigation: human-only provenance workbench, cases, exhibits, verdicts | MVP code-complete |
-| **[PRD-shared-understanding-workspace.md](./PRD-shared-understanding-workspace.md)** | Shared Understanding Workspace PRD (stages U0–U6) | Built |
-| **[SPEC-intent-trace.md](./SPEC-intent-trace.md)** | Intent Trace: extract stated intents (unprompted vs reply-to-AI) from chats, trace against spec docs and GitHub code | In progress — see [INTENT-TRACE-BUILD-LOG.md](./INTENT-TRACE-BUILD-LOG.md) |
-| **[SPEC-change-workspace.md](./SPEC-change-workspace.md)** | Change Workspace: intent → evidence → trace → hypothesis → implementation → verification → learned → promote; Guided / Assisted modes (PRD: [PRD-code-ownership-loop.md](./PRD-code-ownership-loop.md)) | Built (CW-0…CW-8) — see [CHANGE-WORKSPACE-BUILD-LOG.md](./CHANGE-WORKSPACE-BUILD-LOG.md); manual §18 passes pending |
-| **[SPEC-decision-recovery.md](./specs/SPEC-decision-recovery.md)** | Decision Recovery (the Decision spine): recover implicit agent decisions from sessions into first-class Decision objects with alternatives, assumptions labelled specified / inherited / inferred / invented / unknown, exact hunks + verified code links, text-level blast radius, replacement-change seeding, Semantic Decision Diff | Built 2026-09-07 (DR-0…DR-7; Jacob's §16 browser pass pending); log: [DECISION-RECOVERY-BUILD-LOG.md](./agent-build-logs-assessments-plans/DECISION-RECOVERY-BUILD-LOG.md); todos: [DECISION-RECOVERY-TODOS.md](./TODOS/DECISION-RECOVERY-TODOS.md) |
-| **[SPEC-flow-map.md](./specs/SPEC-flow-map.md)** | Flow Map: generate a sha-pinned map of every route, interactive element, and the code chain each one runs (handlers → stores → API calls → endpoints → tables) from the local repository cache; declared/heuristic confidence, fog panel, keep-as-understanding, open-as-trace | Draft (2026-09-07) — spec pending approval; log: [FLOW-MAP-BUILD-LOG.md](./agent-build-logs-assessments-plans/FLOW-MAP-BUILD-LOG.md) |
-
-### Vision & Background
-
-| Document | What it covers |
+| Folder | What lives there |
 |---|---|
-| **[claude-aipkms.md](./claude-aipkms.md)** | Narrative vision for AIPKMS — the "why" and compounding value story |
-| **[Claude activity tracker.md](./Claude%20activity%20tracker.md)** | Technical implementation guide for the Activity Tracker browser extension |
+| **[prds/](./prds/)** | Product-level PRDs spanning tracks: [core platform](./prds/chatdex-prd.md), [AIPKMS](./prds/prd-aipkms.md), [PatternMirror](./prds/PRD-patternmirror.md), [research contribution](./prds/PRD-research-contribution.md) |
+| **[architecture/](./architecture/)** | [System architecture](./architecture/architecture.md) and [auth architecture](./architecture/auth-architecture.md) |
+| **[territories/](./territories/)** | Territory guides — how one capability works end to end ([index](./territories/README.md)) |
+| **[ownership/](./ownership/)** | The code-ownership loop: exercises, investigations, module notes, audit log ([index](./ownership/README.md)) |
+| **[assessments/](./assessments/)** | Point-in-time repo reconnaissance ([current state](./assessments/chatdex-current-state-reconnaissance.md)) and `recon-screenshots/` |
+| **[vision/](./vision/)** | Narrative vision: [AIPKMS](./vision/claude-aipkms.md), [toolkit → AIPKMS roadmap](./vision/roadmap-toolkit-to-aipkms.md) |
+| **[archive/](./archive/)** | Superseded documents, kept for history — links inside are intentionally not maintained |
 
 ---
 
