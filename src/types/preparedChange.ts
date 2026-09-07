@@ -150,6 +150,8 @@ export type WorkspaceOriginKind =
   | 'finding'
   | 'issue'
   | 'commit'
+  /** Seeded from a recovered decision (SPEC-decision-recovery §11.3). */
+  | 'decision'
   | 'manual';
 
 export interface WorkspaceOriginRef {

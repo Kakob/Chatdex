@@ -4,7 +4,7 @@
 // learned → promote → questions). `?view=timeline` shows the read-only
 // reconstruction used by Investigate History (PRD §18).
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { FileCheck2, History, Loader2, Plus } from 'lucide-react';
 import { getObjectsForProject } from '../lib/db/understanding';
@@ -12,6 +12,7 @@ import { db } from '../lib/db/schema';
 import { listPreparedChangesForProject } from '../lib/db/preparedChanges';
 import { createPreparedChange } from '../lib/prepare/changes';
 import { linkQuestion } from '../lib/prepare/lifecycle';
+import { createReplacementWorkspace } from '../lib/understanding/decisions/replacement';
 import { sectionAnchor } from '../lib/prepare/rail';
 import { WorkspaceRail } from '../components/prepare/WorkspaceRail';
 import { IntentSection } from '../components/prepare/IntentSection';
@@ -80,6 +81,40 @@ export function PrepareChangePage() {
       setShowCreate(true);
     }
   }, [data, searchParams]);
+
+  // ?decision=<id> opens (or seeds, once) the replacement workspace for a
+  // recovered decision (SPEC-decision-recovery §11.3). Creation happens in a
+  // promise callback, never synchronously in the effect; the ref guards a
+  // second creation while the first is in flight.
+  const decisionId = searchParams.get('decision');
+  const seedingDecision = useRef<string | null>(null);
+  useEffect(() => {
+    if (!decisionId || !projectId || !data) return;
+    const existing = data.changes.find((c) => c.originRef?.kind === 'decision' && c.originRef.id === decisionId);
+    const next = new URLSearchParams(searchParams);
+    next.delete('decision');
+    if (existing) {
+      next.set('change', existing.id);
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    if (seedingDecision.current === decisionId) return;
+    seedingDecision.current = decisionId;
+    void createReplacementWorkspace(projectId, decisionId)
+      .then(async (change) => {
+        await load();
+        next.set('change', change.id);
+        setSearchParams(next, { replace: true });
+        addToast('Replacement workspace seeded from the decision — edit the desired behavior');
+      })
+      .catch((error: unknown) => {
+        addToast(error instanceof Error ? error.message : String(error), 'error');
+        setSearchParams(next, { replace: true });
+      })
+      .finally(() => {
+        seedingDecision.current = null;
+      });
+  }, [decisionId, projectId, data, searchParams, setSearchParams, load, addToast]);
 
   // ?question=<id> seeds a workspace from a question (PRD §21).
   const questionId = searchParams.get('question');

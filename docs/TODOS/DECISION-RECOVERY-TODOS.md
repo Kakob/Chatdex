@@ -44,10 +44,10 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Page test
 
 ### DR-4 — code links, blast radius, replacement change, challenge
-- [ ] `blastRadius.ts` + `BlastRadiusPanel`
-- [ ] `WorkspaceOriginKind 'decision'`, `?decision=` seeding, `FromWorkspaceLine` label
-- [ ] `challenge.ts`
-- [ ] Tests: blast radius fixture, zero fetch, challenge pending-only
+- [x] `blastRadius.ts` + `BlastRadiusPanel`
+- [x] `WorkspaceOriginKind 'decision'`, `?decision=` seeding, `FromWorkspaceLine` label
+- [x] `challenge.ts`
+- [x] Tests: blast radius fixture, zero fetch, challenge pending-only
 
 ### DR-5 — semantic decision diff
 - [ ] `diff.ts`, `decisionDiffs` helpers, `DecisionDiffView`, run picker, record-as-contradicted

@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, History, Loader2 } from 'lucide-react';
+import { ArrowLeft, History, Loader2, MessageSquareWarning, PencilRuler, Radar } from 'lucide-react';
 import { db } from '../lib/db/schema';
 import { getUnderstandingObject, getUnderstandingProject, getEventsForObject, setObjectReviewState } from '../lib/db/understanding';
 import { listDecisionTracesForDecision } from '../lib/db/decisionTraces';
@@ -15,6 +15,12 @@ import { excerpt as excerptRows } from '../lib/repo/search';
 import { mergeEvidence, type EvidenceLink } from '../lib/understanding/currentUnderstanding';
 import { readDecisionMeta, type DecisionMeta } from '../lib/understanding/decisions/meta';
 import { BASIS_HELP } from '../lib/understanding/decisions/decisionMatrix';
+import { planChallenge, runChallenge, type ChallengePlan } from '../lib/understanding/decisions/challenge';
+import { buildDisclosure, type DisclosureSummary } from '../lib/understanding/runDiscovery';
+import { listReadyProviders, getProviderAuthMode } from '../lib/providers';
+import type { AuthMode, LLMProviderId } from '../lib/providers';
+import { BlastRadiusPanel } from '../components/decisions/BlastRadiusPanel';
+import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { BasisBadge, MadeByChip, UnsupportedBadge } from '../components/decisions/BasisBadge';
 import { AssumptionList } from '../components/decisions/AssumptionList';
 import { CodeEvidenceList, Quote, SpanLinks } from '../components/decisions/EvidenceLists';
@@ -44,6 +50,11 @@ export function DecisionDetailPage() {
   const [data, setData] = useState<Loaded | null | undefined>(undefined);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openFile, setOpenFile] = useState<{ ev: CodeEvidence; text: string } | null>(null);
+  const [showRadius, setShowRadius] = useState(false);
+  const [providers, setProviders] = useState<LLMProviderId[]>([]);
+  const [pendingChallenge, setPendingChallenge] = useState<{ plan: ChallengePlan; disclosure: DisclosureSummary; authMode: AuthMode } | null>(null);
+  const [challenging, setChallenging] = useState(false);
+  const [lastChallenge, setLastChallenge] = useState<{ verdict: string; text: string } | null>(null);
 
   // Fetch returns data; state is set by callers (effect / actions), never
   // synchronously inside the effect.
@@ -77,13 +88,44 @@ export function DecisionDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    void fetchDetail().then((loaded) => {
-      if (!cancelled) setData(loaded);
+    void Promise.all([fetchDetail(), listReadyProviders()]).then(([loaded, ready]) => {
+      if (cancelled) return;
+      setData(loaded);
+      setProviders(ready);
     });
     return () => {
       cancelled = true;
     };
   }, [fetchDetail]);
+
+  const handleChallengeClick = async () => {
+    const provider = providers[0];
+    if (!provider || !objectId) return;
+    try {
+      const plan = await planChallenge(objectId, provider);
+      const conversations = plan.conversationIds.length ? await db.conversations.where('id').anyOf(plan.conversationIds).toArray() : [];
+      setPendingChallenge({ plan, disclosure: buildDisclosure(conversations, provider), authMode: await getProviderAuthMode(provider) });
+    } catch (err) {
+      addToast(`Cannot challenge: ${(err as Error).message}`, 'error');
+    }
+  };
+
+  const handleChallengeConfirm = async () => {
+    if (!pendingChallenge) return;
+    const { plan } = pendingChallenge;
+    setPendingChallenge(null);
+    setChallenging(true);
+    try {
+      const result = await runChallenge(plan);
+      setLastChallenge({ verdict: result.verdict, text: result.text });
+      addToast(`Challenge recorded as a pending ${result.event.op} event — review it in History`);
+      setData(await fetchDetail());
+    } catch (err) {
+      addToast(`Challenge failed: ${(err as Error).message}`, 'error');
+    } finally {
+      setChallenging(false);
+    }
+  };
 
   const handleReview = async (state: ReviewState) => {
     if (!objectId) return;
@@ -141,8 +183,48 @@ export function DecisionDetailPage() {
           <button type="button" onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
             <History size={14} /> History
           </button>
+          {latest && (
+            <button
+              type="button"
+              onClick={() => setShowRadius((v) => !v)}
+              aria-pressed={showRadius}
+              className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              <Radar size={14} /> Blast radius
+            </button>
+          )}
+          {latest && (
+            <button
+              type="button"
+              onClick={() => void handleChallengeClick()}
+              disabled={providers.length === 0 || challenging}
+              title={providers.length === 0 ? 'Configure an LLM provider in Settings' : 'Ask your provider to argue against this decision; the result lands as a pending event'}
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-300 dark:border-violet-800 px-2.5 py-1.5 text-sm text-violet-700 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50"
+            >
+              {challenging ? <Loader2 size={14} className="animate-spin" /> : <MessageSquareWarning size={14} />} Challenge
+            </button>
+          )}
+          <Link
+            to={`/projects/${projectId}/prepare?decision=${encodeURIComponent(object.id)}`}
+            className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-sm text-white hover:bg-violet-700"
+            data-testid="prepare-replacement"
+          >
+            <PencilRuler size={14} /> Prepare replacement change
+          </Link>
         </div>
+        {lastChallenge && (
+          <div className="mt-3 rounded-lg border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20 p-3 text-sm" data-testid="challenge-result">
+            <p className="text-xs uppercase tracking-wide text-violet-600 dark:text-violet-300">AI challenge · {lastChallenge.verdict.replace('_', ' ')} · pending your review</p>
+            <p className="mt-1 whitespace-pre-wrap text-gray-800 dark:text-gray-200">{lastChallenge.text}</p>
+          </div>
+        )}
       </section>
+
+      {showRadius && latest && (
+        <Section title="Blast radius" subtitle="heuristic · from the local cache and imported sessions">
+          <BlastRadiusPanel trace={latest} projectId={projectId} />
+        </Section>
+      )}
 
       {meta.source === 'investigation' && (
         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -270,6 +352,22 @@ export function DecisionDetailPage() {
         <EvidenceLinks evidence={data.evidence} />
       </Section>
 
+      {pendingChallenge && (
+        <DisclosureModal
+          disclosure={pendingChallenge.disclosure}
+          authMode={pendingChallenge.authMode}
+          actionLabel="Decision challenge"
+          title={`Send this decision${pendingChallenge.plan.excerptPaths.length ? ' and repository excerpts' : ''} to ${pendingChallenge.disclosure.providerLabel}?`}
+          sendsDescription={
+            `the decision statement, its reconstructed rationale, ${pendingChallenge.plan.trace?.assumptions.length ?? 0} assumption${(pendingChallenge.plan.trace?.assumptions.length ?? 0) !== 1 ? 's' : ''}, its transcript quotes` +
+            (pendingChallenge.plan.excerptPaths.length ? `, and code windows from ${pendingChallenge.plan.excerptPaths.length} file${pendingChallenge.plan.excerptPaths.length !== 1 ? 's' : ''}` : '') +
+            '. The verdict lands as a pending event you review'
+          }
+          confirmLabel="Send and challenge"
+          onConfirm={() => void handleChallengeConfirm()}
+          onCancel={() => setPendingChallenge(null)}
+        />
+      )}
       {historyOpen && <HistoryDrawer objectId={object.id} onClose={() => setHistoryOpen(false)} />}
     </div>
   );
