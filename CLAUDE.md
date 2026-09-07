@@ -22,6 +22,8 @@ Chatdex is a **local-first AI-conversation workspace**. It ingests conversation 
 
 **Also approved 2026-08-28:** the Change Workspace — `docs/SPEC-change-workspace.md` (PRD: `docs/PRD-code-ownership-loop.md`). Extends Prepare Change into a persistent workspace: intent → evidence (repo search over a local read-only file cache) → trace → hypothesis → implementation (attached, never produced by Chatdex) → verification → learned → promote. Milestones CW-0…CW-8 are all committed (log: `docs/CHANGE-WORKSPACE-BUILD-LOG.md`; Jacob's remaining actions: `docs/CHANGE-WORKSPACE-TODOS.md`); the spec's §2 laws and §15 security audit are binding. Guided mode makes no LLM calls; Assisted mode (CW-7) is disclosed, opt-in, and lands only as `ai_inference`.
 
+**Drafted 2026-09-07 (pending approval):** the Flow Map — `docs/specs/SPEC-flow-map.md`. Generates, from the local read-only repository cache and with zero network calls, a sha-pinned map of every route and interactive element and the code chain each runs, down to backend endpoints and IndexedDB tables. The derived map is LOCAL-ONLY (Dexie v13, never synced); only human-kept flows sync, as `UnderstandingObject { type: 'flow' }`. Every link carries `declared | heuristic` confidence and heuristic links never export to a trace as `verified`. Milestones FM-0…FM-5 (log: `docs/agent-build-logs-assessments-plans/FLOW-MAP-BUILD-LOG.md`; todos: `docs/TODOS/FLOW-MAP-TODOS.md`). Not yet approved: confirm the spec's §21 decisions before FM-0.
+
 If a request conflicts with the spec, say so and ask rather than silently diverging.
 
 ## Hard architectural invariants

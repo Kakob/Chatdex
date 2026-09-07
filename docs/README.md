@@ -27,6 +27,7 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 | **[PRD-shared-understanding-workspace.md](./PRD-shared-understanding-workspace.md)** | Shared Understanding Workspace PRD (stages U0–U6) | Built |
 | **[SPEC-intent-trace.md](./SPEC-intent-trace.md)** | Intent Trace: extract stated intents (unprompted vs reply-to-AI) from chats, trace against spec docs and GitHub code | In progress — see [INTENT-TRACE-BUILD-LOG.md](./INTENT-TRACE-BUILD-LOG.md) |
 | **[SPEC-change-workspace.md](./SPEC-change-workspace.md)** | Change Workspace: intent → evidence → trace → hypothesis → implementation → verification → learned → promote; Guided / Assisted modes (PRD: [PRD-code-ownership-loop.md](./PRD-code-ownership-loop.md)) | Built (CW-0…CW-8) — see [CHANGE-WORKSPACE-BUILD-LOG.md](./CHANGE-WORKSPACE-BUILD-LOG.md); manual §18 passes pending |
+| **[SPEC-flow-map.md](./specs/SPEC-flow-map.md)** | Flow Map: generate a sha-pinned map of every route, interactive element, and the code chain each one runs (handlers → stores → API calls → endpoints → tables) from the local repository cache; declared/heuristic confidence, fog panel, keep-as-understanding, open-as-trace | Draft (2026-09-07) — spec pending approval; log: [FLOW-MAP-BUILD-LOG.md](./agent-build-logs-assessments-plans/FLOW-MAP-BUILD-LOG.md) |
 
 ### Vision & Background
 
