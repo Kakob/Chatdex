@@ -27,6 +27,7 @@ import type {
 import type { SyncKind } from './syncApi';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { IntentTrace, CommitEvidence } from '../../types/intentTrace';
+import type { DecisionTrace } from '../../types/decision';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
   kind: TKind;
@@ -224,6 +225,9 @@ export function envelopeUnderstandingProject(
       ...(p.lastIntentExtractedAt
         ? { lastIntentExtractedAt: dateToIso(p.lastIntentExtractedAt) }
         : {}),
+      ...(p.lastDecisionRecoveredAt
+        ? { lastDecisionRecoveredAt: dateToIso(p.lastDecisionRecoveredAt) }
+        : {}),
     },
   };
 }
@@ -234,6 +238,7 @@ export function rehydrateUnderstandingProject(payload: unknown): UnderstandingPr
     updatedAt: string;
     lastReconciledAt?: string;
     lastIntentExtractedAt?: string;
+    lastDecisionRecoveredAt?: string;
   };
   return {
     ...p,
@@ -242,6 +247,9 @@ export function rehydrateUnderstandingProject(payload: unknown): UnderstandingPr
     ...(p.lastReconciledAt ? { lastReconciledAt: isoToDate(p.lastReconciledAt) } : {}),
     ...(p.lastIntentExtractedAt
       ? { lastIntentExtractedAt: isoToDate(p.lastIntentExtractedAt) }
+      : {}),
+    ...(p.lastDecisionRecoveredAt
+      ? { lastDecisionRecoveredAt: isoToDate(p.lastDecisionRecoveredAt) }
       : {}),
   };
 }
@@ -535,4 +543,22 @@ export function rehydrateIntentTrace(payload: unknown): IntentTrace {
         }
       : {}),
   };
+}
+
+// --- Decision traces (SPEC-decision-recovery §7.6) ---------------------------
+// The only Date is createdAt; spans and code evidence carry no timestamps.
+// parentId is the decision object so deleting it cascades to its traces.
+
+export function envelopeDecisionTrace(t: DecisionTrace): SyncEnvelope<'decision_trace'> {
+  return {
+    kind: 'decision_trace',
+    parentId: t.decisionObjectId,
+    updatedAt: t.createdAt,
+    payload: { ...t, createdAt: dateToIso(t.createdAt) },
+  };
+}
+
+export function rehydrateDecisionTrace(payload: unknown): DecisionTrace {
+  const { createdAt, ...rest } = payload as Omit<DecisionTrace, 'createdAt'> & { createdAt: string };
+  return { ...rest, createdAt: isoToDate(createdAt) };
 }

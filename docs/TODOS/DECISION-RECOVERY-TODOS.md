@@ -26,14 +26,14 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Flow Map draft → Dexie v14
 
 ### DR-1 — types, storage, sync, deterministic capture
-- [ ] `src/types/decision.ts`
-- [ ] Dexie v13: `decisionTraces` (synced), `agentInspections`, `decisionDiffs` (local); `clearAllData`; conversation cascade
-- [ ] `src/lib/db/{decisionTraces,agentInspections,decisionDiffs}.ts`
-- [ ] Sync kind `decision_trace`: `syncApi.ts`, `serializer.ts`, `engine.ts` (remove / apply / read / full-push / hooks / parent cascade), backend `KindSchema` + Drizzle enum
-- [ ] `src/lib/investigation/agentInspections.ts` deriver + backfill + import hook
-- [ ] `src/lib/understanding/decisions/sessionCommits.ts`
-- [ ] Tests: local-only guard (verno 13), serializer round trip, engine coverage, deriver, commits
-- [ ] Build-log row
+- [x] `src/types/decision.ts`
+- [x] Dexie v13: `decisionTraces` (synced), `agentInspections`, `decisionDiffs` (local); `clearAllData`; conversation cascade
+- [x] `src/lib/db/{decisionTraces,agentInspections,decisionDiffs}.ts`
+- [x] Sync kind `decision_trace`: `syncApi.ts`, `serializer.ts`, `engine.ts` (remove / apply / read / full-push / hooks / parent cascade), backend `KindSchema` + Drizzle enum
+- [x] `src/lib/investigation/agentInspections.ts` deriver + backfill + import hook
+- [x] `src/lib/understanding/decisions/sessionCommits.ts`
+- [x] Tests: local-only guard (verno 13), serializer round trip, engine coverage, deriver, commits
+- [x] Build-log row
 
 ### DR-2 — recovery pipeline
 - [ ] `candidates.ts`, `prompt.ts`, `firewall.ts`, `runRecovery.ts`, `symbols.ts`, `decisionMatrix.ts`, `fromInvestigation.ts`

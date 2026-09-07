@@ -327,3 +327,72 @@ describe('intent traces (SPEC-intent-trace §11.4)', () => {
     expect(await db.intentTraces.get(traceId)).toBeUndefined();
   });
 });
+
+describe('decision traces (SPEC-decision-recovery §7.6)', () => {
+  const traceRow = (id: string, decisionObjectId: string) => ({
+    id,
+    projectId: 'up-1',
+    decisionObjectId,
+    runId: 'run-1',
+    alternatives: [],
+    assumptions: [],
+    transcriptEvidence: [
+      { conversationId: 'c1', messageId: 'm1', stepIndex: 0, role: 'user_msg' as const, quote: 'x', startOffset: 0, endOffset: 1 },
+    ],
+    anchorStableKeys: [],
+    implEvidence: [],
+    symbols: [],
+    testPaths: [],
+    invalidates: [],
+    fetchedPaths: [],
+    provider: 'anthropic' as const,
+    model: 'claude-opus-5',
+    warnings: [],
+    createdAt: new Date('2026-09-07T10:00:00Z'),
+  });
+
+  it('pushes local traces as decision_trace records with the decision as parent', async () => {
+    const traceId = crypto.randomUUID();
+    await db.decisionTraces.put(traceRow(traceId, 'uo-d1'));
+    await syncEngine.tick();
+    const pushed = pushedRecords().find((r) => r.id === traceId);
+    expect(pushed?.kind).toBe('decision_trace');
+    expect(pushed?.parentId).toBe('uo-d1');
+  });
+
+  it('deleting a decision object from the server cascades to its traces', async () => {
+    const objectId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
+    await db.understandingObjects.put({
+      id: objectId,
+      projectId: 'up-1',
+      type: 'decision',
+      title: 'Deletion is permanent',
+      status: 'current',
+      origin: 'ai',
+      reviewState: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.decisionTraces.put(traceRow(traceId, objectId));
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: objectId,
+          kind: 'understanding_object',
+          parentId: 'up-1',
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await db.understandingObjects.get(objectId)).toBeUndefined();
+    expect(await db.decisionTraces.get(traceId)).toBeUndefined();
+  });
+});

@@ -27,6 +27,7 @@ const KindSchema = z.enum([
   'investigation_finding',
   'prepared_change',
   'intent_trace',
+  'decision_trace',
 ]);
 
 const PushRecordSchema = z.object({

@@ -29,11 +29,17 @@ beforeEach(async () => {
 
 const sha = 'a'.repeat(40);
 
-describe('Dexie v12 local-only tables', () => {
-  it('is at schema version 12', () => {
-    expect(db.verno).toBe(12);
+describe('Dexie v12/v13 local-only tables', () => {
+  it('is at schema version 13', () => {
+    expect(db.verno).toBe(13);
     expect(db.tables.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['repoFiles', 'inspections'])
+      expect.arrayContaining([
+        'repoFiles',
+        'inspections',
+        'decisionTraces',
+        'agentInspections',
+        'decisionDiffs',
+      ])
     );
   });
 
@@ -93,7 +99,9 @@ describe('Dexie v12 local-only tables', () => {
   it('is never referenced by the sync engine or serializer (audit S1 / S12)', () => {
     for (const file of ['engine.ts', 'serializer.ts', 'syncApi.ts']) {
       const text = readFileSync(resolve(__dirname, '../sync', file), 'utf8');
-      expect(text, `${file} must not touch local-only tables`).not.toMatch(/repoFiles|inspections/);
+      expect(text, `${file} must not touch local-only tables`).not.toMatch(
+        /repoFiles|inspections|agentInspections|decisionDiffs/
+      );
     }
   });
 });

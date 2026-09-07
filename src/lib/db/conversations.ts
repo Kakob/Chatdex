@@ -48,6 +48,7 @@ export async function deleteConversation(id: string): Promise<void> {
       db.detectorRuns,
       db.projectAssociations,
       db.investigationAnchors,
+      db.agentInspections,
       db.investigationCases,
       db.caseExhibits,
       db.reviewScopes,
@@ -69,6 +70,7 @@ export async function deleteConversation(id: string): Promise<void> {
       // can back multiple conversations, and deletion policy for primary
       // sources is a separate decision (spec §14).
       await db.investigationAnchors.where('conversationId').equals(id).delete();
+      await db.agentInspections.where('conversationId').equals(id).delete();
       // Cases and their evidence cannot outlive their primary source without
       // silently appearing authoritative (spec §14) — cascade for now;
       // tombstoning adjudicated cases is a DI-3 concern.
@@ -121,6 +123,7 @@ export async function deleteConversationsBySource(source: DataSource): Promise<v
       db.detectorRuns,
       db.projectAssociations,
       db.investigationAnchors,
+      db.agentInspections,
       db.investigationCases,
       db.caseExhibits,
       db.reviewScopes,
@@ -139,6 +142,7 @@ export async function deleteConversationsBySource(source: DataSource): Promise<v
       await db.detectorRuns.where('conversationId').anyOf(ids).delete();
       await db.projectAssociations.where('conversationId').anyOf(ids).delete();
       await db.investigationAnchors.where('conversationId').anyOf(ids).delete();
+      await db.agentInspections.where('conversationId').anyOf(ids).delete();
       await db.investigationCases.where('conversationId').anyOf(ids).delete();
       await db.caseExhibits.where('conversationId').anyOf(ids).delete();
       await db.reviewScopes.where('conversationId').anyOf(ids).delete();
@@ -161,6 +165,7 @@ export async function clearConversations(): Promise<void> {
       db.detectorRuns,
       db.projectAssociations,
       db.investigationAnchors,
+      db.agentInspections,
       db.investigationCases,
       db.caseExhibits,
       db.reviewScopes,
@@ -175,6 +180,7 @@ export async function clearConversations(): Promise<void> {
       await db.detectorRuns.clear();
       await db.projectAssociations.clear();
       await db.investigationAnchors.clear();
+      await db.agentInspections.clear();
       await db.investigationCases.clear();
       await db.caseExhibits.clear();
       await db.reviewScopes.clear();

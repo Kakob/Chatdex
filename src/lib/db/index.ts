@@ -19,6 +19,9 @@ export * from './investigationAnchors';
 export * from './investigationCases';
 export * from './preparedChanges';
 export * from './intentTraces';
+export * from './decisionTraces';
+export * from './agentInspections';
+export * from './decisionDiffs';
 
 import { db } from './schema';
 
@@ -52,6 +55,9 @@ export async function clearAllData(): Promise<void> {
       db.intentTraces,
       db.repoFiles,
       db.inspections,
+      db.decisionTraces,
+      db.agentInspections,
+      db.decisionDiffs,
     ],
     async () => {
       await db.conversations.clear();
@@ -80,6 +86,9 @@ export async function clearAllData(): Promise<void> {
       await db.intentTraces.clear();
       await db.repoFiles.clear();
       await db.inspections.clear();
+      await db.decisionTraces.clear();
+      await db.agentInspections.clear();
+      await db.decisionDiffs.clear();
     }
   );
 }

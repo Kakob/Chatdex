@@ -2,6 +2,7 @@ import { parseFiles, type ParsedData } from './parsers';
 import { bulkPutConversations, bulkPutMessages, storeRawSources, db } from './db/index';
 import { autoAnalyzeConversations } from './detection/autoAnalyze';
 import { deriveAnchorsForConversation } from './investigation/anchors';
+import { deriveAgentInspectionsForConversation } from './investigation/agentInspections';
 import type { DataSource, StoredConversation, StoredMessage } from '../types';
 
 export interface ImportResult {
@@ -54,6 +55,12 @@ export async function importFiles(
       await deriveAnchorsForConversation(id);
     } catch (err) {
       console.error('[investigation] anchor derivation failed for', id, err);
+    }
+    // What the agent read (SPEC-decision-recovery §8.1) — same posture.
+    try {
+      await deriveAgentInspectionsForConversation(id);
+    } catch (err) {
+      console.error('[decisions] inspection derivation failed for', id, err);
     }
   }
 

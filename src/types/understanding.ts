@@ -57,6 +57,11 @@ export interface UnderstandingProject {
    */
   lastIntentExtractedAt?: Date;
   /**
+   * Decision-recovery cursor (SPEC-decision-recovery §9.5): latest
+   * conversation `updatedAt` a recovery run has processed. Same caveat.
+   */
+  lastDecisionRecoveredAt?: Date;
+  /**
    * Reconciliation cursor (U3.2): the latest conversation `updatedAt` a
    * reconcile run has processed. Runs only consider conversations newer than
    * this. Known limitation: a conversation imported or associated later with

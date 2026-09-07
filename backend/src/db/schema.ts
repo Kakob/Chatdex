@@ -107,6 +107,8 @@ export const syncRecords = pgTable(
         | 'verdict_revision'
         | 'investigation_finding'
         | 'prepared_change'
+        | 'intent_trace'
+        | 'decision_trace'
       >(),
     parentId: text('parent_id'),
     iv: bytea('iv').notNull(),

@@ -14,8 +14,11 @@ import {
   rehydrateInvestigationFinding,
   envelopeIntentTrace,
   rehydrateIntentTrace,
+  envelopeDecisionTrace,
+  rehydrateDecisionTrace,
 } from './serializer';
 import type { IntentTrace } from '../../types/intentTrace';
+import type { DecisionTrace } from '../../types/decision';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { InvestigationFinding } from '../../types/investigation';
 import type {
@@ -366,5 +369,63 @@ describe('intent trace sync serializer', () => {
     // what gets encrypted.
     expect(Object.keys(env).sort()).toEqual(['kind', 'parentId', 'payload', 'updatedAt']);
     expect(JSON.stringify({ kind: env.kind, parentId: env.parentId, updatedAt: env.updatedAt })).not.toContain('Kakob');
+  });
+});
+
+describe('decision traces (SPEC-decision-recovery §7.6)', () => {
+  const createdAt = new Date('2026-09-07T12:00:00Z');
+  const trace: DecisionTrace = {
+    id: 'dt-1',
+    projectId: 'up-1',
+    decisionObjectId: 'uo-decision',
+    runId: 'run-1',
+    repoKey: 'gh:Kakob/Chatdex',
+    sha: 'a'.repeat(40),
+    why: 'Mirrors the existing conversation delete.',
+    alternatives: [{ statement: 'Soft delete', transcriptEvidence: [], rejectedBecause: 'not asked' }],
+    assumptions: [
+      {
+        id: 'as-1',
+        statement: 'Associations cascade',
+        basis: 'inherited',
+        transcriptEvidence: [
+          { conversationId: 'c1', messageId: 'm3', stepIndex: 4, role: 'agent_text', quote: 'I will mirror deleteConversation', startOffset: 0, endOffset: 31 },
+        ],
+        codeEvidence: [{ path: 'src/lib/db/conversations.ts', startLine: 40, endLine: 44, quote: 'export async function deleteConversation' }],
+        inheritedFrom: 'src/lib/db/conversations.ts',
+      },
+    ],
+    transcriptEvidence: [
+      { conversationId: 'c1', messageId: 'm1', stepIndex: 0, role: 'user_msg', quote: 'Add project deletion', startOffset: 0, endOffset: 20 },
+    ],
+    anchorStableKeys: ['abc#s7'],
+    implEvidence: [{ path: 'src/lib/db/projects.ts', startLine: 1, endLine: 3, quote: 'export async function deleteProject' }],
+    symbols: ['deleteProject'],
+    testPaths: ['src/lib/db/projects.test.ts'],
+    invalidates: [],
+    fetchedPaths: ['src/lib/db/conversations.ts'],
+    provider: 'anthropic',
+    model: 'claude-opus-5',
+    warnings: [],
+    createdAt,
+  };
+
+  it('round-trips a trace; parentId is the decision object', () => {
+    const env = envelopeDecisionTrace(trace);
+    expect(env.kind).toBe('decision_trace');
+    expect(env.parentId).toBe('uo-decision');
+    expect(env.updatedAt).toEqual(createdAt);
+    expect(typeof (env.payload as { createdAt: unknown }).createdAt).toBe('string');
+    const back = throughWire(env.payload, rehydrateDecisionTrace);
+    expect(back).toEqual(trace);
+    expect(back.createdAt).toBeInstanceOf(Date);
+  });
+
+  it('round-trips a trace without optional fields', () => {
+    const minimal: DecisionTrace = { ...trace, repoKey: undefined, sha: undefined, why: undefined };
+    const back = throughWire(envelopeDecisionTrace(minimal).payload, rehydrateDecisionTrace);
+    expect(back.repoKey).toBeUndefined();
+    expect(back.why).toBeUndefined();
+    expect(back.assumptions).toEqual(trace.assumptions);
   });
 });

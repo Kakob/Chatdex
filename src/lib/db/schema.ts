@@ -31,6 +31,7 @@ import type {
 import type { PreparedChange } from '../../types/preparedChange';
 import type { IntentTrace } from '../../types/intentTrace';
 import type { RepoFileRow, InspectionRow } from '../../types/repo';
+import type { DecisionTrace, AgentInspection, DecisionDiff } from '../../types/decision';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -65,6 +66,9 @@ export class ChatdexDB extends Dexie {
   intentTraces!: Table<IntentTrace, string>;
   repoFiles!: Table<RepoFileRow, [string, string, string]>;
   inspections!: Table<InspectionRow, string>;
+  decisionTraces!: Table<DecisionTrace, string>;
+  agentInspections!: Table<AgentInspection, string>;
+  decisionDiffs!: Table<DecisionDiff, string>;
 
   constructor() {
     super('chatdex');
@@ -174,6 +178,17 @@ export class ChatdexDB extends Dexie {
     this.version(12).stores({
       repoFiles: '&[repoKey+sha+path], repoKey, sha, [repoKey+sha]',
       inspections: '&id, workspaceId, projectId, [projectId+targetKey], at',
+    });
+    // v13: Decision Recovery (SPEC-decision-recovery §7.5). `decisionTraces`
+    // is append-only synthesis output, one row per (decision, run), synced
+    // as ciphertext (kind 'decision_trace'). `agentInspections` (what the
+    // agent read) and `decisionDiffs` (Semantic Decision Diff) are BOTH
+    // LOCAL-ONLY derived rows — never hooked into the sync engine (law 2.9).
+    this.version(13).stores({
+      decisionTraces:
+        '&id, projectId, decisionObjectId, runId, createdAt, [projectId+createdAt], [decisionObjectId+createdAt], [projectId+runId]',
+      agentInspections: '&id, conversationId, path, [conversationId+stepIndex]',
+      decisionDiffs: '&id, projectId, toRunId, createdAt',
     });
   }
 }
