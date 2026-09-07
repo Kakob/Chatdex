@@ -17,6 +17,8 @@ import {
   ProjectOverviewPage,
   PrepareChangePage,
   IntentTracePage,
+  DecisionsPage,
+  DecisionDetailPage,
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
@@ -58,6 +60,8 @@ export function App() {
               element={<ProjectUnderstandingPage workspaceMode />}
             />
             <Route path="intents" element={<IntentTracePage />} />
+            <Route path="decisions" element={<DecisionsPage />} />
+            <Route path="decisions/:objectId" element={<DecisionDetailPage />} />
             <Route path="prepare" element={<PrepareChangePage />} />
           </Route>
           <Route path="import" element={<ImportPage />} />

@@ -9,7 +9,8 @@ with typecheck + lint + tests green.
 |---|---|---|---|
 | DR-0 | 2026-09-07 | `16ca1b6` | Spec with §2 laws 2.1–2.10, data model (Decision object + `DecisionTrace` + `AgentInspection` + `DecisionDiff`), pipeline, blast radius v1, diff, security audit S1–S10, milestones DR-0…DR-7, killer-demo scenario; Flow Map draft moved to Dexie v14 |
 | DR-1 | 2026-09-07 | `6b73106` | `src/types/decision.ts`; Dexie v13 (`decisionTraces` synced, `agentInspections` + `decisionDiffs` LOCAL-ONLY); sync kind `decision_trace` end to end; agent-inspection deriver + import hook + backfill; `extractSessionCommits`; cursor `lastDecisionRecoveredAt` |
-| DR-2 | 2026-09-07 | _(this commit)_ | Recovery pipeline: `candidates.ts` (user messages + per-anchor agent context + rendered hunks, pre-existing file oracle), `prompt.ts` (JSON contract), `firewall.ts` (span/code verification, recomputed offsets, basis constraints, derived madeBy), `runRecovery.ts` (`planRecovery` before any call; one call per conversation; pending objects + traces; cursor), `symbols.ts`, `decisionMatrix.ts`, `fromInvestigation.ts` (VerdictOrigin → Decision meta bridge); boundary guard extended |
+| DR-2 | 2026-09-07 | `8ff344f` | Recovery pipeline: `candidates.ts` (user messages + per-anchor agent context + rendered hunks, pre-existing file oracle), `prompt.ts` (JSON contract), `firewall.ts` (span/code verification, recomputed offsets, basis constraints, derived madeBy), `runRecovery.ts` (`planRecovery` before any call; one call per conversation; pending objects + traces; cursor), `symbols.ts`, `decisionMatrix.ts`, `fromInvestigation.ts` (VerdictOrigin → Decision meta bridge); boundary guard extended |
+| DR-3 | 2026-09-07 | _(this commit)_ | Decisions tab (`/projects/:id/decisions`) + detail (`decisions/:objectId`): basis / made-by / unsupported badges, session-or-file grouping, basis-count filters, review + history, Recover run with disclosure (hunk + excerpt counts), session-commit sha hints, `RepoBindingCard`; detail shows why, alternatives, assumptions with bases, implemented-by hunks (anchor route, read-only) + code lines (cache + blob links), transcript spans, source conversations |
 
 ---
 
@@ -46,3 +47,11 @@ within varchar(32); no column migration.
 - `src/lib/understanding/decisions/` — `meta.ts`, `candidates.ts`, `prompt.ts`, `firewall.ts`, `symbols.ts`, `runRecovery.ts`, `decisionMatrix.ts`, `fromInvestigation.ts`, `index.ts`.
 - Design notes: one `complete()` per conversation so step indexes are unambiguous; hunk paths are made repo-relative in the plan; `invalidates` land only on traces and resolve `statement:` placeholders against the target's latest trace assumptions; the cursor advances only for unscoped runs with zero errors.
 - Tests: firewall (every basis downgrade, dropped unverifiable spans, offsets, caps, re-recognition), candidates, symbols, run integration with a mocked relay (plan-before-call, secret assertion, pending-only persistence, supported-event re-recognition, failure isolation), investigation bridge, boundary guard (`understanding/decisions` forbidden from detection/investigation; decisions reach investigation only via db accessors + the one-way promotion). 922 + 6 green.
+
+### DR-3 — Decisions tab + detail (2026-09-07)
+
+- `src/pages/DecisionsPage.tsx`, `src/pages/DecisionDetailPage.tsx`; routes in `App.tsx`; tab (Scale icon) after Intent Trace in `ProjectWorkspaceLayout`.
+- `src/components/decisions/{BasisBadge,EvidenceLists,AssumptionList,DecisionList}.tsx`; `src/lib/understanding/decisions/links.ts` (`safeBlobUrl`).
+- Disclosure copy names your messages, the agent's reasoning before each edit, the hunk count, and the repository excerpt count (law 2.6). The only accent on the surface is the unsupported-autonomous badge (law 2.7).
+- Detail page fetches without setting state inside the effect (lint rule `react-hooks/set-state-in-effect`).
+- Tests: `src/pages/DecisionsPage.test.tsx` (rows, badges, escaping, filters, grouping, review; disclosure before any provider call, then run; detail page sections + links). 925 + 6 green.

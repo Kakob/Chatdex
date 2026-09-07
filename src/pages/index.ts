@@ -15,5 +15,7 @@ export { ProjectUnderstandingPage } from './ProjectUnderstandingPage';
 export { ProjectOverviewPage } from './ProjectOverviewPage';
 export { PrepareChangePage } from './PrepareChangePage';
 export { IntentTracePage } from './IntentTracePage';
+export { DecisionsPage } from './DecisionsPage';
+export { DecisionDetailPage } from './DecisionDetailPage';
 export { SettingsPage } from './SettingsPage';
 export { HowDetectionWorksPage } from './HowDetectionWorksPage';

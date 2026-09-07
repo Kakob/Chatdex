@@ -40,8 +40,8 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Tests: firewall downgrades, madeBy, offsets, re-recognition, `assertNoSecrets`, plan-before-call
 
 ### DR-3 — Decisions tab + detail
-- [ ] Routes, tab, `DecisionsPage`, `BasisBadge`, `DecisionDetail`, `AssumptionList`, run + disclosure
-- [ ] Page test
+- [x] Routes, tab, `DecisionsPage`, `BasisBadge`, `DecisionDetail`, `AssumptionList`, run + disclosure
+- [x] Page test
 
 ### DR-4 — code links, blast radius, replacement change, challenge
 - [ ] `blastRadius.ts` + `BlastRadiusPanel`
