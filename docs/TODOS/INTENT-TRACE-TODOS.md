@@ -11,6 +11,7 @@ Companion to `docs/SPEC-intent-trace.md` and `docs/INTENT-TRACE-BUILD-LOG.md`. T
 - [ ] **IT-0 — deploy backend first** (see warning above), then frontend.
 - [ ] **IT-3 — create a GitHub token for Chatdex.** Fine-grained PAT, repository access limited to `Kakob/Chatdex`, permissions **Contents: Read** + **Metadata: Read**, expiry ≤ 90 days. (Quick start: `gh auth token` works but is a classic token and will show the "over-privileged" warning.) Paste it in Settings → GitHub → Test.
 - [ ] **IT-3 — bind the repo** on the Chatdex project: Intent Trace tab → `Kakob/Chatdex` → Validate → Save.
+- [ ] **Known gap — branch binding.** Pasting a `/tree/<branch>` URL silently binds to the default branch, and the card is hidden once bound. Planned fix: `docs/agent-build-logs-assessments-plans/BRANCH-BINDING-PLAN.md` (not yet implemented).
 - [ ] **IT-5 — run the manual acceptance scenario** (spec §16, 7 steps) on real data and answer the qualitative question: did the matrix surface at least one intent you'd forgotten, and did its evidence confirm it without further searching?
 - [ ] **IT-5 — check the second-device behaviour**: intents and traces should sync; the GitHub token must **not** appear on the other device.
 - [ ] **Any run — pick the provider deliberately.** The OpenAI/Codex subscription path adds ~14k tokens per call; prefer Anthropic for extraction over a large project.
