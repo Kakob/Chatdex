@@ -174,7 +174,7 @@ interface FlowMapRow {           // LOCAL-ONLY (§7.2)
 
 Caps (configurable in `FlowMapConfig`, §9.4): `MAX_FLOW_STEPS = 30`, `MAX_FLOW_DEPTH = 8`, `MAX_FANOUT_PER_NODE = 12`, `MAX_FLOWS_PER_ROUTE = 200`, `MAX_SURFACES = 20_000`, `MAX_LINKS = 60_000`. Hitting a cap sets `truncated` or adds a fog item; it never silently drops.
 
-### 7.2 New LOCAL-ONLY table (Dexie v13, never synced)
+### 7.2 New LOCAL-ONLY table (Dexie v14, never synced)
 
 - `flowMaps: '&key, projectId, [repoKey+sha]'` — one row per generation. Evicted with the corresponding `repoFiles` (same Settings "Clear repository cache" control) and by `clearAllData()`. Absent from the sync engine's hook / resync table list (extend test S1).
 
@@ -357,7 +357,7 @@ Everything in Guided mode works offline once the repository is cached. Assisted 
 
 ## 16. Required tests
 
-- **FM-0:** types; deterministic ids (same input twice ⇒ deep-equal map — law 2.4); registry registers / lists / versions; `FlowMapConfig` defaults + `configDigest`; Dexie v13 `flowMaps` exists, cleared by `clearAllData`, absent from the sync engine's table list (S1); boundary guard extended (S10); `isSafePattern` over every recognizer pattern (S8); fixture tree `src/test/fixtures/flowmap/react-vite-fastify/` (a ~25-file miniature with routes, nested routes, a lazy route, a store, a hook, an unresolved tag, a `fetch` with and without a matching endpoint, Dexie schema + reads/writes, a worker, a `<script>` button label, and a file with a fake secret).
+- **FM-0:** types; deterministic ids (same input twice ⇒ deep-equal map — law 2.4); registry registers / lists / versions; `FlowMapConfig` defaults + `configDigest`; Dexie v14 `flowMaps` exists, cleared by `clearAllData`, absent from the sync engine's table list (S1); boundary guard extended (S10); `isSafePattern` over every recognizer pattern (S8); fixture tree `src/test/fixtures/flowmap/react-vite-fastify/` (a ~25-file miniature with routes, nested routes, a lazy route, a store, a hook, an unresolved tag, a `fetch` with and without a matching endpoint, Dexie schema + reads/writes, a worker, a `<script>` button label, and a file with a fake secret).
 - **FM-1:** each front-end recognizer over the fixture — exact surfaces and lines; each false-positive fixture rejected (a non-component `.tsx` export, an `onClick` inside a comment, a `useX` that is not a hook call); nested route path joining; `React.lazy` ⇒ `lazy_element` fog.
 - **FM-2:** request ↔ endpoint matching table (prefix, wildcards, method mismatch ⇒ `unmatched_request`); Dexie read vs write classification; linker import resolution (relative, index, alias, unresolved); derivation: page-load flow, action flow, fan-out cap, depth cap, cycle cut, `(unreached)` entry; `flowSummary`. **Self-atlas test:** run the generator over the real repository from `vitest` (Node `fs`, `src/` + `backend/src/`) and assert: every `<Route path` in `src/App.tsx` is a route surface; `POST /api/sync/push` and `GET /api/sync/pull` are endpoints; the sync engine's push request links to the push endpoint; `preparedChanges` is a table with ≥ 1 write link; generation completes within 3 s. This test is the regression guard that the recognizers still understand Chatdex.
 - **FM-3:** RTL for the Flows tab — empty states, generate progress, route tree, step list with confidence badges, fog panel, `<script>` label renders escaped (S6), kept-flow drift badge on hash mismatch.
@@ -371,7 +371,7 @@ Everything in Guided mode works offline once the repository is cached. Assisted 
 | Milestone | Deliverable | Acceptance |
 |---|---|---|
 | **Spec** | This document; `docs/README.md` row; `CLAUDE.md` pointer; build log + todos created. | Committed on its own after Jacob's review of §21. |
-| **FM-0** | `src/types/flowmap.ts`; `src/lib/flowmap/{registry,config,ids}.ts`; Dexie v13 local-only table + helpers; fixture tree; guard + determinism + pattern-safety tests. | `npm run typecheck && npm run lint && npm run test:all` green; `db.verno === 13`; no backend change. |
+| **FM-0** | `src/types/flowmap.ts`; `src/lib/flowmap/{registry,config,ids}.ts`; Dexie v14 local-only table + helpers; fixture tree; guard + determinism + pattern-safety tests. | `npm run typecheck && npm run lint && npm run test:all` green; `db.verno === 14`; no backend change. |
 | **FM-1** | Front-end recognizers: route, component, action, hook, store, import. | Fixture golden tests pass; every `App.tsx` route recognised. |
 | **FM-2** | Back-end / data recognizers: request, endpoint, table, worker; linker; derivation; fog; coverage; self-atlas test. | Self-atlas test green in < 3 s; `/settings · Unlock with passkey` derives to `session.ts` and `POST /api/auth/...` endpoints. |
 | **FM-3** | Flows tab UI, generate / regenerate, Settings hook-up, Overview card. | Chatdex map browsable end to end in the browser. |

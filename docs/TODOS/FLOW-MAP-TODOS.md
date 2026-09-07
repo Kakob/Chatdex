@@ -29,7 +29,7 @@ Companion to `docs/specs/SPEC-flow-map.md` and `docs/agent-build-logs-assessment
 ### FM-0 — types, registry, config, local-only table, fixtures
 - [ ] `src/types/flowmap.ts`
 - [ ] `src/lib/flowmap/{registry,config,ids}.ts`
-- [ ] Dexie v13 `flowMaps` + helpers; `clearAllData`; cache-eviction hook-up
+- [ ] Dexie v14 `flowMaps` + helpers; `clearAllData`; cache-eviction hook-up
 - [ ] Fixture tree `src/test/fixtures/flowmap/react-vite-fastify/`
 - [ ] Tests: determinism, S1 sync-absence, S8 pattern safety, S10 guard
 

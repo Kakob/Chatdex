@@ -14,4 +14,4 @@ tests green.
 
 ## Operational notes
 
-- No backend change is planned in any milestone: the derived map is LOCAL-ONLY (Dexie v13) and kept flows reuse the existing `understanding_object` / `understanding_event` sync kinds (D1, D2).
+- No backend change is planned in any milestone: the derived map is LOCAL-ONLY (Dexie v14) and kept flows reuse the existing `understanding_object` / `understanding_event` sync kinds (D1, D2).
