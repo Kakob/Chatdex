@@ -50,8 +50,8 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Tests: blast radius fixture, zero fetch, challenge pending-only
 
 ### DR-5 — semantic decision diff
-- [ ] `diff.ts`, `decisionDiffs` helpers, `DecisionDiffView`, run picker, record-as-contradicted
-- [ ] Tests: five ops, idempotent id, determinism, local-only
+- [x] `diff.ts`, `decisionDiffs` helpers, `DecisionDiffView`, run picker, record-as-contradicted
+- [x] Tests: five ops, idempotent id, determinism, local-only
 
 ### DR-6 — dogfood demo + fixture
 - [ ] Session produced (or handed to Jacob), sanitized into `tests/decision-fixtures/`

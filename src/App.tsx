@@ -19,6 +19,7 @@ import {
   IntentTracePage,
   DecisionsPage,
   DecisionDetailPage,
+  DecisionComparePage,
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
@@ -61,6 +62,7 @@ export function App() {
             />
             <Route path="intents" element={<IntentTracePage />} />
             <Route path="decisions" element={<DecisionsPage />} />
+            <Route path="decisions/compare" element={<DecisionComparePage />} />
             <Route path="decisions/:objectId" element={<DecisionDetailPage />} />
             <Route path="prepare" element={<PrepareChangePage />} />
           </Route>

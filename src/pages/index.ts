@@ -17,5 +17,6 @@ export { PrepareChangePage } from './PrepareChangePage';
 export { IntentTracePage } from './IntentTracePage';
 export { DecisionsPage } from './DecisionsPage';
 export { DecisionDetailPage } from './DecisionDetailPage';
+export { DecisionComparePage } from './DecisionComparePage';
 export { SettingsPage } from './SettingsPage';
 export { HowDetectionWorksPage } from './HowDetectionWorksPage';

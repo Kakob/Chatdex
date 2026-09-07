@@ -12,3 +12,4 @@ export * from './blastRadius';
 export * from './replacement';
 export * from './challenge';
 export * from './links';
+export * from './diff';
