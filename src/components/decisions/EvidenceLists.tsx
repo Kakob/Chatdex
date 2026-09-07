@@ -28,10 +28,13 @@ export function SpanLinks({
   spans,
   conversationNames,
   compact,
+  delegatedConversationIds,
 }: {
   spans: TranscriptSpan[];
   conversationNames: Map<string, string>;
   compact?: boolean;
+  /** Conversations that are subagent transcripts (SPEC-decision-recovery §8.3) — spans are labelled "delegated". */
+  delegatedConversationIds?: Set<string>;
 }) {
   if (spans.length === 0) return null;
   return (
@@ -46,6 +49,11 @@ export function SpanLinks({
             <MessageSquare size={11} />
             {conversationNames.get(s.conversationId) ?? 'conversation'} · step {s.stepIndex} · {ROLE_LABEL[s.role]}
           </Link>
+          {delegatedConversationIds?.has(s.conversationId) && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300" title="This step ran inside a delegated subagent">
+              delegated
+            </span>
+          )}
           {!compact && <Quote text={s.quote} />}
         </li>
       ))}

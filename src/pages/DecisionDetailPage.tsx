@@ -39,6 +39,7 @@ interface Loaded {
   meta: DecisionMeta;
   evidence: EvidenceLink[];
   conversationNames: Map<string, string>;
+  delegatedConversationIds: Set<string>;
   traces: DecisionTrace[];
   latest?: DecisionTrace;
   anchors: InvestigationAnchor[];
@@ -71,6 +72,7 @@ export function DecisionDetailPage() {
     if (meta.conversationId) convIds.add(meta.conversationId);
     const convs = convIds.size ? await db.conversations.where('id').anyOf([...convIds]).toArray() : [];
     const conversationNames = new Map(convs.map((c) => [c.id, c.name]));
+    const delegatedConversationIds = new Set(convs.filter((c) => c.providerMeta?.isSidechain === true).map((c) => c.id));
     const anchors = latest
       ? (await Promise.all(latest.anchorStableKeys.map((k) => getInvestigationAnchor(k)))).filter((a): a is InvestigationAnchor => Boolean(a))
       : [];
@@ -80,6 +82,7 @@ export function DecisionDetailPage() {
       meta,
       evidence: mergeEvidence(events.filter((e) => e.reviewState !== 'rejected'), conversationNames),
       conversationNames,
+      delegatedConversationIds,
       traces,
       latest,
       anchors,
@@ -156,7 +159,7 @@ export function DecisionDetailPage() {
     return <p className="text-sm text-gray-500 dark:text-gray-400">Decision not found</p>;
   }
 
-  const { object, meta, latest, anchors, conversationNames } = data;
+  const { object, meta, latest, anchors, conversationNames, delegatedConversationIds } = data;
   const pending = object.reviewState === 'pending';
   const caseId = typeof object.meta?.caseId === 'string' ? object.meta.caseId : undefined;
 
@@ -256,7 +259,7 @@ export function DecisionDetailPage() {
                   <li key={i} className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 text-sm">
                     <p className="text-gray-900 dark:text-white">{a.statement}</p>
                     {a.rejectedBecause && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Rejected because: {a.rejectedBecause}</p>}
-                    <SpanLinks spans={a.transcriptEvidence} conversationNames={conversationNames} compact />
+                    <SpanLinks spans={a.transcriptEvidence} conversationNames={conversationNames} compact delegatedConversationIds={delegatedConversationIds} />
                   </li>
                 ))}
               </ul>
@@ -264,7 +267,7 @@ export function DecisionDetailPage() {
           </Section>
 
           <Section title="Assumptions" subtitle="Each labelled by its own basis">
-            <AssumptionList assumptions={latest.assumptions} conversationNames={conversationNames} repoKey={latest.repoKey} sha={latest.sha} />
+            <AssumptionList assumptions={latest.assumptions} conversationNames={conversationNames} repoKey={latest.repoKey} sha={latest.sha} delegatedConversationIds={delegatedConversationIds} />
           </Section>
 
           <Section title="Implemented by" subtitle={latest.repoKey && latest.sha ? `${latest.repoKey.replace(/^gh:/, '')}@${latest.sha.slice(0, 7)}` : 'No repository snapshot was bound for this run'}>
@@ -330,7 +333,7 @@ export function DecisionDetailPage() {
           </Section>
 
           <Section title="Evidence" subtitle="Transcript spans the decision rests on">
-            <SpanLinks spans={latest.transcriptEvidence} conversationNames={conversationNames} />
+            <SpanLinks spans={latest.transcriptEvidence} conversationNames={conversationNames} delegatedConversationIds={delegatedConversationIds} />
           </Section>
 
           {latest.warnings.length > 0 && (

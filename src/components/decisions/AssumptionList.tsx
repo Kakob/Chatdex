@@ -10,11 +10,13 @@ export function AssumptionList({
   conversationNames,
   repoKey,
   sha,
+  delegatedConversationIds,
 }: {
   assumptions: DecisionAssumption[];
   conversationNames: Map<string, string>;
   repoKey?: string;
   sha?: string;
+  delegatedConversationIds?: Set<string>;
 }) {
   if (assumptions.length === 0) {
     return <p className="text-sm text-gray-500 dark:text-gray-400">No assumptions were recovered for this decision.</p>;
@@ -39,7 +41,7 @@ export function AssumptionList({
               {a.rationale}
             </p>
           )}
-          <SpanLinks spans={a.transcriptEvidence} conversationNames={conversationNames} />
+          <SpanLinks spans={a.transcriptEvidence} conversationNames={conversationNames} delegatedConversationIds={delegatedConversationIds} />
           <CodeEvidenceList items={a.codeEvidence} repoKey={repoKey} sha={sha} />
         </li>
       ))}

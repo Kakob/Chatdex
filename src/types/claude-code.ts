@@ -9,6 +9,17 @@ export interface ClaudeCodeEntryMetadata {
   gitBranch?: string;
   session_id?: string;
   git_branch?: string;
+  // Parser 1.2.0 (SPEC-decision-recovery §8.3): entry identity and delegation.
+  // Real session files chain entries by uuid/parentUuid; subagent transcripts
+  // live in `<sessionId>/subagents/agent-<agentId>.jsonl`, carry the PARENT's
+  // sessionId and cwd, and mark every entry `isSidechain: true`.
+  uuid?: string;
+  parentUuid?: string | null;
+  isSidechain?: boolean;
+  agentId?: string;
+  promptId?: string;
+  userType?: string;
+  version?: string;
 }
 
 export type ClaudeCodeEntry =

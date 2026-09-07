@@ -274,7 +274,7 @@ Derived from `normalizeSession()` like anchors. Tools: `Read` → `read` (path f
 `extractSessionCommits(steps)`: Bash `tool_call` whose `command` matches `/\bgit\s+commit\b/`, paired to its `tool_result` (by `toolUseId`, fallback next step), regex `/^\[([^\s\]]+)\s+(?:\(root-commit\)\s+)?([0-9a-f]{7,40})\]/m`. Not persisted; shown in `RepoBindingCard` as a suggested sha.
 
 ### 8.3 Parser v1.2.0 — DR-7
-`ClaudeCodeEntryMetadata` gains `uuid`, `parentUuid`, `isSidechain`, `agentId`, `userType`. `StoredMessage.sourceMeta?` carries them. `Task`/`Agent` tool calls are linked to sidechain steps that share their `parentUuid` chain; the detail view labels spans from sidechains "delegated".
+`ClaudeCodeEntryMetadata` gains `uuid`, `parentUuid`, `isSidechain`, `agentId`, `promptId`, `userType`, `version`. `StoredMessage.sourceMeta?` carries the identity fields when present. Subagent transcripts are sibling files (`<sessionId>/subagents/agent-<agentId>.jsonl`) that carry the parent's `sessionId`; the parser gives them the conversation id `${sessionId}:agent:${agentId}` and `providerMeta { isSidechain: true, agentId, parentSessionId }`, and the detail view labels spans from such conversations "delegated" (observed 2026-09-07 from a real session).
 
 ---
 
@@ -452,7 +452,6 @@ All DR milestones committed with build-log hashes; §14 tests green; §16 walked
 - Prediction before reveal (PRD §11) as a form on the decision detail; teach-back as user-authored events.
 - Manual "same as …" merge when re-recognition misses (planned in DR-5 if time allows).
 - Batching oversized sessions into multiple calls.
-- Sibling-file subagent transcripts (`<session>/subagents/*.jsonl`) — DR-7 handles inline sidechains only.
 - Sync-registry refactor (recon P9); `decision_trace` is the fourth hand-rolled kind.
 
 ---

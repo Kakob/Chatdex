@@ -12,7 +12,7 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [ ] **DR-6 — run the dogfood session yourself if the automated one was not produced** (spec §16 step 1): branch from `main`, run `claude` in this repo with the prompt in §16, let it commit, push the branch, **do not merge**.
 - [ ] **DR-6 — walk the manual acceptance scenario** (spec §16, 9 steps) on the real session with your provider. Record the actual basis split in the build log.
 - [ ] **DR-6 — decide the fate of the demo branch**: keep unmerged (recommended) or land project deletion deliberately through the replacement-change flow. Recon P5 (three divergent delete cascades) applies.
-- [ ] **DR-7 — tell Claude Code whether your subagent transcripts are inline (`isSidechain`) or sibling files** under `~/.claude/projects/<dir>/<sessionId>/subagents/`. Sibling files are deferred (spec §18).
+- [x] **DR-7 — subagent transcript layout confirmed from a real session:** sibling files under `~/.claude/projects/<dir>/<sessionId>/subagents/agent-<id>.jsonl`, every entry `isSidechain: true` with `agentId`, carrying the PARENT's `sessionId` and `cwd`. Parser 1.2.0 handles them (own conversation id, `providerMeta.parentSessionId`).
 - [ ] **Any run — pick the provider deliberately.** OpenAI/Codex subscription adds ~14k tokens per call; prefer Anthropic.
 - [ ] **Later — approve Flow Map §21** so reverse-traversal blast radius can replace the text-level v1.
 
@@ -58,5 +58,5 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [ ] Fixture tests; spec §16 confirmed; CLAUDE.md invariant-6 sentence; status → built
 
 ### DR-7 — parser v1.2.0 + delegation
-- [ ] `src/types/claude-code.ts` metadata, `StoredMessage.sourceMeta`, parser bump, sidechain linking, "delegated" labels
-- [ ] Golden traces unchanged; sidechain fixture
+- [x] `src/types/claude-code.ts` metadata, `StoredMessage.sourceMeta`, parser bump, sidechain linking, "delegated" labels
+- [x] Golden traces unchanged; sidechain fixture
