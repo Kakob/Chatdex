@@ -36,8 +36,8 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Build-log row
 
 ### DR-2 — recovery pipeline
-- [ ] `candidates.ts`, `prompt.ts`, `firewall.ts`, `runRecovery.ts`, `symbols.ts`, `decisionMatrix.ts`, `fromInvestigation.ts`
-- [ ] Tests: firewall downgrades, madeBy, offsets, re-recognition, `assertNoSecrets`, plan-before-call
+- [x] `candidates.ts`, `prompt.ts`, `firewall.ts`, `runRecovery.ts`, `symbols.ts`, `decisionMatrix.ts`, `fromInvestigation.ts`
+- [x] Tests: firewall downgrades, madeBy, offsets, re-recognition, `assertNoSecrets`, plan-before-call
 
 ### DR-3 — Decisions tab + detail
 - [ ] Routes, tab, `DecisionsPage`, `BasisBadge`, `DecisionDetail`, `AssumptionList`, run + disclosure

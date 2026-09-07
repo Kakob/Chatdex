@@ -35,6 +35,8 @@ const FORBIDDEN = [
   /\/providers(\/|$)/,
   /\/prepare(\/|$)/,
   /\/repo(\/|$)/,
+  // SPEC-decision-recovery law 2.5 / audit S10: recovery is invisible from below.
+  /\/understanding\/decisions(\/|$)/,
 ];
 
 describe('boundary law (§2.5)', () => {
@@ -60,6 +62,27 @@ describe('boundary law (§2.5)', () => {
           if (/\/(detection|investigation)(\/|$)/.test(spec) && !allowed.has(spec)) {
             offenders.push(`${file.replace(ROOT, 'src')} → ${spec}`);
           }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('decision recovery reaches investigation only through read-only db accessors and the one-way finding promotion (SPEC-decision-recovery law 2.5)', () => {
+    const allowed = new Set([
+      '../../detection/normalize',
+      '../../db/investigationAnchors',
+      '../../db/agentInspections',
+      '../../db/investigationCases',
+      '../../investigation/findings',
+      '../../../types/investigation',
+    ]);
+    const offenders: string[] = [];
+    for (const file of walk(join(ROOT, 'lib/understanding/decisions'))) {
+      if (file.endsWith('.test.ts')) continue;
+      for (const spec of importsOf(file)) {
+        if (/\/(detection|investigation)(\/|$)/.test(spec) && !allowed.has(spec)) {
+          offenders.push(`${file.replace(ROOT, 'src')} → ${spec}`);
         }
       }
     }
