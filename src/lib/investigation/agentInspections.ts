@@ -21,7 +21,7 @@ import type { AgentInspection, AgentInspectionKind } from '../../types/decision'
 import type { StoredConversation, StoredMessage } from '../../types/unified';
 
 /** Bump whenever derivation output changes for identical input. */
-export const INSPECTION_DERIVER_VERSION = '1.0.0';
+export const INSPECTION_DERIVER_VERSION = '1.1.0';
 
 const KIND_BY_TOOL: Record<string, AgentInspectionKind> = {
   Read: 'read',
@@ -29,6 +29,63 @@ const KIND_BY_TOOL: Record<string, AgentInspectionKind> = {
   Glob: 'search',
   LS: 'list',
 };
+
+// Agents frequently read files through the shell instead of the Read tool
+// (`sed -n 36,100p src/lib/db/conversations.ts`, `cat`, `grep -rn`). Those are
+// inspections too. Recognized read-only commands and the kind they derive;
+// anything else in a Bash call (including pipelines that write) is ignored.
+const BASH_READ_COMMANDS: Record<string, AgentInspectionKind> = {
+  cat: 'read', sed: 'read', head: 'read', tail: 'read', less: 'read', more: 'read', bat: 'read', wc: 'read',
+  grep: 'search', rg: 'search', ag: 'search', ack: 'search',
+  ls: 'list', find: 'list', tree: 'list',
+};
+const PATH_TOKEN_RE = /^(?:\.{1,2}\/|\/|[\w@-][\w@.-]*\/)[\w@./-]*[\w@-]$|^[\w@.-]+\.[A-Za-z0-9]{1,8}$/;
+const WRITE_MARKERS = /(^|[\s;&|])(rm|mv|cp|touch|tee|sed\s+-i|npm|npx|git\s+(add|commit|checkout|push|reset|rebase|merge)|python3?|node|>{1,2})(\s|$)/;
+
+/** Exposed for tests: the file inspections one shell command line implies. */
+export function bashInspections(command: string): Array<{ kind: AgentInspectionKind; path?: string; pattern?: string }> {
+  const out: Array<{ kind: AgentInspectionKind; path?: string; pattern?: string }> = [];
+  // Split on command separators; a heredoc or subshell is treated as one opaque segment.
+  for (const rawSegment of command.split(/\s*(?:&&|\|\||;|\n)\s*/)) {
+    const segment = rawSegment.trim();
+    if (!segment || WRITE_MARKERS.test(segment)) continue;
+    // Pipelines: inspect every stage that is a read command.
+    for (const stage of segment.split('|')) {
+      const tokens = tokenize(stage.trim());
+      if (tokens.length === 0) continue;
+      let i = 0;
+      if (tokens[i] === 'cd' && tokens.length > 2) i = 2; // `cd dir && …` handled by split; `cd x; cat y` too
+      const cmd = tokens[i]?.replace(/^.*\//, '');
+      const kind = cmd ? BASH_READ_COMMANDS[cmd] : undefined;
+      if (!kind) continue;
+      const args = tokens.slice(i + 1);
+      const positional = args.filter((t) => !t.startsWith('-'));
+      // grep/ls take bare directory names (`grep -rn x src`); reads keep only
+      // path-like tokens so sed scripts and head counts are never paths.
+      const bareOrPath = (t: string) => PATH_TOKEN_RE.test(t) || (/^[\w@.-]+$/.test(t) && !/^\d+$/.test(t));
+      if (kind === 'search') {
+        const pattern = positional[0];
+        const paths = positional.slice(1).filter(bareOrPath);
+        if (paths.length === 0) out.push({ kind, pattern });
+        for (const p of paths) out.push({ kind, pattern, path: p });
+      } else if (kind === 'list') {
+        const paths = positional.filter(bareOrPath);
+        if (paths.length === 0) out.push({ kind, path: '.' });
+        for (const p of paths) out.push({ kind, path: p });
+      } else {
+        for (const p of positional.filter((t) => PATH_TOKEN_RE.test(t))) out.push({ kind, path: p });
+      }
+    }
+  }
+  return out;
+}
+
+function tokenize(stage: string): string[] {
+  const tokens: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  for (const m of stage.matchAll(re)) tokens.push(m[1] ?? m[2] ?? m[3]);
+  return tokens;
+}
 
 export async function deriveAgentInspectionsForConversation(
   conversationId: string
@@ -65,12 +122,30 @@ export function buildAgentInspections(
   const now = new Date();
   const out: AgentInspection[] = [];
   for (const step of inspectionSteps(steps)) {
-    const kind = KIND_BY_TOOL[step.toolName!];
     const input = step.toolInput ?? {};
+    const occurredAt = messageById.get(step.messageId)?.createdAt ?? now;
+    if (step.toolName === 'Bash') {
+      const found = bashInspections(str(input.command) ?? '');
+      found.forEach((f, i) => {
+        out.push({
+          id: `${source.ref}#s${step.index}${i > 0 ? `.${i}` : ''}`,
+          conversationId,
+          messageId: step.messageId,
+          stepIndex: step.index,
+          toolName: 'Bash',
+          kind: f.kind,
+          path: f.path ? relativize(normalizePath(f.path), roots) : undefined,
+          pattern: f.pattern,
+          occurredAt,
+          deriverVersion: INSPECTION_DERIVER_VERSION,
+        });
+      });
+      continue;
+    }
+    const kind = KIND_BY_TOOL[step.toolName!];
     const rawPath = str(input.file_path) ?? str(input.path);
-    const id = `${source.ref}#s${step.index}`;
     out.push({
-      id,
+      id: `${source.ref}#s${step.index}`,
       conversationId,
       messageId: step.messageId,
       stepIndex: step.index,
@@ -78,7 +153,7 @@ export function buildAgentInspections(
       kind,
       path: rawPath ? relativize(normalizePath(rawPath), roots) : undefined,
       pattern: str(input.pattern),
-      occurredAt: messageById.get(step.messageId)?.createdAt ?? now,
+      occurredAt,
       deriverVersion: INSPECTION_DERIVER_VERSION,
     });
   }
@@ -88,7 +163,9 @@ export function buildAgentInspections(
 /** Which steps derive an inspection, without persistence. */
 export function inspectionSteps(steps: Step[]): Step[] {
   return steps.filter(
-    (s) => s.kind === 'tool_call' && Boolean(s.toolName && KIND_BY_TOOL[s.toolName])
+    (s) =>
+      s.kind === 'tool_call' &&
+      Boolean(s.toolName && (KIND_BY_TOOL[s.toolName] || (s.toolName === 'Bash' && bashInspections(str(s.toolInput?.command) ?? '').length > 0)))
   );
 }
 

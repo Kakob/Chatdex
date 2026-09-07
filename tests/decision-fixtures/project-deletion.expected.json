@@ -1,0 +1,57 @@
+{
+  "decisions": [
+    {
+      "statement": "Project deletion lives in a Delete project section on the project overview page",
+      "basis": "specified",
+      "madeBy": "user",
+      "unsupportedAutonomous": false,
+      "assumptions": []
+    },
+    {
+      "statement": "Deleting a project keeps its conversations, messages, and raw sources",
+      "basis": "specified",
+      "madeBy": "user",
+      "unsupportedAutonomous": false,
+      "assumptions": [{ "statement": "The same conversation can back several projects", "basis": "inferred" }]
+    },
+    {
+      "statement": "The project cascade is the inverse of the existing deleteConversation: drop the lens, keep the primary sources",
+      "basis": "inherited",
+      "madeBy": "agent",
+      "unsupportedAutonomous": false,
+      "assumptions": []
+    },
+    {
+      "statement": "Project-scoped rows are deleted one by one so the sync engine emits a tombstone per row",
+      "basis": "inferred",
+      "madeBy": "agent",
+      "unsupportedAutonomous": false,
+      "assumptions": [{ "statement": "Deleting an unknown project id is a no-op", "basis": "inferred" }]
+    },
+    {
+      "statement": "Confirmation is an inline alertdialog on the page that says conversations are not deleted",
+      "basis": "inferred",
+      "madeBy": "agent",
+      "unsupportedAutonomous": false,
+      "assumptions": []
+    },
+    {
+      "statement": "Deletion is permanent — no soft delete, undo, or audit record",
+      "basis": "invented",
+      "madeBy": "agent",
+      "unsupportedAutonomous": true,
+      "assumptions": []
+    },
+    {
+      "statement": "An incoming project tombstone from sync runs the same cascade on the receiving device",
+      "basis": "inferred",
+      "madeBy": "agent",
+      "unsupportedAutonomous": false,
+      "assumptions": []
+    }
+  ],
+  "counts": { "specified": 2, "inherited": 1, "inferred": 3, "invented": 1, "unknown": 0, "unsupportedAutonomous": 1 },
+  "minAnchors": 4,
+  "minInspections": 5,
+  "commits": 1
+}

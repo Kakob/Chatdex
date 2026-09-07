@@ -18,6 +18,9 @@ export const DEFAULT_MAX_AGENT_CHARS = 2000;
 export const DEFAULT_MAX_HUNK_CHARS = 1500;
 export const DEFAULT_ANCHOR_WINDOW = 6;
 export const DEFAULT_MAX_TOTAL_CHARS = 60_000;
+/** Agent text steps after the last edit (the closing summary) that are always included. */
+export const DEFAULT_CLOSING_AGENT_TEXTS = 2;
+export const DEFAULT_MAX_CLOSING_CHARS = 4000;
 export const DEFAULT_MAX_RECOVERY_FILES = 8;
 
 export interface StepExcerpt {
@@ -45,6 +48,9 @@ export interface TranscriptExcerptOptions {
   maxHunkChars?: number;
   window?: number;
   maxTotalChars?: number;
+  /** How many agent-text steps after the final edit to include (agents state decisions in their wrap-up). */
+  closingAgentTexts?: number;
+  maxClosingChars?: number;
 }
 
 function cap(text: string, max: number): string {
@@ -78,6 +84,8 @@ export function buildTranscriptExcerpts(
   const maxHunk = opts.maxHunkChars ?? DEFAULT_MAX_HUNK_CHARS;
   const window = opts.window ?? DEFAULT_ANCHOR_WINDOW;
   const maxTotal = opts.maxTotalChars ?? DEFAULT_MAX_TOTAL_CHARS;
+  const closingCount = opts.closingAgentTexts ?? DEFAULT_CLOSING_AGENT_TEXTS;
+  const maxClosing = opts.maxClosingChars ?? DEFAULT_MAX_CLOSING_CHARS;
   const warnings: string[] = [];
   const byIndex = new Map(steps.map((s) => [s.index, s]));
 
@@ -115,8 +123,20 @@ export function buildTranscriptExcerpts(
     anchorGroups.push(group);
   }
 
+  // Closing statements: the last agent texts after the final edit. Agents
+  // summarize what they built there — permanence, cascades, what they did not
+  // do — so these are kept like user messages (never dropped for the cap).
+  const lastAnchorIndex = sorted.length ? sorted[sorted.length - 1].stepIndex : -1;
+  const closing: StepExcerpt[] = steps
+    .filter((s) => s.kind === 'agent_text' && s.index > lastAnchorIndex && !claimed.has(s.index) && (s.text ?? '').trim())
+    .slice(-closingCount)
+    .map((s) => {
+      claimed.add(s.index);
+      return { stepIndex: s.index, role: s.kind, messageId: s.messageId, text: scrub(s.text ?? '', maxClosing) };
+    });
+
   const size = (list: StepExcerpt[]) => list.reduce((n, e) => n + e.text.length, 0);
-  let total = size(userExcerpts) + anchorGroups.reduce((n, g) => n + size(g), 0);
+  let total = size(userExcerpts) + size(closing) + anchorGroups.reduce((n, g) => n + size(g), 0);
   let dropped = 0;
   while (total > maxTotal && anchorGroups.length > 0) {
     total -= size(anchorGroups.shift()!);
@@ -135,7 +155,7 @@ export function buildTranscriptExcerpts(
     total = size(userExcerpts);
   }
 
-  const excerpts = [...userExcerpts, ...anchorGroups.flat()].sort((a, b) => a.stepIndex - b.stepIndex);
+  const excerpts = [...userExcerpts, ...closing, ...anchorGroups.flat()].sort((a, b) => a.stepIndex - b.stepIndex);
   return { conversationId, excerpts, totalChars: total, droppedAnchors: dropped, warnings };
 }
 

@@ -9,8 +9,8 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 > ⚠️ **Deploy the backend before the frontend for DR-1.** DR-1 adds `decision_trace` to the backend sync `KindSchema`. If the frontend ships first, every sync push containing a trace is rejected with **400**.
 
 - [ ] **DR-1 — deploy backend first**, then frontend. Run `npm run db:push` against Neon for the new enum value if the kind column is an enum there.
-- [ ] **DR-6 — run the dogfood session yourself if the automated one was not produced** (spec §16 step 1): branch from `main`, run `claude` in this repo with the prompt in §16, let it commit, push the branch, **do not merge**.
-- [ ] **DR-6 — walk the manual acceptance scenario** (spec §16, 9 steps) on the real session with your provider. Record the actual basis split in the build log.
+- [x] **DR-6 — dogfood session produced** as a subagent run on `demo/project-deletion` (commit `9987455`, not pushed, not merged). To recover against the code it produced in the browser, `git push -u origin demo/project-deletion` and bind `Kakob/Chatdex` at `9987455` — or bind the local directory with that branch checked out.
+- [ ] **DR-6 — walk the manual acceptance scenario** (spec §16, 9 steps): import `~/.claude/projects/-Users-jacie-dev-apps-chatdex/a5f18574-47b5-4d93-9059-985596769160/subagents/agent-a91bb13ba13341110.jsonl` (or the whole session folder) via the Import page, associate it with the Chatdex project, bind the repo, Recover, and compare the live split with the fixture's 2/1/3/1.
 - [ ] **DR-6 — decide the fate of the demo branch**: keep unmerged (recommended) or land project deletion deliberately through the replacement-change flow. Recon P5 (three divergent delete cascades) applies.
 - [x] **DR-7 — subagent transcript layout confirmed from a real session:** sibling files under `~/.claude/projects/<dir>/<sessionId>/subagents/agent-<id>.jsonl`, every entry `isSidechain: true` with `agentId`, carrying the PARENT's `sessionId` and `cwd`. Parser 1.2.0 handles them (own conversation id, `providerMeta.parentSessionId`).
 - [ ] **Any run — pick the provider deliberately.** OpenAI/Codex subscription adds ~14k tokens per call; prefer Anthropic.
@@ -54,8 +54,8 @@ Companion to `docs/specs/SPEC-decision-recovery.md` and `docs/agent-build-logs-a
 - [x] Tests: five ops, idempotent id, determinism, local-only
 
 ### DR-6 — dogfood demo + fixture
-- [ ] Session produced (or handed to Jacob), sanitized into `tests/decision-fixtures/`
-- [ ] Fixture tests; spec §16 confirmed; CLAUDE.md invariant-6 sentence; status → built
+- [x] Session produced (or handed to Jacob), sanitized into `tests/decision-fixtures/`
+- [x] Fixture tests; spec §16 confirmed; CLAUDE.md invariant-6 sentence; status → built
 
 ### DR-7 — parser v1.2.0 + delegation
 - [x] `src/types/claude-code.ts` metadata, `StoredMessage.sourceMeta`, parser bump, sidechain linking, "delegated" labels

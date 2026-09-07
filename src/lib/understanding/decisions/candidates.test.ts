@@ -45,6 +45,7 @@ describe('buildTranscriptExcerpts (§9.1)', () => {
       [1, 'agent_text'],
       [4, 'agent_text'],
       [5, 'tool_call'],
+      [7, 'agent_text'], // closing statement after the last edit
       [8, 'user_msg'],
     ]);
     const hunk = set.excerpts.find((e) => e.stepIndex === 5)!;
@@ -68,6 +69,20 @@ describe('buildTranscriptExcerpts (§9.1)', () => {
     const scrubbed = full.excerpts.find((e) => e.stepIndex === 7);
     expect(scrubbed?.text).toContain('[REDACTED]');
     expect(scrubbed?.text).not.toContain('sk-ant-api03');
+  });
+
+  it('always includes the closing agent statements after the last edit, even under the cap', () => {
+    const closingSteps: Step[] = [
+      ...steps,
+      step('agent_text', 9, 'Committed. Deletion is permanent with no audit record; rows are deleted one by one.'),
+      step('agent_text', 10, 'Final note: idempotent for unknown ids.'),
+    ];
+    const set = buildTranscriptExcerpts('c1', closingSteps, [anchor(5, 'src/a.ts')]);
+    expect(set.excerpts.map((e) => e.stepIndex)).toEqual([0, 1, 4, 5, 8, 9, 10]);
+    const tight = buildTranscriptExcerpts('c1', closingSteps, [anchor(5, 'src/a.ts')], { maxTotalChars: 10, closingAgentTexts: 1 });
+    // The edit group is dropped first; the (single) closing statement survives with the user messages.
+    expect(tight.excerpts.map((e) => e.stepIndex)).toEqual([0, 8, 10]);
+    expect(tight.droppedAnchors).toBe(1);
   });
 
   it('renders whole-file writes without an old side', () => {

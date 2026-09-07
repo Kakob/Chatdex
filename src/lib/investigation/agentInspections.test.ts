@@ -14,6 +14,7 @@ import {
   deriveAgentInspectionsForConversation,
   deriveAgentInspectionsForAllAgentSessions,
   buildAgentInspections,
+  bashInspections,
   relativize,
   INSPECTION_DERIVER_VERSION,
 } from './agentInspections';
@@ -144,5 +145,48 @@ describe('buildAgentInspections / relativize (pure)', () => {
       []
     );
     expect(rows).toEqual([]);
+  });
+});
+
+describe('bashInspections — read-only shell commands are inspections too (§8.1)', () => {
+  it('recognizes cat / sed -n / head / grep / ls across separators and pipelines', () => {
+    expect(bashInspections('sed -n 36,100p src/lib/db/conversations.ts; echo "=====ENGINE"; sed -n 90,215p src/lib/sync/engine.ts')).toEqual([
+      { kind: 'read', path: 'src/lib/db/conversations.ts' },
+      { kind: 'read', path: 'src/lib/sync/engine.ts' },
+    ]);
+    expect(bashInspections('cat CLAUDE.md && head -40 src/App.tsx | grep Route')).toEqual([
+      { kind: 'read', path: 'CLAUDE.md' },
+      { kind: 'read', path: 'src/App.tsx' },
+      { kind: 'search', pattern: 'Route' },
+    ]);
+    expect(bashInspections("grep -rn 'confirm(' src --include='*.tsx' | head -20")).toEqual([
+      { kind: 'search', pattern: 'confirm(', path: 'src' },
+    ]);
+    expect(bashInspections('ls src/pages src/stores')).toEqual([
+      { kind: 'list', path: 'src/pages' },
+      { kind: 'list', path: 'src/stores' },
+    ]);
+    expect(bashInspections('cd /home/user/chatdex; cat package.json')).toEqual([{ kind: 'read', path: 'package.json' }]);
+  });
+
+  it('ignores commands that write or run things', () => {
+    expect(bashInspections('sed -i "" "s|a|b|" src/x.ts')).toEqual([]);
+    expect(bashInspections('cat >> src/x.test.ts <<\'EOF\'\ndescribe(1)\nEOF')).toEqual([]);
+    expect(bashInspections('npm test 2>&1 | tail -6')).toEqual([]);
+    expect(bashInspections('git add src && git commit -m "x"')).toEqual([]);
+    expect(bashInspections('python3 - <<\'EOF\'\nprint(1)\nEOF')).toEqual([]);
+  });
+
+  it('derives Bash inspections with sub-indexed ids', () => {
+    const rows = buildAgentInspections(
+      CONV_ID,
+      [msg('assistant', [tool('Bash', { command: 'sed -n 1,5p /Users/dev/chatdex/src/a.ts; cat src/b.ts' }, 't1')])],
+      { ref: 'raw', provenance: 'raw' },
+      ['/Users/dev/chatdex']
+    );
+    expect(rows.map((r) => [r.id, r.toolName, r.kind, r.path])).toEqual([
+      ['raw#s0', 'Bash', 'read', 'src/a.ts'],
+      ['raw#s0.1', 'Bash', 'read', 'src/b.ts'],
+    ]);
   });
 });

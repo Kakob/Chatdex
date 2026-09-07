@@ -1,0 +1,141 @@
+{
+  "decisions": [
+    {
+      "existingObjectId": null,
+      "statement": "Project deletion lives in a Delete project section on the project overview page",
+      "why": "The task required it to be reachable from the project page; the overview is that page.",
+      "confidence": 0.95,
+      "basis": "specified",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 0, "quote": "It must be reachable from the project page" },
+        { "stepIndex": 41, "quote": "a delete section on the overview" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [46], "code": [] },
+      "alternatives": [
+        { "statement": "A delete action in the projects list", "evidence": [], "rejectedBecause": "not discussed; the overview was chosen without comparison" }
+      ],
+      "assumptions": []
+    },
+    {
+      "existingObjectId": null,
+      "statement": "Deleting a project keeps its conversations, messages, and raw sources",
+      "why": "The task forbade deleting associated conversations.",
+      "confidence": 0.95,
+      "basis": "specified",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 0, "quote": "deleting a project must not delete the conversations associated with it" },
+        { "stepIndex": 86, "quote": "It deliberately never touches `conversations`, `messages`, or `rawSources`" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [32], "code": [] },
+      "alternatives": [],
+      "assumptions": [
+        {
+          "statement": "The same conversation can back several projects",
+          "basis": "inferred",
+          "evidence": [{ "stepIndex": 86, "quote": "the same conversation can back several projects" }],
+          "code": [],
+          "inheritedFrom": null,
+          "rationale": "Stated as the reason primary sources must survive."
+        }
+      ]
+    },
+    {
+      "existingObjectId": null,
+      "statement": "The project cascade is the inverse of the existing deleteConversation: drop the lens, keep the primary sources",
+      "why": "The agent read the existing conversation-delete cascade and mirrored its shape.",
+      "confidence": 0.8,
+      "basis": "inherited",
+      "inheritedFrom": "src/lib/db/conversations.ts",
+      "evidence": [
+        { "stepIndex": 86, "quote": "the inverse of the existing `deleteConversation`, which drops associations but keeps synthesis" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [32], "code": [] },
+      "alternatives": [],
+      "assumptions": []
+    },
+    {
+      "existingObjectId": null,
+      "statement": "Project-scoped rows are deleted one by one so the sync engine emits a tombstone per row",
+      "why": "Table clears would bypass the per-row Dexie hooks the sync engine relies on.",
+      "confidence": 0.85,
+      "basis": "inferred",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 86, "quote": "Rows are deleted individually rather than via table clears so the sync engine's `deleting` hooks emit one tombstone per synced row" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [32], "code": [] },
+      "alternatives": [],
+      "assumptions": [
+        {
+          "statement": "Deleting an unknown project id is a no-op",
+          "basis": "inferred",
+          "evidence": [{ "stepIndex": 86, "quote": "Idempotent for unknown ids" }],
+          "code": [],
+          "inheritedFrom": null,
+          "rationale": "Stated in the wrap-up."
+        }
+      ]
+    },
+    {
+      "existingObjectId": null,
+      "statement": "Confirmation is an inline alertdialog on the page that says conversations are not deleted",
+      "why": "The agent chose an inline confirmation over a browser dialog.",
+      "confidence": 0.8,
+      "basis": "inferred",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 41, "quote": "an inline confirmation that states conversations are kept" },
+        { "stepIndex": 86, "quote": "First click opens an inline `alertdialog` naming the project and stating \"Conversations are not deleted\"" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [46], "code": [] },
+      "alternatives": [],
+      "assumptions": []
+    },
+    {
+      "existingObjectId": null,
+      "statement": "Deletion is permanent — no soft delete, undo, or audit record",
+      "why": "Nothing in the task asked for recovery and the agent did not raise it.",
+      "confidence": 0.7,
+      "basis": "invented",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 86, "quote": "\"Delete permanently\" runs the cascade" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [32, 46], "code": [] },
+      "alternatives": [
+        { "statement": "Soft delete with a recovery window", "evidence": [], "rejectedBecause": "never considered in the session" }
+      ],
+      "assumptions": []
+    },
+    {
+      "existingObjectId": null,
+      "statement": "An incoming project tombstone from sync runs the same cascade on the receiving device",
+      "why": "So project-scoped rows do not dangle on a second device.",
+      "confidence": 0.85,
+      "basis": "inferred",
+      "inheritedFrom": null,
+      "evidence": [
+        { "stepIndex": 35, "quote": "Engine tombstone case and the page UI are independent" },
+        { "stepIndex": 86, "quote": "The incoming `understanding_project` tombstone case now calls the same cascade" }
+      ],
+      "implementedBy": { "anchorStepIndexes": [36], "code": [] },
+      "alternatives": [],
+      "assumptions": []
+    },
+    {
+      "existingObjectId": null,
+      "statement": "Deleted projects are archived for thirty days",
+      "why": "Fabricated — this quote does not exist in the transcript and must be dropped by the firewall.",
+      "confidence": 0.9,
+      "basis": "specified",
+      "inheritedFrom": null,
+      "evidence": [{ "stepIndex": 0, "quote": "archive deleted projects for thirty days" }],
+      "implementedBy": { "anchorStepIndexes": [32], "code": [] },
+      "alternatives": [],
+      "assumptions": []
+    }
+  ],
+  "invalidates": []
+}

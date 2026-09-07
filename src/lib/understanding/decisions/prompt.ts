@@ -54,6 +54,7 @@ export function buildRecoveryMessages(input: RecoveryPromptInput): ChatMessage[]
     '    "why": string,',
     '    "confidence": number,',
     '    "basis": "specified" | "inherited" | "inferred" | "invented" | "unknown",',
+    '    "inheritedFrom": string | null,',
     '    "evidence": [{ "stepIndex": number, "quote": string }],',
     '    "implementedBy": { "anchorStepIndexes": number[], "code": [{ "path": string, "quote": string }] },',
     '    "alternatives": [{ "statement": string, "evidence": [{ "stepIndex": number, "quote": string }], "rejectedBecause": string }],',

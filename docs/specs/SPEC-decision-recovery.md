@@ -268,7 +268,7 @@ New kind `decision_trace` (14 chars, within varchar(32)). Parent = `decisionObje
 ## 8. Capture (stage 01)
 
 ### 8.1 Agent inspections — `src/lib/investigation/agentInspections.ts`
-Derived from `normalizeSession()` like anchors. Tools: `Read` → `read` (path from `file_path`), `Grep` → `search` (`pattern`, `path`), `Glob` → `search` (`pattern`, `path`), `LS` → `list` (`path`). Paths normalized with `normalizePath` and made repo-relative with the conversation's `projectPath` / `workingDirectory`. `deriveAgentInspectionsForConversation`, `deriveAgentInspectionsForAllAgentSessions` (backfill), invoked from import alongside anchors. Cascades with conversation delete; cleared by `clearAllData`.
+Derived from `normalizeSession()` like anchors. Tools: `Read` → `read` (path from `file_path`), `Grep` → `search` (`pattern`, `path`), `Glob` → `search` (`pattern`, `path`), `LS` → `list` (`path`). **Read-only Bash commands count too** (added in DR-6 after the dogfood session read every file through the shell): `cat`/`sed -n`/`head`/`tail` → `read`, `grep`/`rg` → `search`, `ls`/`find` → `list`, parsed per `;`/`&&`/pipeline stage; segments that write or run anything (`sed -i`, redirections, `npm`, `git commit`, heredocs) are ignored. Deriver version 1.1.0. Paths normalized with `normalizePath` and made repo-relative with the conversation's `projectPath` / `workingDirectory`. `deriveAgentInspectionsForConversation`, `deriveAgentInspectionsForAllAgentSessions` (backfill), invoked from import alongside anchors. Cascades with conversation delete; cleared by `clearAllData`.
 
 ### 8.2 Session commits — `src/lib/understanding/decisions/sessionCommits.ts`
 `extractSessionCommits(steps)`: Bash `tool_call` whose `command` matches `/\bgit\s+commit\b/`, paired to its `tool_result` (by `toolUseId`, fallback next step), regex `/^\[([^\s\]]+)\s+(?:\(root-commit\)\s+)?([0-9a-f]{7,40})\]/m`. Not persisted; shown in `RepoBindingCard` as a suggested sha.
@@ -281,7 +281,7 @@ Derived from `normalizeSession()` like anchors. Tools: `Read` → `read` (path f
 ## 9. Recovery pipeline — `src/lib/understanding/decisions/`
 
 ### 9.1 Candidates — `candidates.ts` (deterministic)
-For each associated Claude Code conversation (reuse `getAssociatedConversations`): normalize; load anchors and inspections. Build transcript excerpts: every `user_msg` step in full (cap 4000 chars each); for each anchor, the preceding `agent_text` steps within a window of 6 plus the hunk (`oldString`/`newString` capped 1500 chars each, `scrubSecrets`). Each excerpt is tagged `<step index=N role=R>`. Total cap 60 000 chars; over cap, drop oldest anchors first and record a warning. Repo excerpts only when `latestCachedSnapshot` exists: `selectCandidateFiles` seeded from anchor paths and inspected paths, `isFetchAllowed`, `excerptFile` windows; each path marked `preExisting` when it is in the tree and no `write` anchor created it. Existing decision objects (not rejected) summarized `{id, title, basis}` for re-recognition.
+For each associated Claude Code conversation (reuse `getAssociatedConversations`): normalize; load anchors and inspections. Build transcript excerpts: every `user_msg` step in full (cap 4000 chars each); for each anchor, the preceding `agent_text` steps within a window of 6 plus the hunk (`oldString`/`newString` capped 1500 chars each, `scrubSecrets`); and the agent's **closing statements** — the last 2 `agent_text` steps after the final edit (cap 4000 each), kept like user messages because agents state permanence, cascades, and omissions in their wrap-up (DR-6 finding). Each excerpt is tagged `<step index=N role=R>`. Total cap 60 000 chars; over cap, drop oldest anchors first and record a warning. Repo excerpts only when `latestCachedSnapshot` exists: `selectCandidateFiles` seeded from anchor paths and inspected paths, `isFetchAllowed`, `excerptFile` windows; each path marked `preExisting` when it is in the tree and no `write` anchor created it. Existing decision objects (not rejected) summarized `{id, title, basis}` for re-recognition.
 
 ### 9.2 Plan — `runRecovery.ts` → `planRecovery(projectId, opts)`
 `RecoveryPlan { projectId, runId, repoKey?, sha?, conversations[{conversationId, title, source, anchorCount, excerptChars}], filePaths, hunkCount, skipped[], existingDecisionIds, warnings }`. Built before any provider call; feeds `DisclosureModal`.
@@ -292,7 +292,7 @@ System prompt states the six stages briefly, the basis vocabulary with its const
 ```json
 { "decisions": [ {
     "existingObjectId": null,
-    "statement": "…", "why": "…", "confidence": 0.8, "basis": "inferred",
+    "statement": "…", "why": "…", "confidence": 0.8, "basis": "inferred", "inheritedFrom": null,
     "evidence": [ { "stepIndex": 12, "quote": "…" } ],
     "implementedBy": { "anchorStepIndexes": [14], "code": [ { "path": "src/…", "quote": "…" } ] },
     "alternatives": [ { "statement": "…", "evidence": [], "rejectedBecause": "…" } ],
@@ -421,12 +421,14 @@ Invariant 6 gains: *"Transcript excerpts and edit hunks sent for decision recove
 | **DR-3** | Routes, tab, `DecisionsPage`, `BasisBadge`, `DecisionDetail`, `AssumptionList`, run + disclosure | page test; every row opens its step and hunk |
 | **DR-4** | `blastRadius.ts` + panel; `WorkspaceOriginKind 'decision'` + `?decision=` seeding; `challenge.ts` | unsupported decision → blast radius → pre-filled draft workspace; challenge lands pending only |
 | **DR-5** | `diff.ts`, `decisionDiffs` helpers, `DecisionDiffView`, run picker, record-as-contradicted | two runs → persisted diff; accepting `invalidated` writes a user event |
-| **DR-6** | Dogfood session (§16), sanitized fixture, §16 manual scenario, CLAUDE.md amendment, status → built | fixture tests green |
+| **DR-6** | Dogfood session (§16), sanitized fixture, §16 manual scenario, CLAUDE.md amendment, status → built; Bash-read inspections; closing statements in excerpts; decision-level `inheritedFrom`; quiet-commit sha fallback | fixture tests green ✔ |
 | **DR-7** | Parser v1.2.0, `sourceMeta`, sidechain linking, "delegated" labels | golden traces unchanged; sidechain fixture parses linked |
 
 ---
 
 ## 16. Manual acceptance scenario (the killer demo)
+
+**How the demo session was produced (DR-6, 2026-09-07).** A nested `claude -p --dangerously-skip-permissions` run is blocked by the auto-mode classifier, so the session was run as a **subagent of the building session** in this repo on branch `demo/project-deletion` (from the DR-7 HEAD, not `main`, so it saw the same code Jacob runs). Its transcript is a real Claude Code sidechain file (`<sessionId>/subagents/agent-….jsonl`), sanitized into `tests/decision-fixtures/project-deletion.jsonl`. It committed `9987455` ("feat(projects): delete a project from its overview page, keeping conversations"); the branch is **not pushed and not merged** (recon P5). Two findings changed the pipeline: the agent read files only through Bash (§8.1 now derives inspections from `sed -n`/`cat`/`grep`), and it stated most decisions in its closing summary (§9.1 now always includes the closing agent statements). The canned response in `project-deletion.response.json` quotes that transcript; the firewall pins **2 specified · 1 inherited · 3 inferred · 1 invented (unsupported autonomous)** and drops a fabricated eighth decision.
 
 1. On a branch from `main`, run an unsteered Claude Code session in this repo with the prompt: *"Add project deletion to Chatdex. It must be reachable from the project page, and deleting a project must not delete the conversations associated with it."* Let it commit. Push the branch. Do not merge.
 2. Import the session JSONL from `~/.claude/projects/-Users-jacie-dev-apps-chatdex/` via the Import page directory picker.

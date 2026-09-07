@@ -266,7 +266,7 @@ export function DecisionsPage() {
           Sessions committed:{' '}
           {commits.slice(0, 5).map((c, i) => (
             <span key={`${c.sha}-${i}`} className="mr-2">
-              <span className="font-mono">{c.sha.slice(0, 7)}</span> on <span className="font-mono">{c.branch}</span>
+              <span className="font-mono">{c.sha.slice(0, 7)}</span>{c.branch ? <> on <span className="font-mono">{c.branch}</span></> : null}
               {c.subject ? ` — ${c.subject}` : ''} ({c.conversationName})
             </span>
           ))}

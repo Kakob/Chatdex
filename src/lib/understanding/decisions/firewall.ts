@@ -305,8 +305,9 @@ export function parseRecoveryResponse(text: string, ctx: FirewallContext): Parse
       });
     }
 
+    const decisionInheritedFrom = asString(rec.inheritedFrom, 300);
     const constrained = constrainBasis(
-      { claimed: rec.basis, spans, code: implEvidence, inheritedFrom: undefined },
+      { claimed: rec.basis, spans, code: implEvidence, inheritedFrom: decisionInheritedFrom },
       ctx
     );
     if (constrained.warning) warnings.push(`Decision "${statement}": ${constrained.warning}`);
