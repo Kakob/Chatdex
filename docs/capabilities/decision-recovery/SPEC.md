@@ -47,7 +47,7 @@ An agent coding session makes dozens of decisions the user never sees: which exi
 Every decision and every assumption cites at least one verified verbatim span of a transcript step that was actually supplied to the model. Claims whose quotes cannot be located are dropped, never stored as text.
 
 ### 2.2 Basis-constraint law
-Basis labels are mechanically constrained after the model answers. `specified` requires a verified `user_msg` span. `inherited` requires verified code evidence on a path that pre-existed in the bound snapshot, or an `inheritedFrom` pointer to a path the agent inspected or a dependency present in the snapshot's `package.json`. `invented` requires zero `user_msg` spans. `inferred` requires an `agent_text` or `tool_call` span. Labels that fail their constraint are downgraded and the downgrade is recorded as a warning on the trace. The model never sets `madeBy` or `unsupportedAutonomous`; both are derived (§7.3).
+Basis labels are mechanically constrained after the model answers. `specified` requires a verified `user_msg` span. `inherited` requires verified code evidence on a path that pre-existed in the bound snapshot, or an `inheritedFrom` pointer to a path the agent inspected or a dependency present in the snapshot's `package.json`. `invented` requires zero `user_msg` spans. `inferred` requires an `agent_text` or `tool_call` span. Labels that fail their constraint are downgraded and the downgrade is recorded as a warning on the trace. The model never sets `madeBy` or `unsupportedAutonomous`; both are derived (§7.3). These constraints verify quote presence and roles, not semantic authorship, rationale, or adoption. Presentation must qualify the labels and keep original values inspectable.
 
 ### 2.3 Pending law
 Recovery output lands `origin: 'ai'`, `reviewState: 'pending'`. Recovery never emits `superseded`, `contradicted`, or `resolved` understanding events. The model's `invalidates` claims land only on the trace and surface through the diff (§12) for a human to act on.
@@ -62,7 +62,7 @@ Decision Investigation tables, spec, and `src/lib/investigation/*` are not modif
 `planRecovery` runs before any provider call and produces the disclosure: which conversations, which source providers, whether the call is cross-provider, and how many repository excerpts and edit hunks will be sent. Transcript excerpts and edit hunks are user data under CLAUDE.md invariant 6, same as repository excerpts.
 
 ### 2.7 No-ranking law
-Decisions are ordered by first citing step and grouped by primary path or session. There is no importance score. Ranking is itself an implicit AI decision, exactly what this product exposes. `basis` and `unsupportedAutonomous` are the only salience cues and both are mechanical.
+Decisions are ordered by first citing step and grouped by primary path or session. There is no importance score. Ranking is itself an implicit AI decision, exactly what this product exposes. Neutral cues may describe stored evidence presence and review state. Explicit filters, session/path grouping, pagination, and selection/focus accents are allowed; none may imply importance or project relevance. Legacy basis and unsupported-autonomous values remain inspectable, without automatic semantic reclassification.
 
 ### 2.8 Deterministic-diff law
 `DecisionDiff` is a pure function of two trace sets. No model, no network. Same input twice produces deep-equal entries. `differVersion` is bumped when fold rules change.
@@ -241,6 +241,8 @@ export interface DecisionDiff {          // LOCAL-ONLY, derived
 - `unsupportedAutonomous = madeBy === 'agent' && (basis === 'invented' || basis === 'unknown')`.
 - `primaryPath`, `firstStepIndex`, `decidedAt` from the cited anchors and spans.
 
+Presentation of these legacy derivations must not equate a user quote with an exact implementation request or an earlier agent quote with proven user adoption. Stored values and derivation rules remain unchanged.
+
 ### 7.4 Human override — promotion from Decision Investigation
 
 `src/lib/understanding/decisions/fromInvestigation.ts` → `promoteDecisionFinding(findingId)` calls the existing `promoteFindingToCurrentUnderstanding`, reads the case's latest `VerdictRevision`, and writes meta from this map. No `DecisionTrace` is created; the detail view shows "Adjudicated by you in case …".
@@ -327,16 +329,26 @@ Caps: `MAX_DECISIONS_PER_CALL` 20, `MAX_ASSUMPTIONS` 8, `MAX_ALTERNATIVES` 4.
 Project tab **Decisions** (`/projects/:id/decisions`) after Intent Trace; detail at `/projects/:id/decisions/:objectId`.
 
 ### 10.2 List
-Rows ordered by `firstStepIndex` within session, grouped by session or by `primaryPath`. Row: basis badge · made-by chip · statement · assumption count · review state · latest trace sha (short) · evidence deep links. Filters: basis, made by, review state, unsupported only, session. Header: run picker, **Recover decisions**, **Compare runs**, `RepoBindingCard`. Unsupported autonomous rows carry the only accent treatment.
+Compact rows and a persistent evidence pane; forty rows per page. Ordering uses the existing chronological read model, with groups ordered by first occurrence and original row order preserved within each group. Group by session (name, date, ID) or normalized primary path; missing values have explicit buckets. No inferred topic/relevance ranking.
+
+Case-insensitive local search covers title, body, primary path, session name/ID, latest explanation and decision-level transcript quotes. Filters retain original basis, made-by, review state, unsupported flag and session. Result counts explicitly exclude rejected objects; Clear filters removes all search/filter restrictions. Search, grouping, filters, selection and page are stored in URL query parameters. Inspecting a row preserves list position. Source/full-detail links open another tab; query state is restored on reload, while pixel scroll is not.
+
+Rows show evidence-presence cues and review state. Selection never reviews a candidate. Arrow keys and Home/End select visible rows; Tab reaches the evidence pane; Escape returns to the selected visible row. On narrow screens the pane follows the list. Only the selected candidate's detail is rendered.
 
 ### 10.3 Detail
-Sections: Decision · Made by · Why · Alternatives · Assumptions (basis badge, evidence links each) · Implemented by (hunks open the anchor route read-only; code lines open from the repo cache) · Evidence (transcript spans → conversation message) · Blast radius (lazy) · Actions: `ReviewButtons`, **Challenge**, **Prepare replacement change**. Investigation-promoted decisions show "Adjudicated by you in case …" instead of a trace.
+The inline pane shows original statement, recorded quotes with source roles, AI explanation, expandable original classification/attribution, code evidence, alternatives/assumptions, provenance/warnings and review controls. Code hunks load read-only when expanded; missing anchors are labeled unavailable. Hunk previews are capped at 3,000 characters per side with links to full source. Original classifications remain available without rewriting records.
+
+The existing full-detail route retains cached-file context, edit links, lazy Blast radius, Challenge and Prepare replacement change. Investigation-promoted decisions are labeled as human adjudications; records without traces use existing source links. Accept/Reject update the object's review state and timestamp. Reject removes it from this list but retains records and traces. Neither action accepts pending events, creates a separate review-history event, or records an endorsement for future work. UI copy must state these effects.
 
 ### 10.4 Disclosures
 Recovery: conversations, sources, cross-provider status, hunk count, repository-excerpt count. Challenge: reuses the Assisted disclosure.
 
 ### 10.5 Rendering rules
-Every model-authored string is labelled AI and capped. Every evidence item opens its primary source. Nothing is preselected for review.
+Every model-authored string is labelled AI and capped. Every evidence item opens its primary source. Nothing is preselected for review. Quote roles and code evidence do not establish rationale, authorship, inheritance or adoption by themselves.
+
+Show recorded run ID/date/provider/model and repository key/SHA separately from the current binding. A `local` revision is a working-tree marker, not an immutable commit. Missing trace/snapshot data must be explicit. Saved run summaries derive from surviving traces, so complete run-wide diagnostics and failed/zero-output session totals are unavailable. Trace warnings must not be summed into a fabricated run-health report. Browsing/search/grouping/paging/inspection make no provider calls and do not mutate saved records.
+
+Implementation change record: [Decision review experience](../../changes/decision-review-experience/SPEC.md).
 
 ---
 

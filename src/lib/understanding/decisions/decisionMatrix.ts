@@ -39,11 +39,11 @@ export const BASIS_LABEL: Record<DecisionBasis, string> = {
 };
 
 export const BASIS_HELP: Record<DecisionBasis, string> = {
-  specified: 'The user asked for it — a user message states it.',
-  inherited: 'Copied from an existing pattern, default, or file the agent read.',
-  inferred: 'The agent reasoned to it from context and said so.',
-  invented: 'The agent chose it with no user direction and no existing pattern.',
-  unknown: 'Cannot be determined from the recorded session.',
+  specified: 'Original classification: specified. A cited user quote does not establish that the exact implementation was requested.',
+  inherited: 'Original classification: inherited. Evidence of an existing path or pattern does not by itself establish why it was used.',
+  inferred: 'Original classification: inferred. Agent or tool evidence is present; verify the reconstructed reasoning against its sources.',
+  invented: 'Original classification: invented. This label does not establish absence of code evidence, rationale, or an existing pattern.',
+  unknown: 'Original classification: unknown. Attribution could not be determined from the recorded evidence.',
 };
 
 export const MADE_BY_LABEL: Record<DecisionMadeBy, string> = {

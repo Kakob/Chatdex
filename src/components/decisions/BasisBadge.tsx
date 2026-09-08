@@ -30,7 +30,7 @@ export function BasisBadge({ basis, small }: { basis: DecisionBasis; small?: boo
 
 export function MadeByChip({ madeBy }: { madeBy: DecisionMadeBy }) {
   return (
-    <span className={`${CHIP} bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300`} title="Derived from who said it in the transcript">
+    <span className={`${CHIP} bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300`} title="Original attribution; transcript roles alone do not prove authorship or adoption">
       {MADE_BY_LABEL[madeBy]}
     </span>
   );
@@ -40,10 +40,10 @@ export function UnsupportedBadge() {
   return (
     <span
       className={`${CHIP} bg-rose-600 text-white dark:bg-rose-500`}
-      title="The agent decided this with no user direction and no existing pattern — review it"
+      title="Legacy unsupported-autonomous flag; inspect the evidence before interpreting this classification"
       data-testid="unsupported-badge"
     >
-      <AlertTriangle size={11} /> Unsupported autonomous
+      <AlertTriangle size={11} /> Legacy unsupported flag
     </span>
   );
 }

@@ -4,7 +4,7 @@
 // run: Recover decisions. Everything AI-produced lands pending (law 2.3).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { GitCompareArrows, Loader2, Scale } from 'lucide-react';
 import { db } from '../lib/db/schema';
 import { setObjectReviewState } from '../lib/db/understanding';
@@ -26,8 +26,9 @@ import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { HistoryDrawer } from '../components/understanding/HistoryDrawer';
 import { RepoBindingCard } from '../components/intents/RepoBindingCard';
 import { DecisionList, type DecisionGrouping } from '../components/decisions/DecisionList';
+import { normalizedPath } from '../lib/understanding/decisions/reviewBrowser';
 import { useToastStore } from '../stores/toastStore';
-import type { DataSource, StoredConversation } from '../types';
+import type { StoredConversation } from '../types';
 import type { ReviewState } from '../types/understanding';
 import type { DecisionBasis, DecisionMadeBy } from '../types/decision';
 
@@ -49,7 +50,6 @@ export function DecisionsPage() {
   const addToast = useToastStore((s) => s.addToast);
   const [data, setData] = useState<DecisionMatrix | null | undefined>(undefined);
   const [sessions, setSessions] = useState<StoredConversation[]>([]);
-  const [sourcesByConversation, setSourcesByConversation] = useState<Map<string, DataSource>>(new Map());
   const [conversationNames, setConversationNames] = useState<Map<string, string>>(new Map());
   const [commits, setCommits] = useState<Array<SessionCommit & { conversationName: string }>>([]);
   const [providers, setProviders] = useState<LLMProviderId[]>([]);
@@ -58,14 +58,30 @@ export function DecisionsPage() {
   const [progress, setProgress] = useState<{ label: string; done: number; total: number } | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [historyObjectId, setHistoryObjectId] = useState<string | null>(null);
-  const [grouping, setGrouping] = useState<DecisionGrouping>('session');
-  const [filters, setFilters] = useState<{
-    basis: DecisionBasis | 'all';
-    madeBy: DecisionMadeBy | 'all';
-    review: ReviewState | 'all';
-    unsupportedOnly: boolean;
-    session: string | 'all';
-  }>({ basis: 'all', madeBy: 'all', review: 'all', unsupportedOnly: false, session: 'all' });
+  const [params, setParams] = useSearchParams();
+  const updateParams = (values: Record<string, string>) => {
+    setParams((previous) => {
+      const next = new URLSearchParams(previous);
+      for (const [key, value] of Object.entries(values)) {
+        if (!value || value === 'all' || value === 'false') next.delete(key);
+        else next.set(key, value);
+      }
+      return next;
+    }, { replace: true });
+  };
+  const grouping: DecisionGrouping = params.get('group') === 'path' ? 'path' : 'session';
+  const setGrouping = (group: DecisionGrouping) => updateParams({ group, page: '0' });
+  const query = params.get('q') ?? '';
+  const selectedId = params.get('selected') ?? '';
+  const page = Math.max(0, Number.parseInt(params.get('page') ?? '0', 10) || 0);
+  const filters = {
+    basis: (params.get('basis') ?? 'all') as DecisionBasis | 'all',
+    madeBy: (params.get('madeBy') ?? 'all') as DecisionMadeBy | 'all',
+    review: (params.get('review') ?? 'all') as ReviewState | 'all',
+    unsupportedOnly: params.get('unsupportedOnly') === 'true',
+    session: params.get('session') ?? 'all',
+  };
+  const setFilters = (next: typeof filters) => updateParams({ ...next, unsupportedOnly: String(next.unsupportedOnly), page: '0' });
 
   const load = useCallback(async () => {
     if (!projectId) return;
@@ -84,7 +100,6 @@ export function DecisionsPage() {
     const ids = new Set<string>(associated.map((c) => c.id));
     if (matrix) for (const r of matrix.rows) for (const e of r.evidence) ids.add(e.conversationId);
     const convs = ids.size ? await db.conversations.where('id').anyOf([...ids]).toArray() : [];
-    setSourcesByConversation(new Map(convs.map((c) => [c.id, c.source])));
     setConversationNames(new Map(convs.map((c) => [c.id, c.name])));
 
     // Suggested shas: what these sessions committed (deterministic, §8.2).
@@ -100,7 +115,7 @@ export function DecisionsPage() {
     void load();
   }, [load]);
 
-  const rows = useMemo(() => {
+  const rows = (() => {
     if (!data) return [];
     return data.rows.filter((r) => {
       if (filters.basis !== 'all' && r.meta.basis !== filters.basis) return false;
@@ -108,9 +123,12 @@ export function DecisionsPage() {
       if (filters.review !== 'all' && r.object.reviewState !== filters.review) return false;
       if (filters.unsupportedOnly && !r.meta.unsupportedAutonomous) return false;
       if (filters.session !== 'all' && r.meta.conversationId !== filters.session) return false;
-      return true;
+      const search = query.trim().toLowerCase();
+      return !search || [r.object.title, r.object.body, normalizedPath(r.meta.primaryPath), r.conversationName,
+        r.meta.conversationId, r.latestTrace?.why, ...(r.latestTrace?.transcriptEvidence.map((e) => e.quote) ?? [])]
+        .some((value) => value?.toLowerCase().includes(search));
     });
-  }, [data, filters]);
+  })();
 
   const counts = useMemo(() => {
     const byBasis: Record<DecisionBasis, number> = { specified: 0, inherited: 0, inferred: 0, invented: 0, unknown: 0 };
@@ -123,8 +141,12 @@ export function DecisionsPage() {
   }, [data]);
 
   const handleReview = async (objectId: string, state: ReviewState) => {
-    await setObjectReviewState(objectId, state);
-    await load();
+    try {
+      await setObjectReviewState(objectId, state);
+      await load();
+    } catch (error) {
+      addToast(`Could not save review: ${(error as Error).message}`, 'error');
+    }
   };
 
   const handleRecoverClick = async () => {
@@ -208,16 +230,12 @@ export function DecisionsPage() {
         <div>
           <p className="text-sm font-medium text-violet-600 dark:text-violet-400">Decisions</p>
           <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-            The choices hidden inside your agent sessions, made explicit
+            Review recovered decisions
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-            Each decision is reconstructed from a recorded session and labelled by <em>basis</em>:{' '}
-            <span className="font-medium">Specified</span> when you asked for it,{' '}
-            <span className="font-medium">Inherited</span> when it copied an existing pattern,{' '}
-            <span className="font-medium">Inferred</span> when the agent reasoned to it,{' '}
-            <span className="font-medium">Invented</span> when nothing in the record supports it. Labels
-            are checked against the quotes, not taken from the model. Rows are in the order the
-            decisions were made — nothing is ranked.
+            Browse saved reconstructions and check their sources. Quotes establish what was recorded,
+            not whether a choice was justified or adopted. Search and review use this existing data;
+            only Recover decisions starts a new provider run.
           </p>
           {data.latestRecoveredAt && (
             <p className="mt-2 text-xs text-gray-400">
@@ -260,6 +278,8 @@ export function DecisionsPage() {
         </div>
       </section>
 
+      <details className="text-sm text-gray-500">
+      <summary className="cursor-pointer mb-2">Repository connection and session commits</summary>
       <RepoBindingCard
         project={project}
         collapsible
@@ -281,6 +301,7 @@ export function DecisionsPage() {
           {repository ? ' Use one as the tracked ref above to recover against the code the session produced.' : ''}
         </p>
       )}
+      </details>
       {provider === 'openai' && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
           The OpenAI subscription path adds roughly 14k tokens of overhead per call; prefer Anthropic for large runs.
@@ -304,12 +325,22 @@ export function DecisionsPage() {
         </details>
       )}
 
+      {data.runs.length > 0 && <details className="rounded-lg border border-gray-200 dark:border-gray-800 p-3 text-xs text-gray-500">
+        <summary className="cursor-pointer">Saved runs and coverage limitations · {data.runs.length}</summary>
+        <p className="my-2">Complete run-wide diagnostics are unavailable in saved data. Trace warnings remain inspectable per candidate; failed sessions and dropped candidates cannot be counted from surviving traces. Runs without saved traces are not represented here.</p>
+        {data.runs.map((run) => <p key={run.runId} className="break-all">{run.createdAt.toISOString()} · Run {run.runId} · {run.traceCount} traces · {run.sha ? `${run.repoKey ?? 'Repository unrecorded'} @ ${run.sha}` : 'No repository snapshot recorded'}</p>)}
+      </details>}
       {data.rows.length > 0 && (
         <>
+          <label className="block text-sm text-gray-600 dark:text-gray-300">Search saved candidates
+            <input type="search" value={query} onChange={(e) => updateParams({ q: e.target.value, page: '0' })} placeholder="Search titles, explanations, quotes, sessions, and paths" className={`${SELECT} mt-1 block w-full`} />
+          </label>
+          <p className="text-xs text-gray-500">Original classification filters — these labels do not establish authorship or rationale.</p>
           <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="basis-counts">
             {(Object.keys(BASIS_LABEL) as DecisionBasis[]).map((b) => (
               <button
                 key={b}
+                aria-pressed={filters.basis === b}
                 type="button"
                 onClick={() => setFilters({ ...filters, basis: filters.basis === b ? 'all' : b })}
                 className={`rounded-full px-2 py-0.5 border ${filters.basis === b ? 'border-violet-500 text-violet-700 dark:text-violet-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`}
@@ -319,15 +350,16 @@ export function DecisionsPage() {
             ))}
             <button
               type="button"
+              aria-pressed={filters.unsupportedOnly}
               onClick={() => setFilters({ ...filters, unsupportedOnly: !filters.unsupportedOnly })}
               className={`rounded-full px-2 py-0.5 border ${filters.unsupportedOnly ? 'border-rose-500 text-rose-700 dark:text-rose-300' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`}
             >
-              {counts.unsupported} unsupported autonomous
+              {counts.unsupported} legacy unsupported flags
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <select aria-label="Made-by filter" className={SELECT} value={filters.madeBy} onChange={(e) => setFilters({ ...filters, madeBy: e.target.value as typeof filters.madeBy })}>
-              <option value="all">Anyone</option>
+              <option value="all">Any original attribution</option>
               {(Object.keys(MADE_BY_LABEL) as DecisionMadeBy[]).map((m) => (
                 <option key={m} value={m}>{MADE_BY_LABEL[m]}</option>
               ))}
@@ -338,11 +370,11 @@ export function DecisionsPage() {
               <option value="accepted">accepted</option>
               <option value="edited">edited</option>
             </select>
-            {sessions.length > 1 && (
+            {conversationNames.size > 0 && (
               <select aria-label="Session filter" className={SELECT} value={filters.session} onChange={(e) => setFilters({ ...filters, session: e.target.value })}>
                 <option value="all">All sessions</option>
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                {[...conversationNames].map(([id, name]) => (
+                  <option key={id} value={id}>{name} · {id}</option>
                 ))}
               </select>
             )}
@@ -350,7 +382,8 @@ export function DecisionsPage() {
               <option value="session">Group by session</option>
               <option value="path">Group by file</option>
             </select>
-            <span className="text-gray-400">{rows.length} of {data.rows.length}</span>
+            <span className="text-gray-400" role="status">{rows.length} of {data.rows.length} candidates · rejected records excluded</span>
+            <button className="text-violet-600" onClick={() => updateParams({ q: '', basis: '', madeBy: '', review: '', unsupportedOnly: '', session: '', page: '0' })}>Clear filters</button>
           </div>
         </>
       )}
@@ -364,7 +397,10 @@ export function DecisionsPage() {
           rows={rows}
           projectId={projectId}
           grouping={grouping}
-          sourcesByConversation={sourcesByConversation}
+          selectedId={selectedId}
+          onSelect={(selected) => updateParams({ selected })}
+          page={page}
+          onPage={(next) => updateParams({ page: String(next) })}
           conversationNames={conversationNames}
           onReview={(objectId, state) => void handleReview(objectId, state)}
           onOpenHistory={setHistoryObjectId}

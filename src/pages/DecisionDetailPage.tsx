@@ -181,6 +181,7 @@ export function DecisionDetailPage() {
         </div>
         <h1 className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{object.title}</h1>
         <p className="mt-1 text-xs text-gray-400">{BASIS_HELP[meta.basis]}</p>
+        <p className="mt-2 text-xs text-gray-500">Accept marks the object accepted in project understanding; Reject excludes it from the decision list while retaining its records. Neither records a separate endorsement for future work or reviews pending events.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="decision-actions">
           {pending && <ReviewButtons onReview={(state) => void handleReview(state)} />}
           <button type="button" onClick={() => setHistoryOpen(true)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">

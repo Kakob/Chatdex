@@ -38,7 +38,7 @@ Ordered by build sequence, not by age.
 | [decision-investigation](./decision-investigation/) | MVP code-complete — DI-0…DI-4 | Jacob's §18 manual acceptance pass, then the §20 deferred list |
 | [intent-trace](./intent-trace/) | Code-complete — IT-0…IT-6 | Jacob's §16 browser pass |
 | [change-workspace](./change-workspace/) | Code-complete — CW-0…CW-8 | Jacob's §18 browser passes |
-| [decision-recovery](./decision-recovery/) | Code-complete — DR-0…DR-7 (demo fixture on unmerged `demo/project-deletion`) | Jacob's §16 browser pass |
+| [decision-recovery](./decision-recovery/) | Code-complete — DR-0…DR-7 (demo fixture on unmerged `demo/project-deletion`) | Jacob's §16 browser pass; [review experience delivery](../changes/decision-review-experience/PLAN.md) |
 | [flow-map](./flow-map/) | Draft spec (2026-09-07), no code | Approve the spec's §21 decisions D1–D10, then FM-0 |
 | [repository-integration](./repository-integration/SPEC.md) | Existing shared behavior documented; read-only | Branch Binding acceptance checks in its change plan; future refresh/write work in roadmap |
 | [activity-tracker](./activity-tracker/) | Chrome extension — in progress | — |

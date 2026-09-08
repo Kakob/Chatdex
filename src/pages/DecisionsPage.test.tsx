@@ -15,6 +15,7 @@ vi.mock('../lib/providers', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/providers')>();
   return { ...actual, listReadyProviders: vi.fn(async () => ['anthropic']), complete: vi.fn() };
 });
+import { db } from '../lib/db/schema';
 import { complete } from '../lib/providers';
 const completeMock = vi.mocked(complete);
 
@@ -98,6 +99,7 @@ describe('DecisionsPage branch binding', () => {
     renderAt(`/projects/${project.id}/decisions`);
 
     // The card used to vanish once a repo was bound.
+    await user.click(await screen.findByText('Repository connection and session commits'));
     expect(await screen.findByLabelText('Change repository binding')).toBeInTheDocument();
     await user.click(screen.getByLabelText('Change repository binding'));
 
@@ -107,46 +109,75 @@ describe('DecisionsPage branch binding', () => {
 });
 
 describe('DecisionsPage', () => {
-  it('renders decisions chronologically with basis badges, highlights only unsupported autonomous rows, escapes text, filters, and reviews', async () => {
+  it('browses saved evidence, searches and groups without writes or provider calls, then reviews explicitly', async () => {
+    const user = userEvent.setup();
+    const { project, specified, invented } = await seed();
+    const beforeObjects = await db.understandingObjects.toArray();
+    const beforeTraces = await db.decisionTraces.toArray();
+    const beforeEvents = await db.understandingEvents.toArray();
+    renderAt(`/projects/${project.id}/decisions`);
+    await screen.findByText('Deleting a project keeps its conversations');
+    const rows = screen.getAllByTestId('decision-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveAttribute('data-decision-id', specified.id);
+    expect(within(rows[1]).getByText('Agent quote · Code evidence')).toBeInTheDocument();
+    expect(document.querySelector('script')).toBeNull();
+    await user.click(rows[0]);
+    const panel = within(screen.getByRole('complementary', { name: 'Decision evidence' }));
+    expect(panel.getByText('No trace quotes available for this record.')).toBeInTheDocument();
+    expect(panel.getByRole('link', { name: /Open source/ })).toHaveAttribute('href', '/conversations/sess-1?scrollTo=m0');
+    await user.keyboard('{ArrowDown}');
+    expect(rows[1]).toHaveFocus();
+    expect(panel.getByText('Nobody asked for recovery.')).toBeInTheDocument();
+    await user.tab();
+    expect(screen.getByRole('complementary')).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(rows[1]).toHaveFocus();
+    expect(panel.getAllByRole('link', { name: /step 1 · agent/ })[0]).toHaveAttribute('target', '_blank');
+    await user.click(panel.getByText('Original classification and attribution'));
+    expect(panel.getByText(/Basis: Invented/)).toBeInTheDocument();
+    expect(panel.getByText(/Code edits alone do not establish rationale/)).toBeInTheDocument();
+    await user.click(panel.getByText(/Recovery provenance and warnings/));
+    await user.click(panel.getByText(/Code evidence ·/));
+    expect(await panel.findByRole('link', { name: /Write · step/ })).toHaveAttribute('target', '_blank');
+    expect(panel.getByText(/Recorded snapshot: gh:Kakob/)).toHaveTextContent('a'.repeat(40));
+    await user.type(screen.getByRole('searchbox'), 'permanent with no audit');
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(1);
+    await user.selectOptions(screen.getByLabelText('Group by'), 'path');
+    expect(screen.getByRole('heading', { name: 'src/lib/db/projects.ts' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(2);
+    expect(completeMock).not.toHaveBeenCalled();
+    expect(await db.understandingObjects.toArray()).toEqual(beforeObjects);
+    expect(await db.decisionTraces.toArray()).toEqual(beforeTraces);
+    expect(await db.understandingEvents.toArray()).toEqual(beforeEvents);
+    await user.click(panel.getByTitle('Accept'));
+    await waitFor(async () => expect((await getUnderstandingObject(invented.id))?.reviewState).toBe('accepted'));
+    expect(await db.decisionTraces.toArray()).toEqual(beforeTraces);
+    expect(await db.understandingEvents.toArray()).toEqual(beforeEvents);
+  });
+
+  it('restores URL selection and filters, handles empty results, and bounds large lists', async () => {
     const user = userEvent.setup();
     const { project, invented } = await seed();
-    renderAt(`/projects/${project.id}/decisions`);
-
-    expect(await screen.findByText('Deleting a project keeps its conversations')).toBeInTheDocument();
-    const list = within(screen.getByTestId('decision-list'));
-    const rows = list.getAllByTestId('decision-row');
-    expect(rows).toHaveLength(2);
-    expect(within(rows[0]).getByText('Specified')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('Invented')).toBeInTheDocument();
-    expect(list.getAllByTestId('unsupported-badge')).toHaveLength(1);
-    expect(within(rows[1]).getByTestId('unsupported-badge')).toBeInTheDocument();
-    expect(list.getByText(/no audit record <script>alert\(1\)<\/script>/)).toBeInTheDocument();
-    expect(document.querySelector('script')).toBeNull();
-    expect(within(rows[1]).getByText('1 assumption')).toBeInTheDocument();
-    expect(within(rows[1]).getByText('1 edit')).toBeInTheDocument();
-    expect(await screen.findByRole('heading', { level: 2, name: /project deletion session · 2/ })).toBeInTheDocument();
-    // No `git commit` in this session, so no suggested sha line.
-    expect(screen.queryByTestId('session-commits')).not.toBeInTheDocument();
-
-    // Counts row doubles as basis filter.
-    expect(within(screen.getByTestId('basis-counts')).getByText('1 invented')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '1 unsupported autonomous' }));
-    expect(screen.queryByText('Deleting a project keeps its conversations')).not.toBeInTheDocument();
-    expect(screen.getByText('1 of 2')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '1 unsupported autonomous' }));
-
-    // Group by file.
-    await user.selectOptions(screen.getByLabelText('Group by'), 'path');
-    expect(await screen.findByRole('heading', { level: 2, name: /src\/lib\/db\/projects\.ts · 2/ })).toBeInTheDocument();
-
-    // Review flips state; nothing was preselected.
-    const inventedRow = screen.getAllByTestId('decision-row').find((r) => r.getAttribute('data-decision-id') === invented.id)!;
-    expect(within(inventedRow).getByText('pending')).toBeInTheDocument();
-    await user.click(within(inventedRow).getByTitle('Accept'));
-    await vi.waitFor(async () => {
-      expect((await getUnderstandingObject(invented.id))?.reviewState).toBe('accepted');
-    });
-    await waitFor(() => expect(within(inventedRow).queryByText('pending')).not.toBeInTheDocument());
+    for (let i = 0; i < 45; i++) {
+      await createUnderstandingObject({ projectId: project.id, type: 'decision', title: `Extra candidate ${i}`, body: 'Historical choice', origin: 'user', evidence: [], occurredAt: now });
+    }
+    renderAt(`/projects/${project.id}/decisions?selected=${invented.id}&q=permanent&group=path`);
+    await screen.findByText('Nobody asked for recovery.');
+    expect(screen.getByRole('searchbox')).toHaveValue('permanent');
+    expect(screen.getByLabelText('Group by')).toHaveValue('path');
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(1);
+    await user.clear(screen.getByRole('searchbox'));
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(40);
+    await user.click(screen.getByRole('button', { name: 'Next page' }));
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(7);
+    await user.type(screen.getByRole('searchbox'), 'not-in-any-record');
+    expect(screen.queryAllByTestId('decision-row')).toHaveLength(0);
+    expect(screen.getByText(/No candidates match/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getAllByTestId('decision-row')).toHaveLength(40);
+    expect(completeMock).not.toHaveBeenCalled();
   });
 
   it('plans and discloses before any provider call, then runs recovery on confirm', async () => {

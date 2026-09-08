@@ -29,10 +29,12 @@ export function SpanLinks({
   conversationNames,
   compact,
   delegatedConversationIds,
+  newTab,
 }: {
   spans: TranscriptSpan[];
   conversationNames: Map<string, string>;
   compact?: boolean;
+  newTab?: boolean;
   /** Conversations that are subagent transcripts (SPEC-decision-recovery §8.3) — spans are labelled "delegated". */
   delegatedConversationIds?: Set<string>;
 }) {
@@ -42,6 +44,8 @@ export function SpanLinks({
       {spans.map((s, i) => (
         <li key={`${s.messageId}-${s.stepIndex}-${i}`} className="text-xs">
           <Link
+            target={newTab ? '_blank' : undefined}
+            rel={newTab ? 'noopener noreferrer' : undefined}
             to={`/conversations/${s.conversationId}?scrollTo=${encodeURIComponent(s.messageId)}`}
             className="inline-flex items-center gap-1 text-violet-600 dark:text-violet-400 hover:underline"
             title={`Step ${s.stepIndex} · ${ROLE_LABEL[s.role]}`}

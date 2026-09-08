@@ -13,6 +13,7 @@ plan; these summaries are navigation aids, not independent checklists.
 | Change | Primary capability | Related capabilities | Summary |
 |---|---|---|---|
 | [Branch Binding](./branch-binding/PLAN.md) | Repository Integration | Intent Trace, Decision Recovery, Change Workspace | Implementation recorded; manual acceptance checks remain |
+| [Decision review experience](./decision-review-experience/PLAN.md) | Decision Recovery | Repository Integration (snapshot context only) | Completed locally; verification and limitations in the linked plan/build log |
 
 ## When to create a package
 
