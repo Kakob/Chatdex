@@ -1,4 +1,4 @@
-// Intent traces (docs/tracks/intent-trace/SPEC.md §11.3): append-only per
+// Intent traces (docs/capabilities/intent-trace/SPEC.md §11.3): append-only per
 // (intent, commit). There is deliberately no update or delete helper — a
 // re-trace at a new commit adds a row; deletion happens only by cascade when
 // the intent object itself is removed (sync engine).

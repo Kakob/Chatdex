@@ -1,4 +1,4 @@
-// Decision Investigation entities (docs/tracks/decision-investigation/SPEC.md).
+// Decision Investigation entities (docs/capabilities/decision-investigation/SPEC.md).
 //
 // RawSource is the immutable primary-source record behind every investigation
 // artifact (§7.1): the verbatim payload a parser consumed, content-addressed

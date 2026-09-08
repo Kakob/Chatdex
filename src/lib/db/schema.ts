@@ -85,13 +85,13 @@ export class ChatdexDB extends Dexie {
       dailyStats: '&date',
       metadata: '&key',
     });
-    // v2: agent-observability entities (docs/tracks/agent-observability/SPEC.md §3).
+    // v2: agent-observability entities (docs/capabilities/agent-observability/SPEC.md §3).
     this.version(2).stores({
       findings:
         '&id, conversationId, runId, detector, severity, userLabel, createdAt, [conversationId+createdAt]',
       detectorRuns: '&id, &runKey, conversationId, finishedAt',
     });
-    // v3: shared-understanding entities (docs/tracks/understanding-workspace/PRD.md §6-§11).
+    // v3: shared-understanding entities (docs/capabilities/understanding-workspace/PRD.md §6-§11).
     this.version(3).stores({
       understandingProjects: '&id, name, reviewState, updatedAt',
       projectAssociations:

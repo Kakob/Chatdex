@@ -6,40 +6,42 @@ Project context for Claude Code. Read this before making changes.
 
 ## What Chatdex is
 
-Chatdex is a **local-first AI-conversation workspace**. It ingests conversation history from multiple providers (Claude.ai, Claude Code JSONL, ChatGPT), lets users browse/search/analyze it, detects **agent failure patterns** (loops, verification-absence, silent reversions), and is growing a **shared understanding workspace** that reconstructs projects and synthesizes current understanding from conversation history (`docs/tracks/understanding-workspace/PRD.md`).
+Chatdex is a **local-first AI-conversation workspace**. It ingests conversation history from multiple providers (Claude.ai, Claude Code JSONL, ChatGPT), lets users browse/search/analyze it, detects **agent failure patterns** (loops, verification-absence, silent reversions), and is growing a **shared understanding workspace** that reconstructs projects and synthesizes current understanding from conversation history (`docs/capabilities/understanding-workspace/PRD.md`).
 
 **Positioning (updated 2026-08-09):** Chatdex is moving away from the client-side-only power-user framing toward robust LLM-provider interactions for synthesis. Detection explainability and encrypted-at-rest sync remain differentiators; the *detection layer* specifically stays fully client-side (see invariants).
 
-## Current state vs. current work
+## Current state and current work
 
-**Built and working:** JSONL ingestion, session browse/search, analytics, client-side encryption (AES-GCM master key, WebAuthn+PRF-derived wrapping key, recovery-code fallback), hybrid IndexedDB (local plaintext) + Postgres (synced ciphertext) storage.
+Read [docs/capabilities/README.md](docs/capabilities/README.md) for capability status
+and [docs/changes/README.md](docs/changes/README.md) for bounded work. Do not duplicate
+those status tables here. Capability specs retain their architectural laws, security
+requirements, and consumer-specific contracts; change plans identify proposed amendments.
 
-**Being built now:** the agent observability layer. The authoritative documents are:
-- `docs/tracks/agent-observability/SPEC.md` — what to build and why
-- `docs/tracks/agent-observability/PLAN.md` — phase order, acceptance criteria, testing strategy
-
-**Next up (approved 2026-08-28):** the Intent Trace feature — `docs/tracks/intent-trace/SPEC.md`. Extracts the user's stated intents from chats (recording whether each was unprompted or a reply to the AI) and traces them against spec docs and GitHub code. Milestones IT-0…IT-6, one per session, logged in `docs/tracks/intent-trace/BUILD-LOG.md`; the spec's §2 laws and §13 security audit are binding.
-
-**Also approved 2026-08-28:** the Change Workspace — `docs/tracks/change-workspace/SPEC.md` (PRD: `docs/tracks/change-workspace/PRD.md`). Extends Prepare Change into a persistent workspace: intent → evidence (repo search over a local read-only file cache) → trace → hypothesis → implementation (attached, never produced by Chatdex) → verification → learned → promote. Milestones CW-0…CW-8 are all committed (log: `docs/tracks/change-workspace/BUILD-LOG.md`; Jacob's remaining actions: `docs/tracks/change-workspace/TODOS.md`); the spec's §2 laws and §15 security audit are binding. Guided mode makes no LLM calls; Assisted mode (CW-7) is disclosed, opt-in, and lands only as `ai_inference`.
-
-**Built 2026-09-07 (Jacob's §16 browser pass pending):** Decision Recovery — `docs/tracks/decision-recovery/SPEC.md`. The Decision spine: recover the implicit decisions inside agent sessions into first-class `UnderstandingObject { type: 'decision' }` records paired with synced `DecisionTrace` rows (why, alternatives, assumptions each labelled `specified | inherited | inferred | invented | unknown`, exact edit hunks, firewall-verified code quotes). Basis labels are mechanically constrained (§2.2); everything lands pending (§2.3); Decision Investigation stays quarantined (§2.5). Adds LOCAL-ONLY `agentInspections` (what the agent read) and `decisionDiffs` (Semantic Decision Diff), text-level blast radius, and `WorkspaceOriginRef { kind: 'decision' }` into Prepare Change. Dexie v13. Milestones DR-0…DR-7 all committed; demo fixture in `tests/decision-fixtures/` from a real subagent session on branch `demo/project-deletion` (unmerged) (log: `docs/tracks/decision-recovery/BUILD-LOG.md`; todos: `docs/tracks/decision-recovery/TODOS.md`).
-
-**Drafted 2026-09-07 (pending approval):** the Flow Map — `docs/tracks/flow-map/SPEC.md`. Generates, from the local read-only repository cache and with zero network calls, a sha-pinned map of every route and interactive element and the code chain each runs, down to backend endpoints and IndexedDB tables. The derived map is LOCAL-ONLY (Dexie v14, never synced); only human-kept flows sync, as `UnderstandingObject { type: 'flow' }`. Every link carries `declared | heuristic` confidence and heuristic links never export to a trace as `verified`. Milestones FM-0…FM-5 (log: `docs/tracks/flow-map/BUILD-LOG.md`; todos: `docs/tracks/flow-map/TODOS.md`). Not yet approved: confirm the spec's §21 decisions before FM-0.
-
-If a request conflicts with the spec, say so and ask rather than silently diverging.
+Decision Investigation remains quarantined from AI recovery under its spec. Flow Map
+remains a draft capability until its outstanding design decisions are resolved. These
+boundaries are not changed by the documentation reorganization.
 
 ## Where docs live
 
-Every feature track has one folder — `docs/tracks/<track>/` — holding all of its documents
-under fixed names: `SPEC.md`, `PRD.md`, `PLAN.md`, `BUILD-LOG.md`, `TODOS.md`. So the path
-for any track document is guessable without searching (`docs/tracks/flow-map/BUILD-LOG.md`).
-**`docs/tracks/README.md` is the only place track status is recorded** — update that table
-when a milestone lands, and don't restate per-track status anywhere else.
+Current capability contracts live in `docs/capabilities/<capability>/`. Bounded
+work packages live in `docs/changes/<change>/`. Read `docs/changes/README.md` for
+ownership, planning, spec amendments, completion, and the lightweight plan template.
 
-Non-track documents: `docs/prds/` (product-level PRDs spanning tracks), `docs/architecture/`,
-`docs/territories/` (how one capability works end to end), `docs/ownership/` (the
-code-ownership loop), `docs/assessments/` (point-in-time repo recon), `docs/vision/`,
-`docs/archive/` (superseded — never update links inside it). Index: `docs/README.md`.
+- `docs/capabilities/README.md` is the capability status and ownership index.
+- `docs/changes/README.md` indexes change packages; each package's PLAN.md owns its
+  delivery status and open acceptance checks. Index summaries link to that plan.
+- A proposal never silently overrides a capability spec. Identify affected sections
+  in the change plan and amend them as the corresponding behavior lands.
+- Before closing work, update affected contracts, record verification and limitations,
+  and close the plan. Small fixes need no change folder unless a durable plan helps.
+- Keep historical build logs and completed plans as history. Do not copy them into
+  current contracts. Existing capability-local plans/logs are retained legacy records;
+  new bounded work uses `docs/changes/`.
+
+Other documents: `docs/prds/` (product-level requirements), `docs/architecture/`,
+`docs/territories/` (code walkthroughs), `docs/ownership/`, `docs/assessments/`,
+`docs/vision/`, and `docs/archive/` (historical; links inside are not maintained).
+Index: `docs/README.md`.
 
 ## Hard architectural invariants
 
@@ -63,8 +65,8 @@ These are non-negotiable. Violating any of them is a bug even if the feature "wo
    - **Backend relay is transit-only.** The Chatdex backend may proxy provider calls (streaming, rate limiting), but must never persist or log request/response content. Relay handlers must not write conversation plaintext to the database, log lines, or error traces.
    - **Cross-provider disclosure is explicit.** Sending one provider's history to a different provider (e.g., ChatGPT conversations to Anthropic) is a new disclosure; the UI must state which provider will receive which sources before the first such call.
    - **Synthesis outputs are user data.** Understanding objects derived from LLM calls store like everything else: plaintext in IndexedDB, ciphertext in sync.
-   - **Transcript excerpts and edit hunks follow the same rule (Decision Recovery, 2026-09-07).** Decision recovery sends the user's messages, the agent's reasoning around each edit, its closing statements, and the edit hunks themselves to the provider under the same user-initiated, disclosed, transit-only conditions; the disclosure states the session, hunk, and repository-excerpt counts (`docs/tracks/decision-recovery/SPEC.md` §2.6).
-   - **Repository excerpts follow the same rule (Intent Trace, 2026-08-28).** File and spec-document excerpts fetched read-only from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only conditions — the disclosure must say repository excerpts are being sent. The GitHub token is device-local, goes only to api.github.com, and never enters a relay body or a prompt (`docs/tracks/intent-trace/SPEC.md` §13). **Whole repository files may be cached locally for Change Workspace search** (GitHub at a pinned sha, or a user-picked local directory, read-only) in a LOCAL-ONLY IndexedDB table that is never synced; synced workspace records carry only paths, shas, line ranges, and capped quotes (`docs/tracks/change-workspace/SPEC.md` §2.5).
+   - **Transcript excerpts and edit hunks follow the same rule (Decision Recovery, 2026-09-07).** Decision recovery sends the user's messages, the agent's reasoning around each edit, its closing statements, and the edit hunks themselves to the provider under the same user-initiated, disclosed, transit-only conditions; the disclosure states the session, hunk, and repository-excerpt counts (`docs/capabilities/decision-recovery/SPEC.md` §2.6).
+   - **Repository excerpts follow the same rule (Intent Trace, 2026-08-28).** File and spec-document excerpts fetched read-only from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only conditions — the disclosure must say repository excerpts are being sent. The GitHub token is device-local, goes only to api.github.com, and never enters a relay body or a prompt (`docs/capabilities/intent-trace/SPEC.md` §13). **Whole repository files may be cached locally for Change Workspace search** (GitHub at a pinned sha, or a user-picked local directory, read-only) in a LOCAL-ONLY IndexedDB table that is never synced; synced workspace records carry only paths, shas, line ranges, and capped quotes (`docs/capabilities/change-workspace/SPEC.md` §2.5).
 
 ## Tech stack
 
@@ -74,7 +76,7 @@ These are non-negotiable. Violating any of them is a bug even if the feature "wo
 - Zustand 5 for global state (`src/stores/`); no React Query
 - Storage: IndexedDB via **Dexie 4** locally (`src/lib/db.ts`, `src/lib/db/`); Postgres via **Drizzle ORM** behind a Fastify 5 API (`backend/src/`) for encrypted sync
 - Crypto: WebCrypto AES-256-GCM (`src/lib/crypto/primitives.ts`). Key material is unlocked via **WebAuthn** (`@simplewebauthn/browser` + `@simplewebauthn/server`) — the earlier Argon2id/password KDF was removed on `main`. Do not reintroduce a password KDF path without an explicit spec change.
-- Workers: detection pipeline will run in a Web Worker (not yet wired — see `docs/tracks/agent-observability/SPEC.md`)
+- Workers: detection pipeline will run in a Web Worker (not yet wired — see `docs/capabilities/agent-observability/SPEC.md`)
 
 ## Repository layout
 
@@ -107,7 +109,7 @@ backend/
 │  └─ db/                 # Drizzle schema
 ```
 
-**Planned addition for the observability layer** (from `docs/tracks/agent-observability/SPEC.md` / `docs/tracks/agent-observability/PLAN.md` — not yet created):
+**Planned addition for the observability layer** (from `docs/capabilities/agent-observability/SPEC.md` / `docs/capabilities/agent-observability/PLAN.md` — not yet created):
 
 ```
 src/lib/
@@ -147,7 +149,7 @@ db studio:                 npm run db:studio
 ## Development workflow rules
 
 - **Always run typecheck + tests before declaring a task done.** (Yes, the irony of skipping verification while building a verification-absence detector is noted. Don't be a finding.)
-- **Write tests alongside detector logic, not after.** Every detector rule and every suppression rule gets at least one golden-trace test (see `tests/golden-traces/` and `docs/tracks/agent-observability/PLAN.md`).
+- **Write tests alongside detector logic, not after.** Every detector rule and every suppression rule gets at least one golden-trace test (see `tests/golden-traces/` and `docs/capabilities/agent-observability/PLAN.md`).
 - Prefer small, reviewable diffs. One detector or one pipeline concern per change.
 - When adding a detector rule or threshold, make it configurable via `DetectorConfig` with a documented default — no magic numbers inline.
 - Never touch `src/crypto/` without being explicitly asked to.

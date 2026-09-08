@@ -1,4 +1,4 @@
-// Intent Trace entities (docs/tracks/intent-trace/SPEC.md §11).
+// Intent Trace entities (docs/capabilities/intent-trace/SPEC.md §11).
 //
 // Intents themselves are UnderstandingObjects of type 'intent' (spec D1) —
 // their polarity / origin / statedAt live in UnderstandingObject.meta. This

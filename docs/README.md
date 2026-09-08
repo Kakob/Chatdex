@@ -10,15 +10,17 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 - **[CLAUDE.md](../CLAUDE.md)** — primary instructions. Read this before working on any part of the codebase: tech stack, commands, structure, architecture invariants, conventions.
 
-### Feature work
+### Capabilities and development changes
 
-- **[tracks/](./tracks/)** — one folder per feature track, holding that track's spec, PRD, plan, build log and todos. **[tracks/README.md](./tracks/README.md)** carries the status table for every track and is the single place track status is recorded.
+- **[capabilities/](./capabilities/README.md)** — lasting responsibilities, current contracts, and capability status.
+- **[changes/](./changes/README.md)** — bounded fixes and refinements, active work index, lifecycle rules, and a lightweight plan template.
+- Start with the capability to understand what applies now; open a change plan to understand what is proposed or how a change shipped.
 
 ### Everything else
 
 | Folder | What lives there |
 |---|---|
-| **[prds/](./prds/)** | Product-level PRDs spanning tracks: [core platform](./prds/chatdex-prd.md), [AIPKMS](./prds/prd-aipkms.md), [PatternMirror](./prds/PRD-patternmirror.md), [research contribution](./prds/PRD-research-contribution.md) |
+| **[prds/](./prds/)** | Product-level PRDs spanning capabilities: [core platform](./prds/chatdex-prd.md), [AIPKMS](./prds/prd-aipkms.md), [PatternMirror](./prds/PRD-patternmirror.md), [research contribution](./prds/PRD-research-contribution.md) |
 | **[architecture/](./architecture/)** | [System architecture](./architecture/architecture.md) and [auth architecture](./architecture/auth-architecture.md) |
 | **[territories/](./territories/)** | Territory guides — how one capability works end to end ([index](./territories/README.md)) |
 | **[ownership/](./ownership/)** | The code-ownership loop: exercises, investigations, module notes, audit log ([index](./ownership/README.md)) |
@@ -86,10 +88,8 @@ npm run dev:extension        # Watches and rebuilds dist-extension/
 
 ---
 
-## Current development phase
+## Current development work
 
-Check the PRDs for phase status. Rough order of priority:
-
-1. Core webapp (search, analytics, export, conversations) — **in progress**
-2. Activity Tracker browser extension — **in progress**
-3. AIPKMS — **planned** (Phase 1: anchor & annotate)
+See the [capability index](./capabilities/README.md) for delivery status and the
+[change index](./changes/README.md) for bounded work. Older PRD phase descriptions
+are historical context, not a second work queue.

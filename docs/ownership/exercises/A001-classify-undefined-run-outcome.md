@@ -156,7 +156,7 @@ Carried to Round 4.
 
 > I guess if it doesnt match we cant say it passes or fails so we just could say its observed.
 
-Right shape of answer. To be confirmed against `docs/tracks/change-workspace/SPEC.md:39`.
+Right shape of answer. To be confirmed against `docs/capabilities/change-workspace/SPEC.md:39`.
 
 **Hand-execution fixtures (assigned, not yet worked):**
 
@@ -223,7 +223,7 @@ output told us nothing conclusive."
 > before the call. Both halves of the guard return the same value, so nothing is broken - but only
 > the `''` half is load-bearing.
 
-**5. Why `'observed'` is the right default.** `docs/tracks/change-workspace/SPEC.md:39` defines `verified` as
+**5. Why `'observed'` is the right default.** `docs/capabilities/change-workspace/SPEC.md:39` defines `verified` as
 *mechanically established* - observed in code at a pinned sha, recorded test/runtime evidence,
 commit history - and forbids AI output from ever setting `verified`. `pass` and `fail` are both
 claims about what happened; `'observed'` claims only that a test-shaped command ran and was
@@ -267,7 +267,7 @@ conversation steps[]
 
 * What input reaches line 103? (read `FAIL_RE` / `PASS_RE` at lines 78-79 and construct one)
 * Why is `'observed'` the right default in Change Workspace terms?
-  (`docs/tracks/change-workspace/SPEC.md:39` and `:171`)
+  (`docs/capabilities/change-workspace/SPEC.md:39` and `:171`)
 
 * What is `Step` exactly? (`src/lib/detection/normalize.ts:24`)
 * Line 115 — what does `steps.find((s) => s.kind === 'tool_result' && s.toolUseId === step.toolUseId)` actually do?
@@ -363,6 +363,6 @@ this and with what*. Once I traced the single production call site, most of the 
 
 **Promote anything to module documentation?** Yes, candidate: a short note on
 `src/lib/prepare/verification.ts` covering the conservative-default rule and its link to
-`docs/tracks/change-workspace/SPEC.md:39`.
+`docs/capabilities/change-workspace/SPEC.md:39`.
 
 **Commit:** _n/a (no code change in this exercise)_

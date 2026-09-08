@@ -107,7 +107,7 @@ IndexedDB (Dexie) is the only boundary — no network, no worker. Which means th
 
 **Decision:** Fuzzy in-memory Fuse index over denormalized per-conversation `fullText`, rebuilt from scratch on invalidation.
 **Evidence:** [CODE search.ts:19-55; DOC architecture.md:189-201 states the rationale; DOC architecture.md:165 frames `fullText` as intentional redundancy — "search needs to be cheap, rendering needs structure"]
-**Consequence:** fuzzy recall, sub-ms queries — and the whole corpus in memory, with an explicit 10,000-conversation ceiling already flagged as at-risk for large ChatGPT histories [DOC docs/tracks/understanding-workspace/ASSESSMENT-U0.md:50].
+**Consequence:** fuzzy recall, sub-ms queries — and the whole corpus in memory, with an explicit 10,000-conversation ceiling already flagged as at-risk for large ChatGPT histories [DOC docs/capabilities/understanding-workspace/ASSESSMENT-U0.md:50].
 **Possible alternative:** message-level inverted index in a worker (e.g. FlexSearch/minisearch), or Dexie full-text via an index table.
 
 **Decision:** One-shot fetches + manual invalidation instead of live queries.

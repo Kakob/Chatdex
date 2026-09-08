@@ -208,7 +208,7 @@ export function rehydrateDetectorRun(payload: unknown): StoredDetectorRun {
   return { ...p, startedAt: isoToDate(p.startedAt), finishedAt: isoToDate(p.finishedAt) };
 }
 
-// --- shared-understanding entities (docs/tracks/understanding-workspace/PRD.md) ---
+// --- shared-understanding entities (docs/capabilities/understanding-workspace/PRD.md) ---
 
 export function envelopeUnderstandingProject(
   p: UnderstandingProject
