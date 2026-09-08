@@ -54,7 +54,6 @@ describe('parseRepoInput', () => {
     expect(parseRepoInput('Kakob/Chatdex')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
     expect(parseRepoInput('https://github.com/Kakob/Chatdex')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
     expect(parseRepoInput('https://github.com/Kakob/Chatdex.git')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
-    expect(parseRepoInput('https://github.com/Kakob/Chatdex/tree/main/src')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
     expect(parseRepoInput('git@github.com:Kakob/Chatdex.git')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
     expect(parseRepoInput('  Kakob/Chatdex/  ')).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
   });
@@ -63,6 +62,67 @@ describe('parseRepoInput', () => {
     expect(parseRepoInput('../evil/repo')).toBeNull();
     expect(parseRepoInput('https://evil.example/Kakob/Chatdex')).toBeNull();
     expect(parseRepoInput('Kakob/Chat dex')).toBeNull();
+  });
+
+  // The reported bug: a /tree/<branch> URL used to bind silently to main.
+  it('keeps the branch from a /tree/ URL, longest candidate first', () => {
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/tree/feature/project-workspace-golden-path')).toEqual({
+      owner: 'Kakob',
+      repo: 'Chatdex',
+      ref: 'feature/project-workspace-golden-path',
+      refCandidates: ['feature/project-workspace-golden-path', 'feature'],
+    });
+    // Unambiguous: no candidate list at all.
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/tree/main')).toEqual({
+      owner: 'Kakob',
+      repo: 'Chatdex',
+      ref: 'main',
+    });
+    // Branch `main/src` and branch `main` + path `src` are indistinguishable here.
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/tree/main/src')).toEqual({
+      owner: 'Kakob',
+      repo: 'Chatdex',
+      ref: 'main/src',
+      refCandidates: ['main/src', 'main'],
+    });
+    // A %2F-encoded branch decodes into the same segments.
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/tree/feature%2Fx')).toEqual({
+      owner: 'Kakob',
+      repo: 'Chatdex',
+      ref: 'feature/x',
+      refCandidates: ['feature/x', 'feature'],
+    });
+  });
+
+  it('reads refs out of blob, commit, pull, tag and @ref inputs', () => {
+    // A file path follows the ref and is usually the longer half, so the
+    // shortest candidate is tried first.
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/blob/main/src/lib/a.ts')).toMatchObject({
+      ref: 'main',
+      refCandidates: ['main', 'main/src', 'main/src/lib'],
+    });
+    expect(parseRepoInput(`https://github.com/Kakob/Chatdex/commit/${SHA}`)).toEqual({
+      owner: 'Kakob',
+      repo: 'Chatdex',
+      ref: SHA,
+    });
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/pull/12')).toMatchObject({ ref: 'refs/pull/12/head' });
+    expect(parseRepoInput('https://github.com/Kakob/Chatdex/releases/tag/v1.2.0')).toMatchObject({ ref: 'v1.2.0' });
+    expect(parseRepoInput('Kakob/Chatdex@feature/x')).toEqual({ owner: 'Kakob', repo: 'Chatdex', ref: 'feature/x' });
+  });
+
+  it('names no ref for refless paths, query strings, or refs assertRef would reject', () => {
+    for (const input of [
+      'https://github.com/Kakob/Chatdex/issues/3',
+      'https://github.com/Kakob/Chatdex/actions',
+      'https://github.com/Kakob/Chatdex?tab=readme-ov-file',
+      'https://github.com/Kakob/Chatdex#readme',
+      'https://github.com/Kakob/Chatdex/tree/a..b',
+      'https://github.com/Kakob/Chatdex/tree/../etc',
+      'https://github.com/Kakob/Chatdex/commit/not-a-sha',
+    ]) {
+      expect(parseRepoInput(input)).toEqual({ owner: 'Kakob', repo: 'Chatdex' });
+    }
   });
 });
 
@@ -194,6 +254,14 @@ describe('listCommits', () => {
     expect(url.searchParams.get('since')).toBe(since.toISOString());
     expect(url.searchParams.get('sha')).toBe(SHA);
     expect(url.searchParams.get('per_page')).toBe('5');
+  });
+
+  it('sends a branch as the sha query parameter but keeps assertSha strict for sha', async () => {
+    const fetchImpl = fetchWith(() => jsonResponse([]));
+    await listCommits('Kakob', 'Chatdex', { ref: 'feature/x' }, { fetchImpl });
+    expect(calls[0].url).toContain('sha=feature%2Fx');
+    await expect(listCommits('Kakob', 'Chatdex', { ref: 'a..b' }, { fetchImpl })).rejects.toThrow(/Invalid git ref/);
+    await expect(listCommits('Kakob', 'Chatdex', { sha: 'feature/x' }, { fetchImpl })).rejects.toThrow(/Invalid commit sha/);
   });
 });
 

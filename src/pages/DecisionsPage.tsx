@@ -260,7 +260,15 @@ export function DecisionsPage() {
         </div>
       </section>
 
-      {!repository && <RepoBindingCard project={project} onSaved={() => void load()} />}
+      <RepoBindingCard
+        project={project}
+        collapsible
+        onSaved={() => void load()}
+        suggestedRefs={commits.slice(0, 5).map((c) => ({
+          ref: c.branch ?? c.sha,
+          label: c.branch ? `${c.sha.slice(0, 7)} · ${c.branch}` : c.sha.slice(0, 7),
+        }))}
+      />
       {commits.length > 0 && (
         <p className="text-xs text-gray-500 dark:text-gray-400" data-testid="session-commits">
           Sessions committed:{' '}
@@ -270,7 +278,7 @@ export function DecisionsPage() {
               {c.subject ? ` — ${c.subject}` : ''} ({c.conversationName})
             </span>
           ))}
-          {repository ? ' Pin one as the repository ref to recover against the code the session produced.' : ''}
+          {repository ? ' Use one as the tracked ref above to recover against the code the session produced.' : ''}
         </p>
       )}
       {provider === 'openai' && (
@@ -372,7 +380,7 @@ export function DecisionsPage() {
           sendsDescription={
             `your messages, the agent's reasoning before each edit, and ${pending.plan.hunkCount} edit hunk${pending.plan.hunkCount !== 1 ? 's' : ''} from ${pending.plan.conversations.length} session${pending.plan.conversations.length !== 1 ? 's' : ''}` +
             (pending.plan.filePaths.length
-              ? `, plus excerpts of ${pending.plan.filePaths.length} file${pending.plan.filePaths.length !== 1 ? 's' : ''} from ${pending.plan.repoKey?.replace(/^gh:/, '')}@${pending.plan.sha?.slice(0, 7)}`
+              ? `, plus excerpts of ${pending.plan.filePaths.length} file${pending.plan.filePaths.length !== 1 ? 's' : ''} from ${pending.plan.repoKey?.replace(/^gh:/, '')}@${pending.plan.sha?.slice(0, 7)}${pending.plan.ref ? ` (${pending.plan.ref})` : ''}`
               : '') +
             (pending.ignoreCursor ? ' (full re-run)' : '') +
             '. Recovered decisions land pending review; quotes are stored capped with your understanding (encrypted in sync)'

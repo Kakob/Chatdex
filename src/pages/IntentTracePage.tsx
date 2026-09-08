@@ -64,7 +64,7 @@ export function IntentTracePage() {
   const [progress, setProgress] = useState<{ label: string; done: number; total: number } | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [historyObjectId, setHistoryObjectId] = useState<string | null>(null);
-  const [stale, setStale] = useState<string | null>(null);
+  const [stale, setStale] = useState<{ sha7: string; ref: string; switched: boolean } | null>(null);
   const [filters, setFilters] = useState<{
     origin: IntentOrigin | 'all';
     polarity: IntentPolarity | 'all';
@@ -95,15 +95,20 @@ export function IntentTracePage() {
     void load();
   }, [load]);
 
-  // Stale hint: cheap ref resolve; failure is tolerated (offline, no token).
+  // Stale hint: cheap ref resolve against the ref the binding tracks now —
+  // which may not be the one the last trace ran on. Failure is tolerated
+  // (offline, no token). A sha-valued pinnedRef resolves to itself.
   useEffect(() => {
     const repo = data?.project.repository;
-    const ref = data?.latestRepoRef;
-    if (!repo || !ref || repo.pinnedRef) return;
+    const latest = data?.latestRepoRef;
+    if (!repo || !latest) return;
+    const boundRef = repo.pinnedRef ?? repo.defaultBranch ?? 'HEAD';
+    const tracedRef = latest.ref ?? boundRef;
     let cancelled = false;
-    resolveRef(repo.owner, repo.repo, repo.defaultBranch ?? 'HEAD')
+    resolveRef(repo.owner, repo.repo, boundRef)
       .then(({ sha }) => {
-        if (!cancelled && sha !== ref.commitSha) setStale(sha.slice(0, 7));
+        if (cancelled || sha === latest.commitSha) return;
+        setStale({ sha7: sha.slice(0, 7), ref: boundRef, switched: tracedRef !== boundRef });
       })
       .catch(() => undefined);
     return () => {
@@ -273,7 +278,9 @@ export function IntentTracePage() {
               {data.latestTracedAt && ` on ${data.latestTracedAt.toISOString().slice(0, 10)}`}
               {stale && (
                 <span className="ml-2 text-amber-600 dark:text-amber-400">
-                  · {repository?.defaultBranch ?? 'default branch'} has moved to {stale}
+                  {stale.switched
+                    ? `· now tracking ${stale.ref} — re-trace to compare`
+                    : `· ${stale.ref} has moved to ${stale.sha7}`}
                 </span>
               )}
             </p>
@@ -327,9 +334,7 @@ export function IntentTracePage() {
         </div>
       </section>
 
-      {!repository && (
-        <RepoBindingCard project={project} onSaved={() => void load()} />
-      )}
+      <RepoBindingCard project={project} collapsible onSaved={() => void load()} />
       {repository && !tokenPresent && (
         <p className="text-xs text-gray-500 dark:text-gray-400">
           No GitHub token on this device — public repositories trace at 60 requests/hour; private ones

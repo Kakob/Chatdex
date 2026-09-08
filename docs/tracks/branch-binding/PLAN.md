@@ -1,6 +1,8 @@
 # Branch Binding — implementation plan
 
-Status: **planned, no code written.** Drafted 2026-09-07.
+Status: **code-complete.** Drafted 2026-09-07, implemented 2026-09-07 — steps 1–6 all
+landed. As-built notes and the one deviation: `BUILD-LOG.md`. Remaining: the manual
+browser pass, §5 items 4–7.
 
 Cross-cutting fix touching Intent Trace (`docs/tracks/intent-trace/SPEC.md`), Change
 Workspace (`docs/tracks/change-workspace/SPEC.md`) and Decision Recovery

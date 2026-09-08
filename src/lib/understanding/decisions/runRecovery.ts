@@ -22,11 +22,12 @@ import { getMessagesForConversation } from '../../db/messages';
 import { listInvestigationAnchors } from '../../db/investigationAnchors';
 import { listAgentInspections } from '../../db/agentInspections';
 import { putDecisionTrace, getLatestTraceByDecision } from '../../db/decisionTraces';
-import { latestCachedSnapshot, listRepoFiles } from '../../db/repoFiles';
+import { latestCachedSnapshot, listRepoFiles, countRepoFiles } from '../../db/repoFiles';
 import { getGitHubToken } from '../../github/credentials';
+import { resolveRef } from '../../github/client';
 import { getRememberedLocalDirectoryName } from '../../repo/localDir';
 import { localRepoKey } from '../../repo/localDirSource';
-import { githubRepoKey } from '../../repo/sources';
+import { githubRepoKey, parseRepoKey } from '../../repo/sources';
 import { normalizeSession, type Step } from '../../detection/normalize';
 import { generateId } from '../../utils/ids';
 import { getAssociatedConversations } from '../reconcile';
@@ -66,6 +67,8 @@ export interface RecoveryConfig {
   maxDecisionsPerCall?: number;
   /** Defaults to the stored device-local GitHub token (asserted absent from prompts). */
   token?: string;
+  /** Injectable for tests; used only to resolve the bound ref to a sha. */
+  fetchImpl?: typeof fetch;
 }
 
 export interface RecoveryPlanConversation {
@@ -90,6 +93,8 @@ export interface RecoveryPlan {
   runId: string;
   repoKey?: string;
   sha?: string;
+  /** The ref the snapshot sha came from, when the binding named one. */
+  ref?: string;
   conversations: RecoveryPlanConversation[];
   /** Unique repository paths across conversations (what the disclosure counts). */
   filePaths: string[];
@@ -107,10 +112,14 @@ function isAgentSession(c: StoredConversation): boolean {
   return c.source === 'claude-code';
 }
 
+// Which snapshot a recovery run reads. The bound ref decides it: falling back
+// to whatever was indexed last is branch-blind, and the snapshot is what the
+// `inherited` basis label is computed against (SPEC-decision-recovery §2.2),
+// so recovering against another branch's code silently changes labels.
 async function resolveSnapshot(
-  project: { repository?: { owner: string; repo: string } },
+  project: { repository?: { owner: string; repo: string; pinnedRef?: string; defaultBranch?: string } },
   config: RecoveryConfig
-): Promise<{ repoKey?: string; sha?: string; warning?: string }> {
+): Promise<{ repoKey?: string; sha?: string; ref?: string; warning?: string }> {
   let repoKey = config.repoKey;
   if (!repoKey) {
     if (project.repository) repoKey = githubRepoKey(project.repository.owner, project.repository.repo);
@@ -120,7 +129,39 @@ async function resolveSnapshot(
     }
   }
   if (!repoKey) return { warning: 'No repository bound; decisions will carry transcript evidence and hunks only' };
-  const sha = config.sha ?? (await latestCachedSnapshot(repoKey)) ?? undefined;
+  if (config.sha) return { repoKey, sha: config.sha };
+
+  const parsed = parseRepoKey(repoKey);
+  if (parsed?.kind === 'gh') {
+    const ref = project.repository?.pinnedRef ?? project.repository?.defaultBranch ?? 'HEAD';
+    try {
+      const { sha } = await resolveRef(parsed.owner, parsed.repo, ref, {
+        token: config.token ?? (await getGitHubToken()),
+        ...(config.fetchImpl ? { fetchImpl: config.fetchImpl } : {}),
+      });
+      // Never substitute another branch's cache for the one that was asked for.
+      if ((await countRepoFiles(repoKey, sha)) === 0) {
+        return {
+          repoKey,
+          sha,
+          ref,
+          warning: `${ref} resolves to ${sha.slice(0, 7)} but no snapshot is indexed; index it in Prepare → Evidence to add code links`,
+        };
+      }
+      return { repoKey, sha, ref };
+    } catch {
+      const cached = (await latestCachedSnapshot(repoKey)) ?? undefined;
+      if (!cached) return { repoKey, ref, warning: `No cached snapshot for ${repoKey}; index the repository to add code links` };
+      return {
+        repoKey,
+        sha: cached,
+        warning: `Could not resolve ${ref}; using the most recently indexed snapshot ${cached.slice(0, 7)}, which may be from a different branch`,
+      };
+    }
+  }
+
+  // Local directories have no branch to resolve.
+  const sha = (await latestCachedSnapshot(repoKey)) ?? undefined;
   if (!sha) return { repoKey, warning: `No cached snapshot for ${repoKey}; index the repository to add code links` };
   return { repoKey, sha };
 }
@@ -220,6 +261,7 @@ export async function planRecovery(projectId: string, config: RecoveryConfig): P
     runId: generateId(),
     repoKey: snapshot.repoKey,
     sha: snapshot.sha,
+    ...(snapshot.ref ? { ref: snapshot.ref } : {}),
     conversations: planned,
     filePaths: [...allFiles].sort(),
     preExistingPaths: [...preExisting].sort(),

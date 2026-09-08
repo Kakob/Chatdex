@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -62,6 +62,67 @@ function renderPage(projectId: string) {
 
 beforeEach(async () => {
   await clearAllData();
+});
+
+/** The stale hint resolves the bound ref through global fetch. */
+function stubResolve(shaByRef: Record<string, string>) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const m = /\/commits\/(.+)$/.exec(String(input));
+      const sha = m ? shaByRef[decodeURIComponent(m[1])] : undefined;
+      return new Response(JSON.stringify(sha ? { sha } : {}), {
+        status: sha ? 200 : 404,
+        headers: { 'content-type': 'application/json' },
+      });
+    })
+  );
+}
+
+async function bindRepo(projectId: string, pinnedRef?: string) {
+  const project = (await db.understandingProjects.get(projectId))!;
+  await putUnderstandingProject({
+    ...project,
+    repository: { owner: 'Kakob', repo: 'Chatdex', defaultBranch: 'main', ...(pinnedRef ? { pinnedRef } : {}) },
+  });
+}
+
+describe('IntentTracePage branch binding', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // The card used to disappear after the first Save, so the branch could not
+  // be changed from this tab at all.
+  it('keeps the binding card reachable once a repository is bound', async () => {
+    stubResolve({});
+    const { project } = await seedProject();
+    await bindRepo(project.id, 'feature/x');
+    renderPage(project.id);
+    expect(await screen.findByLabelText('Change repository binding')).toBeInTheDocument();
+  });
+
+  it('reports staleness against the pinned ref, not only the default branch', async () => {
+    stubResolve({ 'feature/x': 'b'.repeat(40) });
+    const { project } = await seedProject();
+    await bindRepo(project.id, 'feature/x');
+    await putIntentTrace({
+      id: 't-2', projectId: project.id, intentObjectId: 'x',
+      repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: SHA, ref: 'feature/x' },
+      specStatus: 'no_spec', specEvidence: [], implStatus: 'unknown', implEvidence: [],
+      fetchedPaths: [], provider: 'anthropic', model: 'm', warnings: [], createdAt: new Date(now.getTime() + 5000),
+    });
+    renderPage(project.id);
+    expect(await screen.findByText(/feature\/x has moved to bbbbbbb/)).toBeInTheDocument();
+  });
+
+  it('says the binding switched refs when the last trace ran on another one', async () => {
+    stubResolve({ 'feature/x': 'b'.repeat(40) });
+    const { project } = await seedProject();
+    await bindRepo(project.id, 'feature/x'); // the seeded trace recorded ref 'main'
+    renderPage(project.id);
+    expect(await screen.findByText(/now tracking feature\/x — re-trace to compare/)).toBeInTheDocument();
+  });
 });
 
 describe('IntentTracePage', () => {

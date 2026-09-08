@@ -30,6 +30,28 @@ const SHA = 'a'.repeat(40);
 const REPO_KEY = 'gh:Kakob/Chatdex';
 const ROOT = '/Users/dev/chatdex';
 
+const SHA_B = 'b'.repeat(40);
+const ghCalls: string[] = [];
+
+/** Injected for the ref → sha resolve; anything not in `refs` 404s. */
+function ghFetch(refs: Record<string, string> = { HEAD: SHA }): typeof fetch {
+  return (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    ghCalls.push(url);
+    const m = /\/commits\/(.+)$/.exec(url);
+    const sha = m ? refs[decodeURIComponent(m[1])] : undefined;
+    return new Response(JSON.stringify(sha ? { sha } : { message: 'Not Found' }), {
+      status: sha ? 200 : 404,
+      headers: { 'content-type': 'application/json' },
+    });
+  }) as typeof fetch;
+}
+
+/** Every plan resolves the bound ref, so every call injects a fetch. */
+function cfg(extra: Partial<Parameters<typeof planRecovery>[1]> = {}) {
+  return { provider: 'anthropic' as const, fetchImpl: ghFetch(), ...extra };
+}
+
 const USER_TEXT = 'Add project deletion to Chatdex. Deleting a project must not delete the conversations associated with it.';
 const AGENT_TEXT = 'I read deleteConversation and will mirror its cascade. Deletion will be permanent with no audit record.';
 const CONV_FILE = 'export async function deleteConversation(id: string): Promise<void> {\n  // cascade\n}\n';
@@ -134,12 +156,13 @@ function modelResponse(stepOfUser: number, stepOfAgent: number, stepOfWrite: num
 beforeEach(async () => {
   await clearAllData();
   completeMock.mockReset();
+  ghCalls.length = 0;
   await seed();
 });
 
 describe('planRecovery (§9.2, law 2.6)', () => {
   it('assembles the disclosure inputs without calling the provider', async () => {
-    const plan = await planRecovery(PROJECT, { provider: 'anthropic' });
+    const plan = await planRecovery(PROJECT, cfg());
     expect(completeMock).not.toHaveBeenCalled();
     expect(plan.repoKey).toBe(REPO_KEY);
     expect(plan.sha).toBe(SHA);
@@ -158,25 +181,61 @@ describe('planRecovery (§9.2, law 2.6)', () => {
   it('honours the cursor and scoped runs', async () => {
     const project = (await getUnderstandingProject(PROJECT))!;
     await putUnderstandingProject({ ...project, lastDecisionRecoveredAt: new Date('2026-09-06T00:00:00Z') });
-    expect((await planRecovery(PROJECT, { provider: 'anthropic' })).conversations).toHaveLength(0);
-    expect((await planRecovery(PROJECT, { provider: 'anthropic', ignoreCursor: true })).conversations).toHaveLength(1);
-    const scoped = await planRecovery(PROJECT, { provider: 'anthropic', conversationIds: [CONV] });
+    expect((await planRecovery(PROJECT, cfg())).conversations).toHaveLength(0);
+    expect((await planRecovery(PROJECT, cfg({ ignoreCursor: true }))).conversations).toHaveLength(1);
+    const scoped = await planRecovery(PROJECT, cfg({ conversationIds: [CONV] }));
     expect(scoped.conversations).toHaveLength(1);
     expect(scoped.advancesCursor).toBe(false);
   });
 
-  it('warns instead of failing when no snapshot is cached', async () => {
+  it('warns instead of failing when the resolved snapshot is not indexed', async () => {
     await db.repoFiles.clear();
-    const plan = await planRecovery(PROJECT, { provider: 'anthropic' });
-    expect(plan.sha).toBeUndefined();
-    expect(plan.warnings[0]).toMatch(/No cached snapshot/);
+    const plan = await planRecovery(PROJECT, cfg());
+    // The ref still decides the sha — another branch's cache is never substituted.
+    expect(plan.sha).toBe(SHA);
+    expect(plan.warnings[0]).toMatch(/no snapshot is indexed/);
     expect(plan.filePaths).toEqual([]);
+  });
+
+  // The bug: recovery used to take whichever branch was indexed last, so the
+  // `inherited` basis label (§2.2) was computed against the wrong code.
+  it('resolves the bound ref rather than reusing the most recently indexed branch', async () => {
+    const project = (await getUnderstandingProject(PROJECT))!;
+    await putUnderstandingProject({
+      ...project,
+      repository: { owner: 'Kakob', repo: 'Chatdex', defaultBranch: 'main', pinnedRef: 'feature/x' },
+    });
+    const plan = await planRecovery(PROJECT, {
+      provider: 'anthropic',
+      fetchImpl: ghFetch({ 'feature/x': SHA_B }),
+    });
+    expect(ghCalls[0]).toContain('/commits/feature%2Fx');
+    expect(plan.sha).toBe(SHA_B);
+    expect(plan.ref).toBe('feature/x');
+    expect(plan.warnings[0]).toMatch(/no snapshot is indexed/);
+    expect(plan.filePaths).toEqual([]);
+  });
+
+  it('falls back to the last indexed snapshot with a different-branch warning when the ref cannot be resolved', async () => {
+    const plan = await planRecovery(PROJECT, { provider: 'anthropic', fetchImpl: ghFetch({}) });
+    expect(plan.sha).toBe(SHA);
+    expect(plan.warnings[0]).toMatch(/may be from a different branch/);
+  });
+
+  it('makes no GitHub call when the sha is given, or when the snapshot is a local directory', async () => {
+    const pinned = await planRecovery(PROJECT, cfg({ sha: SHA }));
+    expect(pinned.sha).toBe(SHA);
+    expect(ghCalls).toHaveLength(0);
+
+    const local = await planRecovery(PROJECT, cfg({ repoKey: 'fs:chatdex' }));
+    expect(local.repoKey).toBe('fs:chatdex');
+    expect(ghCalls).toHaveLength(0);
   });
 });
 
 describe('runRecovery (§9.5, law 2.3)', () => {
   it('sends exactly the planned excerpts, persists pending decisions + traces, and advances the cursor', async () => {
-    const plan = await planRecovery(PROJECT, { provider: 'anthropic' });
+    const plan = await planRecovery(PROJECT, cfg());
     const steps = plan.conversations[0].excerpts.map((e) => e.stepIndex);
     completeMock.mockResolvedValue(modelResponse(steps[0], steps[1], steps[2]));
 
@@ -215,13 +274,13 @@ describe('runRecovery (§9.5, law 2.3)', () => {
   });
 
   it('re-recognizes an existing decision as a pending supported event and never supersedes', async () => {
-    let plan = await planRecovery(PROJECT, { provider: 'anthropic' });
+    let plan = await planRecovery(PROJECT, cfg());
     let steps = plan.conversations[0].excerpts.map((e) => e.stepIndex);
     completeMock.mockResolvedValue(modelResponse(steps[0], steps[1], steps[2]));
     await runRecovery(PROJECT, plan, { provider: 'anthropic', token: undefined });
     const first = (await getObjectsForProject(PROJECT)).find((o) => o.title.startsWith('Deleting a project keeps'))!;
 
-    plan = await planRecovery(PROJECT, { provider: 'anthropic', ignoreCursor: true });
+    plan = await planRecovery(PROJECT, cfg({ ignoreCursor: true }));
     steps = plan.conversations[0].excerpts.map((e) => e.stepIndex);
     expect(plan.existingDecisions.map((d) => d.id)).toContain(first.id);
     completeMock.mockResolvedValue(modelResponse(steps[0], steps[1], steps[2], first.id));
@@ -239,7 +298,7 @@ describe('runRecovery (§9.5, law 2.3)', () => {
   });
 
   it('isolates provider failures per conversation and does not advance the cursor', async () => {
-    const plan = await planRecovery(PROJECT, { provider: 'anthropic' });
+    const plan = await planRecovery(PROJECT, cfg());
     completeMock.mockRejectedValue(new Error('relay down'));
     const outcome = await runRecovery(PROJECT, plan, { provider: 'anthropic', token: undefined });
     expect(outcome).toMatchObject({ errored: 1, decisionsCreated: 0, tracesWritten: 0 });

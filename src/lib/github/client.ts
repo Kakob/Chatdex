@@ -5,8 +5,9 @@
 //   configurable host would be a token-redirect vector.
 // - The token travels only in the Authorization header, never in a URL.
 //   `fetch` drops Authorization on cross-origin redirects by spec.
-// - owner / repo / sha / path are validated before they touch a URL, and
-//   every web link is built here, never string-concatenated in JSX.
+// - owner / repo / sha / ref / path are validated before they touch a URL
+//   (refs via assertRef, including ones parsed out of a pasted /tree/ URL),
+//   and every web link is built here, never string-concatenated in JSX.
 // - Error messages are content-free (status only) — response bodies are
 //   never echoed into errors, logs, or the UI.
 // - Nothing here writes: no POST/PUT/PATCH/DELETE exists in this module.
@@ -84,26 +85,123 @@ export function encodeRepoPath(path: string): string {
   return segments.map(encodeURIComponent).join('/');
 }
 
-/** Accepts `owner/repo`, a github.com URL, or a git@github.com: remote. */
-export function parseRepoInput(input: string): { owner: string; repo: string } | null {
-  const trimmed = input.trim();
-  const patterns = [
-    /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/,
-    /^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:[/#?].*)?$/,
-    /^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?$/,
-  ];
-  for (const re of patterns) {
-    const m = re.exec(trimmed);
-    if (m) {
-      try {
-        assertRepoName(m[1], m[2]);
-        return { owner: m[1], repo: m[2] };
-      } catch {
-        return null;
-      }
+export interface ParsedRepoInput {
+  owner: string;
+  repo: string;
+  /** Best-guess ref from a /tree, /blob, /commit, /pull or @ref input. */
+  ref?: string;
+  /** Alternatives in try order when a slashed ref is ambiguous; omitted when unambiguous. */
+  refCandidates?: string[];
+}
+
+/** owner/repo, optionally `.git` and optionally `@ref`. */
+const REPO_SHORTHAND_RE = /^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:@(.+))?\/?$/;
+/** A github.com URL; group 3 is everything after owner/repo (`tree/<branch>`, …). */
+const REPO_URL_RE = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:\/(.*))?$/;
+const REPO_SSH_RE = /^git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?\/?$/;
+
+/** Split a URL remainder into path segments; `%2F` in a branch name decodes into more of them. */
+function decodeSegments(rest: string): string[] {
+  const out: string[] = [];
+  for (const raw of rest.split('/')) {
+    if (raw === '') continue;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(raw);
+    } catch {
+      decoded = raw;
+    }
+    for (const part of decoded.split('/')) if (part !== '') out.push(part);
+  }
+  return out;
+}
+
+/** Drop duplicates and anything `assertRef` would reject, so a returned ref never throws downstream. */
+function keepValidRefs(candidates: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of candidates) {
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+    try {
+      assertRef(candidate);
+      out.push(candidate);
+    } catch {
+      // Not a usable ref; never offered.
     }
   }
-  return null;
+  return out;
+}
+
+/** Joined prefixes of `segments`, longest first unless `shortestFirst`. */
+function prefixCandidates(segments: string[], max: number, shortestFirst = false): string[] {
+  const out: string[] = [];
+  for (let n = 1; n <= Math.min(max, segments.length); n++) out.push(segments.slice(0, n).join('/'));
+  return shortestFirst ? out : out.reverse();
+}
+
+// Branch `a/b` and branch `a` + path `b` are indistinguishable from the string
+// alone, so a slashed ref yields an ordered candidate list; the caller resolves
+// it over the network and keeps the first that exists.
+function refCandidatesFromRemainder(rest: string): string[] {
+  const segments = decodeSegments(rest);
+  if (segments.length === 0) return [];
+  const [kind, ...tail] = segments;
+  switch (kind) {
+    case 'tree':
+      return keepValidRefs(prefixCandidates(tail, tail.length));
+    case 'blob':
+      // A file path follows the ref, so at least one trailing segment is not
+      // part of it — and the path is usually the longer half, so the shortest
+      // ref goes first (`/blob/main/src/lib/a.ts` → `main`).
+      return keepValidRefs(prefixCandidates(tail, tail.length - 1, true));
+    case 'commit':
+    case 'commits':
+      return tail[0] && SHA_RE.test(tail[0]) ? keepValidRefs([tail[0]]) : [];
+    case 'releases':
+      return tail[0] === 'tag' ? keepValidRefs([tail.slice(1).join('/')]) : [];
+    case 'pull':
+      return /^\d+$/.test(tail[0] ?? '') ? keepValidRefs([`refs/pull/${tail[0]}/head`]) : [];
+    default:
+      // issues, actions, wiki, settings, … name no ref.
+      return [];
+  }
+}
+
+/**
+ * Accepts `owner/repo`, a github.com URL, or a git@github.com: remote. A ref
+ * named by the input (`/tree/<branch>`, `/blob/<ref>/<path>`, `@ref`, …) comes
+ * back alongside it rather than being discarded.
+ */
+export function parseRepoInput(input: string): ParsedRepoInput | null {
+  // Strip ?query and #hash up front so the remainder is pure path grammar.
+  const trimmed = input.trim().replace(/[?#].*$/, '');
+  const shorthand = REPO_SHORTHAND_RE.exec(trimmed);
+  const url = shorthand ? null : REPO_URL_RE.exec(trimmed);
+  const ssh = shorthand ?? url ? null : REPO_SSH_RE.exec(trimmed);
+  const matched = shorthand ?? url ?? ssh;
+  if (!matched) return null;
+  const owner = matched[1];
+  const repo = matched[2];
+  try {
+    assertRepoName(owner, repo);
+  } catch {
+    return null;
+  }
+  const rest = matched[3];
+  const candidates = !rest
+    ? []
+    : shorthand
+      ? keepValidRefs([decodeSegments(rest).join('/')])
+      : url
+        ? refCandidatesFromRemainder(rest)
+        : [];
+  return {
+    owner,
+    repo,
+    ...(candidates.length > 0 ? { ref: candidates[0] } : {}),
+    ...(candidates.length > 1 ? { refCandidates: candidates } : {}),
+  };
 }
 
 // --- transport ---
@@ -294,16 +392,20 @@ export interface CommitSummary {
 export async function listCommits(
   owner: string,
   repo: string,
-  params: { path?: string; since?: Date; sha?: string; perPage?: number } = {},
+  // GitHub's `sha` query parameter takes a branch name too, but `sha` here
+  // stays strictly a commit sha (callers pinning history depend on it); a
+  // branch or tag goes in `ref`.
+  params: { path?: string; since?: Date; sha?: string; ref?: string; perPage?: number } = {},
   opts: GitHubClientOptions = {}
 ): Promise<CommitSummary[]> {
   assertRepoName(owner, repo);
   if (params.sha) assertSha(params.sha);
+  if (params.ref) assertRef(params.ref);
   if (params.path) encodeRepoPath(params.path); // validation only; the API takes it raw as a query param
   const { data } = await request(`/repos/${owner}/${repo}/commits`, opts, {
     path: params.path,
     since: params.since?.toISOString(),
-    sha: params.sha,
+    sha: params.sha ?? params.ref,
     per_page: params.perPage ?? DEFAULT_COMMITS_PER_PAGE,
   });
   const list = data as Array<{

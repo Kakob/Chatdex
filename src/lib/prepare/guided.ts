@@ -75,5 +75,10 @@ export async function commitsTouchingPath(
   opts: GitHubClientOptions = {},
   perPage = 10
 ): Promise<CommitSummary[]> {
-  return listCommits(repository.owner, repository.repo, { path, perPage, ...(repository.pinnedRef ? {} : {}) }, opts);
+  return listCommits(
+    repository.owner,
+    repository.repo,
+    { path, perPage, ...(repository.pinnedRef ? { ref: repository.pinnedRef } : {}) },
+    opts
+  );
 }

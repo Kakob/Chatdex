@@ -31,7 +31,7 @@ Ordered by build sequence, not by age.
 | [change-workspace](./change-workspace/) | Code-complete — CW-0…CW-8 | Jacob's §18 browser passes |
 | [decision-recovery](./decision-recovery/) | Code-complete — DR-0…DR-7 (demo fixture on unmerged `demo/project-deletion`) | Jacob's §16 browser pass |
 | [flow-map](./flow-map/) | Draft spec (2026-09-07), no code | Approve the spec's §21 decisions D1–D10, then FM-0 |
-| [branch-binding](./branch-binding/) | Planned, no code — cross-cutting fix over intent-trace, change-workspace, decision-recovery | Start the plan's phase 1 |
+| [branch-binding](./branch-binding/) | Code-complete — steps 1–6 of the plan (parse, intake UI, both pages, recovery snapshot, tests) | Jacob's manual pass: PLAN.md §5 items 4–7 |
 | [activity-tracker](./activity-tracker/) | Chrome extension — in progress | — |
 
 ---

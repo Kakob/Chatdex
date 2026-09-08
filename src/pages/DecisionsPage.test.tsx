@@ -3,7 +3,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { bulkPutConversations, bulkPutMessages, clearAllData, createHumanProject } from '../lib/db';
-import { createUnderstandingObject, getUnderstandingObject, putProjectAssociation } from '../lib/db/understanding';
+import { createUnderstandingObject, getUnderstandingObject, putProjectAssociation, putUnderstandingProject } from '../lib/db/understanding';
 import { putDecisionTrace } from '../lib/db/decisionTraces';
 import { deriveAnchorsForConversation } from '../lib/investigation/anchors';
 import { toMetaRecord } from '../lib/understanding/decisions/meta';
@@ -79,6 +79,31 @@ function renderAt(path: string) {
 beforeEach(async () => {
   await clearAllData();
   completeMock.mockReset();
+});
+
+describe('DecisionsPage branch binding', () => {
+  it('keeps the binding card reachable when bound and fills the ref from a session-commit chip', async () => {
+    const user = userEvent.setup();
+    const { project } = await seed();
+    await putUnderstandingProject({
+      ...project,
+      repository: { owner: 'Kakob', repo: 'Chatdex', defaultBranch: 'main' },
+    });
+    // A session that committed on a branch — the case the chips serve.
+    const bash: ContentBlock = { type: 'tool_use', toolName: 'Bash', toolUseId: 't2', toolInput: { command: 'git commit -m "feat: delete"' } };
+    const result: ContentBlock = { type: 'tool_result', toolName: 'Bash', toolUseId: 't2', toolResult: '[demo/project-deletion 9987455] feat: delete' };
+    await bulkPutMessages([
+      { id: 'm2', conversationId: 'sess-1', sender: 'assistant', text: '', contentBlocks: [bash, result], createdAt: new Date(now.getTime() + 2000) },
+    ]);
+    renderAt(`/projects/${project.id}/decisions`);
+
+    // The card used to vanish once a repo was bound.
+    expect(await screen.findByLabelText('Change repository binding')).toBeInTheDocument();
+    await user.click(screen.getByLabelText('Change repository binding'));
+
+    await user.click(await screen.findByRole('button', { name: '9987455 · demo/project-deletion' }));
+    expect((screen.getByLabelText('Branch or ref') as HTMLInputElement).value).toBe('demo/project-deletion');
+  });
 });
 
 describe('DecisionsPage', () => {

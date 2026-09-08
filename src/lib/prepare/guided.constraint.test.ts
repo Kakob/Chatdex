@@ -99,6 +99,13 @@ describe('Guided mode makes no provider call (law §2.7)', () => {
     // Guided lookups: history (GitHub) and related conversations (local).
     const commits = await commitsTouchingPath({ owner: 'Kakob', repo: 'Chatdex' }, 'src/pages/SearchPage.tsx', { token: 'ghp_test' });
     expect(commits).toHaveLength(1);
+    // History follows the bound branch, not always the default one.
+    await commitsTouchingPath(
+      { owner: 'Kakob', repo: 'Chatdex', pinnedRef: 'feature/x' },
+      'src/pages/SearchPage.tsx',
+      { token: 'ghp_test' }
+    );
+    expect(requests[requests.length - 1]).toContain('sha=feature%2Fx');
     const related = await findRelatedConversations('p1', 'handleResultClick');
     expect(related.related.map((r) => [r.conversationId, r.hits, r.firstMessageId])).toEqual([['conv-1', 1, 'm1']]);
 

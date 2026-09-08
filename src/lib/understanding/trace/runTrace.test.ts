@@ -115,6 +115,29 @@ describe('planTrace', () => {
     expect(completeMock).not.toHaveBeenCalled();
   });
 
+  it('traces against the branch the binding pins, and config.ref still overrides it', async () => {
+    await seed();
+    await putUnderstandingProject({
+      id: 'proj-1', name: 'Chatdex', origin: 'user', reviewState: 'accepted',
+      repository: { owner: 'Kakob', repo: 'Chatdex', defaultBranch: 'main', pinnedRef: 'feature/x' },
+      createdAt: new Date('2026-08-01T00:00:00Z'), updatedAt: new Date('2026-08-01T00:00:00Z'),
+    });
+    const branchSha = 'e'.repeat(40);
+    const branchRoutes: Route[] = [
+      (u) => (u.pathname === '/repos/Kakob/Chatdex/commits/feature%2Fx' ? { body: { sha: branchSha } } : (undefined as never)),
+      (u) => (u.pathname === `/repos/Kakob/Chatdex/git/trees/${branchSha}` ? { body: { truncated: false, tree: [] } } : (undefined as never)),
+    ];
+    const { fetchImpl, urls } = makeFetch(repoRoutes({ 'src/a.ts': 'x' }, branchRoutes));
+    const plan = await planTrace('proj-1', { provider: 'anthropic', fetchImpl });
+    expect(plan.repoRef).toEqual({ owner: 'Kakob', repo: 'Chatdex', commitSha: branchSha, ref: 'feature/x' });
+    expect(urls.some((u) => u.includes('/commits/feature%2Fx'))).toBe(true);
+    expect(urls.some((u) => u.includes('/commits/main'))).toBe(false);
+
+    clearGitHubCaches();
+    const overridden = await planTrace('proj-1', { provider: 'anthropic', fetchImpl, ref: 'main' });
+    expect(overridden.repoRef).toEqual({ owner: 'Kakob', repo: 'Chatdex', commitSha: SHA, ref: 'main' });
+  });
+
   it('refuses without a repository binding and skips intents already traced at this sha', async () => {
     await seed({ withRepo: false });
     await expect(planTrace('proj-1', { provider: 'anthropic' })).rejects.toThrow(/Bind a GitHub repository/);
