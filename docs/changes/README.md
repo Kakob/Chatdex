@@ -14,6 +14,9 @@ plan; these summaries are navigation aids, not independent checklists.
 |---|---|---|---|
 | [Branch Binding](./branch-binding/PLAN.md) | Repository Integration | Intent Trace, Decision Recovery, Change Workspace | Implementation recorded; manual acceptance checks remain |
 | [Decision review experience](./decision-review-experience/PLAN.md) | Decision Recovery | Repository Integration (snapshot context only) | Completed locally; verification and limitations in the linked plan/build log |
+| [Experiment Lab](./experiment-lab/PLAN.md) | Experiment Lab (proposed) | Decision Authoring, Change Workspace, Private → Shared | Proposed — developing project idea collection, next moves, attempts and outcomes |
+| [Decision Authoring & Evidence](./decision-authoring-evidence/PLAN.md) | Decision Authoring (proposed) | Decision Recovery, Intent Trace, Understanding Workspace, Repository Integration | Proposed — manual and AI-assisted interpretation, evidence, revision history and scoped gaps |
+| [Share Build Story](./share-build-story/PLAN.md) | Private → Shared (proposed) | Decision Authoring, Experiment Lab, Change Workspace | Proposed — reviewed hosted stories, exports and aggregate engagement |
 
 ## When to create a package
 
