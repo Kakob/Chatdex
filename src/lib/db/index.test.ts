@@ -146,6 +146,26 @@ describe('conversations', () => {
     expect(await getAnchorsByConversation(conv.id)).toHaveLength(0);
   });
 
+  it('cascades delete to tag links and gives usage counts back', async () => {
+    const conv = makeConv();
+    await putConversation(conv);
+    const anchor = makeAnchor({ conversationId: conv.id });
+    await putAnchor(anchor);
+    const tag = { id: crypto.randomUUID(), name: 'kept', color: null, category: null, usageCount: 0, createdAt: new Date() };
+    await putTag(tag);
+    await tagEntity(tag.id, conv.id, 'conversation');
+    await tagEntity(tag.id, anchor.id, 'anchor');
+    await tagEntity(tag.id, 'unrelated-conv', 'conversation');
+    expect((await db.tags.get(tag.id))?.usageCount).toBe(3);
+
+    await deleteConversation(conv.id);
+
+    expect(await getEntityTags('conversation', conv.id)).toHaveLength(0);
+    expect(await getEntityTags('anchor', anchor.id)).toHaveLength(0);
+    expect(await getEntityTags('conversation', 'unrelated-conv')).toHaveLength(1);
+    expect((await db.tags.get(tag.id))?.usageCount).toBe(1);
+  });
+
   it('deleteConversationsBySource removes only that source', async () => {
     const a = makeConv({ source: 'claude.ai' });
     const b = makeConv({ source: 'claude-code' });

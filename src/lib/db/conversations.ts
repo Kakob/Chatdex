@@ -1,4 +1,5 @@
 import { db } from './schema';
+import { removeEntityTagsFor } from './tags';
 import type { StoredConversation, DataSource } from '../../types';
 
 export async function putConversation(conv: StoredConversation): Promise<void> {
@@ -54,15 +55,21 @@ export async function deleteConversation(id: string): Promise<void> {
       db.reviewScopes,
       db.verdictRevisions,
       db.investigationFindings,
+      db.entityTags,
+      db.tags,
     ],
     async () => {
       const caseIds = await db.investigationCases
         .where('conversationId')
         .equals(id)
         .primaryKeys();
+      const anchorIds = await db.anchors.where('conversationId').equals(id).primaryKeys();
       await db.conversations.delete(id);
       await db.messages.where('conversationId').equals(id).delete();
       await db.anchors.where('conversationId').equals(id).delete();
+      // Tag links would otherwise dangle and keep usageCount inflated.
+      await removeEntityTagsFor('conversation', [id]);
+      await removeEntityTagsFor('anchor', anchorIds as string[]);
       await db.findings.where('conversationId').equals(id).delete();
       await db.detectorRuns.where('conversationId').equals(id).delete();
       await db.projectAssociations.where('conversationId').equals(id).delete();

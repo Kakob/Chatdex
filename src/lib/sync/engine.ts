@@ -8,7 +8,7 @@
 // conversations is good enough at v1 (messages are append-only, anchors are
 // rarely edited concurrently).
 
-import { db, clearAllData } from '../db';
+import { db, clearAllData, removeEntityTagsFor } from '../db';
 import { encryptJSON, decryptJSON, getMasterKey, isUnlocked } from '../crypto';
 import { getMetadata, setMetadata } from '../db/metadata';
 import {
@@ -104,9 +104,16 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
   if (rec.deleted) {
     switch (rec.kind) {
       case 'conversation': {
+        const anchorIds = (await db.anchors
+          .where('conversationId')
+          .equals(rec.id)
+          .primaryKeys()) as string[];
         await db.conversations.delete(rec.id);
         await db.messages.where('conversationId').equals(rec.id).delete();
         await db.anchors.where('conversationId').equals(rec.id).delete();
+        // Tag links go with their entity (mirrors deleteConversation).
+        await removeEntityTagsFor('conversation', [rec.id]);
+        await removeEntityTagsFor('anchor', anchorIds);
         await db.findings.where('conversationId').equals(rec.id).delete();
         await db.detectorRuns.where('conversationId').equals(rec.id).delete();
         // Associations dangle without their conversation; understanding

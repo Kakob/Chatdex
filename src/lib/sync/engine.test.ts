@@ -37,7 +37,7 @@ vi.mock('./syncApi', async (importOriginal) => {
 
 import type { PushRecord, PullRecord } from './syncApi';
 import { syncEngine } from './engine';
-import { db, setMetadata, getMetadata, bulkPutConversations, bulkPutMessages } from '../db';
+import { db, setMetadata, getMetadata, bulkPutConversations, bulkPutMessages, tagEntity, getEntityTags } from '../db';
 import type { StoredConversation, StoredMessage } from '../../types';
 
 function makeConv(overrides: Partial<StoredConversation> = {}): StoredConversation {
@@ -325,6 +325,56 @@ describe('intent traces (SPEC-intent-trace §11.4)', () => {
     await syncEngine.tick();
     expect(await db.understandingObjects.get(objectId)).toBeUndefined();
     expect(await db.intentTraces.get(traceId)).toBeUndefined();
+  });
+});
+
+describe('conversation deletion from the server', () => {
+  it('cascades to tag links and gives usage counts back (mirrors deleteConversation)', async () => {
+    const convId = crypto.randomUUID();
+    const now = new Date();
+    await bulkPutConversations([
+      {
+        id: convId,
+        source: 'claude.ai',
+        name: 'to delete',
+        summary: null,
+        createdAt: now,
+        updatedAt: now,
+        importedAt: now,
+        messageCount: 0,
+        userMessageCount: 0,
+        assistantMessageCount: 0,
+        estimatedTokens: 0,
+        fullText: '',
+      },
+    ]);
+    const tagId = crypto.randomUUID();
+    await db.tags.put({ id: tagId, name: 'srv', color: null, category: null, usageCount: 0, createdAt: now });
+    await tagEntity(tagId, convId, 'conversation');
+    await tagEntity(tagId, 'other-conv', 'conversation');
+    await syncEngine.tick();
+
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: convId,
+          kind: 'conversation',
+          parentId: null,
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+
+    expect(await db.conversations.get(convId)).toBeUndefined();
+    expect(await getEntityTags('conversation', convId)).toHaveLength(0);
+    expect(await getEntityTags('conversation', 'other-conv')).toHaveLength(1);
+    expect((await db.tags.get(tagId))?.usageCount).toBe(1);
   });
 });
 
