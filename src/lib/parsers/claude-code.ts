@@ -18,9 +18,21 @@ import { generateId } from '../utils/ids';
 //        (SPEC-decision-recovery §8.3).
 export const CLAUDE_CODE_PARSER_VERSION = '1.2.0';
 
+/**
+ * A line the parser could not use. Surfaced, never swallowed
+ * (SPEC-decision-investigation §7.1: parser errors must be visible without
+ * discarding unaffected source events).
+ */
+export interface ParseWarning {
+  /** 1-based line number in the source file, counting blank lines. */
+  line: number;
+  reason: 'malformed-json';
+}
+
 export interface ParsedClaudeCode {
   conversations: StoredConversation[];
   messages: StoredMessage[];
+  warnings: ParseWarning[];
 }
 
 export async function parseClaudeCodeJSONL(file: File): Promise<ParsedClaudeCode> {
@@ -32,30 +44,32 @@ export function parseClaudeCodeContent(
   content: string,
   filename: string
 ): ParsedClaudeCode {
-  const lines = content.split('\n').filter((line) => line.trim());
+  const lines = content.split('\n');
   const entries: ClaudeCodeEntry[] = [];
+  const warnings: ParseWarning[] = [];
 
-  for (const line of lines) {
+  lines.forEach((line, index) => {
+    if (!line.trim()) return;
     try {
-      const entry = JSON.parse(line) as ClaudeCodeEntry;
-      entries.push(entry);
+      entries.push(JSON.parse(line) as ClaudeCodeEntry);
     } catch {
-      // Skip malformed lines
-      console.warn('Skipping malformed JSONL line');
+      // Keep going — one bad line must not discard the rest of the session —
+      // but record it so the import result can say what was skipped.
+      warnings.push({ line: index + 1, reason: 'malformed-json' });
     }
-  }
+  });
 
   if (entries.length === 0) {
     throw new Error('No valid entries found in JSONL file');
   }
 
-  return parseEntries(entries, filename);
+  return { ...parseEntries(entries, filename), warnings };
 }
 
 function parseEntries(
   entries: ClaudeCodeEntry[],
   filename: string
-): ParsedClaudeCode {
+): Omit<ParsedClaudeCode, 'warnings'> {
   const messages: StoredMessage[] = [];
   const textParts: string[] = [];
   const now = new Date();

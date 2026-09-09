@@ -1,4 +1,4 @@
-import { parseFiles, type ParsedData } from './parsers';
+import { parseFiles, type ImportWarning, type ParsedData } from './parsers';
 import { bulkPutConversations, bulkPutMessages, storeRawSources, db } from './db/index';
 import { autoAnalyzeConversations } from './detection/autoAnalyze';
 import { deriveAnchorsForConversation } from './investigation/anchors';
@@ -13,6 +13,8 @@ export interface ImportResult {
   addedConversationIds: string[];
   /** Raw payloads retained this import (deduped by content hash). */
   rawSourcesAdded: number;
+  /** Source lines a parser skipped. Never empty silently: the UI shows them. */
+  parseWarnings: ImportWarning[];
 }
 
 export interface ImportProgress {
@@ -138,5 +140,6 @@ async function storeData(
     source: data.source,
     addedConversationIds,
     rawSourcesAdded: rawResult.added,
+    parseWarnings: data.warnings,
   };
 }
