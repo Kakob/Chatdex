@@ -28,6 +28,14 @@ export const bytea = customType<{ data: Buffer; default: false }>({
   dataType() {
     return 'bytea';
   },
+  // postgres-js hands back Buffer; PGlite (tests) hands back Uint8Array.
+  // Normalize so callers can rely on Buffer methods either way.
+  fromDriver(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) return value;
+    if (value instanceof Uint8Array) return Buffer.from(value);
+    if (typeof value === 'string' && value.startsWith('\\x')) return Buffer.from(value.slice(2), 'hex');
+    throw new Error('Unexpected bytea driver value');
+  },
 });
 
 // Users table — created when a user opts into cloud sync.

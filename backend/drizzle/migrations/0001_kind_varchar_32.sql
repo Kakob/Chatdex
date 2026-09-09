@@ -1,0 +1,1 @@
+ALTER TABLE "sync_records" ALTER COLUMN "kind" SET DATA TYPE varchar(32);

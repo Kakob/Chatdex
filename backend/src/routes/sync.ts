@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, gt, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, syncRecords, type SyncRecord } from '../db/index.js';
+import type { Db } from '../db/index.js';
+import { syncRecords, type SyncRecord } from '../db/schema.js';
 import { b64ToBuf, bufToB64 } from '../utils/binary.js';
 
 const KindSchema = z.enum([
@@ -58,7 +59,8 @@ function rowToWire(r: SyncRecord) {
   };
 }
 
-export async function syncRoutes(app: FastifyInstance) {
+export async function syncRoutes(app: FastifyInstance, opts: { db: Db }): Promise<void> {
+  const { db } = opts;
   // Push a batch of upserts. Last-write-wins by updatedAt: existing rows with
   // a newer updatedAt are kept; older incoming records are ignored.
   app.post('/push', { preHandler: app.authenticate }, async (req, reply) => {

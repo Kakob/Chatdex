@@ -14,7 +14,8 @@ import type {
   AuthenticationResponseJSON,
 } from '@simplewebauthn/server';
 
-import { db, users } from '../db/index.js';
+import type { Db } from '../db/index.js';
+import { users } from '../db/schema.js';
 import { b64ToBuf, bufToB64 } from '../utils/binary.js';
 import { hashSecret, newServerSalt, verifySecret } from '../utils/passwordHash.js';
 import {
@@ -78,7 +79,8 @@ function userMaterial(u: typeof users.$inferSelect) {
   };
 }
 
-export async function authRoutes(app: FastifyInstance) {
+export async function authRoutes(app: FastifyInstance, opts: { db: Db }): Promise<void> {
+  const { db } = opts;
   // ---------- registration ----------
 
   app.post('/passkey/register-init', async (req, reply) => {
