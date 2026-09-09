@@ -24,7 +24,7 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 | **[architecture/](./architecture/)** | [System architecture](./architecture/architecture.md) and [auth architecture](./architecture/auth-architecture.md) |
 | **[territories/](./territories/)** | Territory guides — how one capability works end to end ([index](./territories/README.md)) |
 | **[ownership/](./ownership/)** | The code-ownership loop: exercises, investigations, module notes, audit log ([index](./ownership/README.md)) |
-| **[assessments/](./assessments/)** | Point-in-time repo reconnaissance ([current state](./assessments/chatdex-current-state-reconnaissance.md)) and `recon-screenshots/` |
+| **[assessments/](./assessments/)** | Point-in-time repo reconnaissance ([current state](./assessments/chatdex-current-state-reconnaissance.md)), the [invariant register](./assessments/invariant-register.md) (every guarantee → owning spec § → guard test, with unguarded/drift findings), and `recon-screenshots/` |
 | **[vision/](./vision/)** | Narrative vision: [AIPKMS](./vision/claude-aipkms.md), [toolkit → AIPKMS roadmap](./vision/roadmap-toolkit-to-aipkms.md) |
 | **[archive/](./archive/)** | Superseded documents, kept for history — links inside are intentionally not maintained |
 
