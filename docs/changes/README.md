@@ -17,6 +17,7 @@ plan; these summaries are navigation aids, not independent checklists.
 | [Experiment Lab](./experiment-lab/PLAN.md) | Experiment Lab (proposed) | Decision Authoring, Change Workspace, Private → Shared | Proposed — developing project idea collection, next moves, attempts and outcomes |
 | [Decision Authoring & Evidence](./decision-authoring-evidence/PLAN.md) | Decision Authoring (proposed) | Decision Recovery, Intent Trace, Understanding Workspace, Repository Integration | Proposed — manual and AI-assisted interpretation, evidence, revision history and scoped gaps |
 | [Share Build Story](./share-build-story/PLAN.md) | Private → Shared (proposed) | Decision Authoring, Experiment Lab, Change Workspace | Proposed — reviewed hosted stories, exports and aggregate engagement |
+| [Backend test harness](./backend-test-harness/PLAN.md) | none (shared infrastructure) | Sync, LLM relay, auth (architecture docs; CLAUDE.md inv. 1 and 6) | Proposed — `buildApp` extraction, backend vitest setup, route tests for the nine unguarded backend rows in the invariant register |
 
 ## When to create a package
 
