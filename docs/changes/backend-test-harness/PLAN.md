@@ -1,6 +1,6 @@
 # Backend test harness
 
-Status: Proposed — drafted 2026-09-09 from the [invariant register](../../assessments/invariant-register.md).
+Status: Completed — drafted and delivered 2026-09-09 (`8cd29d8` harness + relay/sync/util tests, `69e00c0` auth reconciliation + tests). Source: the [invariant register](../../assessments/invariant-register.md).
 Primary capability: none (shared infrastructure). Owner of the affected contracts:
 [architecture.md](../../architecture/architecture.md) §"Backend", [auth-architecture.md](../../architecture/auth-architecture.md),
 CLAUDE.md invariants 1 and 6.
@@ -78,15 +78,16 @@ reconciliations in step 4. Excludes: the frontend, any change to relay or sync b
 beyond step 4, load or timing tests, and WebAuthn ceremony tests against a real
 authenticator (the `@simplewebauthn/server` verify calls are stubbed at the boundary).
 
-## Unresolved choices
+## Resolved choices
 
-- **Database for route tests.** Options: (a) `@electric-sql/pglite` with `drizzle-orm/pglite`,
-  an in-process Postgres needing no service (recommended; one dev dependency); (b) the Docker
-  Postgres on port 5433 via `npm run docker:up`, requiring Docker in every environment that
-  runs `test:all`; (c) a hand-written fake of the Drizzle query surface, which drifts.
-  Jacob's development database is Neon, so (b) is not the default today.
-- Whether `buildApp` should also own CORS origin and body-limit configuration (proposed yes,
-  so tests exercise the same instance shape).
+- **Database for route tests: `@electric-sql/pglite` 0.5.x via `drizzle-orm/pglite`** (in-process
+  Postgres, no service). Neon stays the development/production database untouched; tests never
+  reach it. Migrations are applied from `backend/drizzle/migrations` with the pglite migrator, so
+  a new migration `0001_kind_varchar_32` was generated to bring the folder in line with the schema.
+  The `bytea` custom type gained a `fromDriver` that normalizes PGlite's `Uint8Array` to `Buffer`.
+- `buildApp` owns CORS, body limit, JWT registration, and route registration; `index.ts` only listens.
+- Installing `vitest` into `backend/` needed `--legacy-peer-deps` (npm 10.9 arborist bug on vitest 4's
+  optional peer set); recorded in case `npm ci` hits the same.
 
 ## Implementation steps
 
@@ -102,14 +103,14 @@ authenticator (the `@simplewebauthn/server` verify calls are stubbed at the boun
 
 ## Acceptance criteria
 
-- [ ] `cd backend && npm test` runs green with no network and no external service beyond the chosen database option.
-- [ ] A deliberate `fastify.log.info(request.body)` or `db.insert(...)` added to `routes/llm.ts` fails at least one test.
-- [ ] A deliberate removal of the `userId` predicate in `routes/sync.ts` fails a test.
-- [ ] A deliberate `>=` → `>` flip in the LWW comparison fails a test.
-- [ ] `buildApp` throws on a missing or short `JWT_SECRET`.
-- [ ] INV-27 and INV-29 have one agreed behavior, one doc statement, one code path, and one test each.
-- [ ] The invariant register rows listed above read `guarded` with resolvable test names.
-- [ ] `npm run typecheck`, `npm run lint`, `npm run test:all` pass.
+- [x] `cd backend && npm test` runs green with no network and no external service beyond the chosen database option.
+- [x] A deliberate `app.log.info({ body: req.body })` in `routes/llm.ts` failed 9 of 16 relay tests (mutation check 1).
+- [x] Removing the `userId` predicate from `/pull` failed 2 sync tests (mutation check 2).
+- [x] Flipping `>=` to `>` in the LWW comparison failed 1 sync test (mutation check 3).
+- [x] `buildApp` throws on a missing or short `JWT_SECRET` (`auth.test.ts::boot guard`).
+- [x] INV-27 and INV-29 have one agreed behavior, one doc statement, one code path, and one test each (see Outcome).
+- [x] The invariant register rows listed above read `guarded` with resolvable test names.
+- [x] `npm run typecheck`, `npm run lint`, `npm run test:all` pass; `cd backend && npm run typecheck` (tests included) passes.
 
 ## Documentation updates
 
@@ -120,4 +121,34 @@ Step 4 amends `architecture.md:50` or `routes/auth.ts`, and `auth-architecture.m
 
 ## Outcome
 
-Populate when delivered.
+Delivered 2026-09-09.
+
+**Shipped:** `backend/src/app.ts` (`buildApp`), database injected into `authRoutes`/`syncRoutes`
+through plugin options, `backend/src/test/harness.ts` (PGlite + migrations + real app + log
+capture + `seedUser`), backend `vitest.config.ts`, `test`/`typecheck` scripts, tests excluded from
+the dist build via `tsconfig.json`/`tsconfig.test.json`. Tests: `utils/challengeToken.test.ts`,
+`utils/passwordHash.test.ts`, `llm/subscription.test.ts`, `routes/llm.test.ts`,
+`routes/sync.test.ts`, `routes/auth.test.ts`. 53 backend tests pass in about 5 s.
+
+**Step 4 reconciliations.** INV-27: SimpleWebAuthn already throws on a non-increasing counter
+(`verifyAuthenticationResponse.js:144-150`), so "clone detection" was implemented by the library
+and the register's finding was wrong on that point; the route let the throw become a 500 and now
+answers 401. INV-29: the documented behavior (recovery wrap and hash untouched) won; the route no
+longer accepts a recovery wrap, the client no longer sends one, and the comment matches.
+
+**Mutation checks** (each applied, the affected file's tests run, then reverted):
+
+| # | Mutation | Result |
+|---|---|---|
+| 1 | `routes/llm.ts` logs `req.body` | 9 of 16 relay tests fail |
+| 2 | `routes/sync.ts` `/pull` without the `userId` predicate | 2 of 10 sync tests fail |
+| 3 | `routes/sync.ts` LWW `>=` → `>` | 1 of 10 sync tests fail |
+| 4 | `routes/auth.ts` `/recover-finish` overwrites the recovery wrap again | 1 of 8 auth tests fail |
+| 5 | `llm/subscription.ts` stops deleting `ANTHROPIC_API_KEY` | 1 of 3 bridge tests fail |
+
+**Limitations.** The relay's "never persists" half is guarded by a source-text assertion (no
+`/db/` or `drizzle-orm` import, no log call) plus the log capture, not by instrumenting the
+database; a future write through some other module would need the same guard extended.
+`/stream` is covered for one success and one provider-error path; client-abort mid-stream is
+not. WebAuthn attestation/assertion verification is mocked at the library boundary, so the
+ceremonies themselves are untested here. Drizzle-only/no-raw-SQL (INV-26) remains a policy row.

@@ -1,6 +1,6 @@
 # Invariant register
 
-**Date:** 2026-09-09 · **HEAD:** `3b66fa0` (branch `feature/project-workspace-golden-path`, clean tree) · **Method:** read-only extraction by seven parallel agents over every rule-bearing document, followed by grep verification of every Tier 1 guard-test name and a read of the cited code for every spec-drift row. No source, test, or spec was modified. Test suites were not run; `guarded` means a test with that name asserts the property, not that it passed today.
+**Date:** 2026-09-09 · **HEAD:** `3b66fa0` (branch `feature/project-workspace-golden-path`, clean tree) · **Method:** read-only extraction by seven parallel agents over every rule-bearing document, followed by grep verification of every Tier 1 guard-test name and a read of the cited code for every spec-drift row. At extraction no source, test, or spec was modified and suites were not run. **Updated 2026-09-09 (same day):** the three spec-drift rows were fixed (`db060a6`, `9b59690`, `69e00c0`) and a backend test harness landed (`8cd29d8`); rows marked `guarded (2026-09-09)` were verified by running `cd backend && npm test` (53 tests) and `npm run test:all`, plus five deliberate mutations that each failed at least one test (recorded in the backend-test-harness plan Outcome). `guarded` elsewhere still means a test with that name asserts the property.
 
 ## Why this exists
 
@@ -29,46 +29,37 @@ Qualifiers in parentheses narrow a status ("guarded (Accept only)" means the Rej
 
 | Section | rows | guarded | implemented-unguarded | not-found-in-code | spec-drift | policy | proposed |
 |---|---|---|---|---|---|---|---|
-| Tier 1 — trust invariants (INV) | 35 | 16 | 12 | 0 | 1 | 6 | 0 |
-| Decision Recovery + Repository Integration | 62 | 52 | 9 | 0 | 0 | 1 | 0 |
-| Decision Investigation | 77 | 46 | 21 | 4 | 1 | 2 | 3 |
-| Agent Observability + Understanding Workspace | 77 | 49 | 6 | 0 | 0 | 9 | 13 |
+| Tier 1 — trust invariants (INV) | 35 | 24 | 5 | 0 | 0 | 6 | 0 |
+| Decision Recovery + Repository Integration | 62 | 53 | 8 | 0 | 0 | 1 | 0 |
+| Decision Investigation | 77 | 47 | 21 | 4 | 0 | 2 | 3 |
+| Agent Observability + Understanding Workspace | 77 | 50 | 5 | 0 | 0 | 9 | 13 |
 | Intent Trace + Change Workspace + Branch Binding | 95 | 78 | 8 | 0 | 0 | 9 | 0 |
-| Orphan rules (territories) | 15 | 7 | 6 | 1 | 1 | 0 | 0 |
-| **Total** | 361 | 248 | 62 | 5 | 3 | 27 | 16 |
+| Orphan rules (territories) | 15 | 10 | 4 | 1 | 0 | 0 | 0 |
+| **Total** | 361 | 262 | 51 | 5 | 0 | 27 | 16 |
 
 Tier 3 (proposed contracts) adds 133 rows that are not status-bearing: Flow Map 21, Decision Authoring 28, Experiment Lab 25, Share Build Story 29, Activity Tracker 7, product PRDs 29. Undocumented enforced guarantees add 15 rows with no owner.
 
 ## Findings
 
-### 1. Tier 1 rows with no guard (12)
+### 1. Tier 1 rows with no guard (5, down from 12)
 
-These are trust guarantees that hold today only because nobody has changed the code. A regression would pass CI.
+The backend test harness (`docs/changes/backend-test-harness/PLAN.md`, `8cd29d8`) guarded INV-11 and INV-21 through INV-25, and the auth fix (`69e00c0`) guarded INV-27 and INV-29. What remains:
 
 | ID | Guarantee | Why unguarded |
 |---|---|---|
 | INV-4 | Detection compute runs in a Web Worker | jsdom has no Worker; the test drives the handler directly |
-| INV-11 | Backend relay is transit-only, never persists or logs content | `backend/` has exactly one test file (`llm/sse.test.ts`); zero route tests. Also `backend/src/index.ts:9` sets `logger: true`; Fastify's default omits bodies but nothing pins that |
 | INV-18 | Zustand stores never hold the master key | grep-only |
 | INV-19 | PRF output never touches the network | `src/lib/auth/` has no test files at all |
 | INV-20 | No password KDF path exists | absence not asserted |
-| INV-21 | `JWT_SECRET` ≥32 chars enforced at boot | no backend tests |
-| INV-22 | Challenge-token verification timing-safe, 5-min window | no backend tests |
-| INV-23 | Recovery code never stored cleartext; constant-time compare | no backend tests |
-| INV-24 | Every sync read/write scoped to the JWT user | no backend tests |
-| INV-25 | Sync conflict resolution is LWW by `updatedAt` | no backend tests |
-| INV-26 | Drizzle-only, no raw SQL | absence not asserted |
-| INV-27 | WebAuthn counter updated for clone detection | no backend tests; **and** the counter is only updated when higher, never rejected when stale or equal, so "clone detection" is not implemented (`backend/src/routes/auth.ts:252`) |
+| INV-26 | Drizzle-only, no raw SQL | absence not asserted (the relay's source guard covers `llm.ts` only) |
 
-Nine of twelve are backend. The single highest-leverage action in this register is a backend route test harness. Until it exists, invariants 1 and 6 in CLAUDE.md rest on the client-side envelope tests plus code reading.
+### 2. Spec-drift (3 found; all 3 fixed on 2026-09-09)
 
-### 2. Spec-drift (3 confirmed by reading the cited lines)
-
-| ID | Document says | Code does |
-|---|---|---|
-| INV-29 | `auth-architecture.md:111`: after recovery re-enrollment `wrapped_by_recovery_*` and `recovery_code_hash` stay unchanged | `backend/src/routes/auth.ts:394-395` overwrites `wrappedByRecoveryIv/Ct` from the request body (hash is preserved). The in-file comment at `auth.ts:343` claims the hash is regenerated. Doc, comment, and code disagree three ways. User-visible impact undetermined: the client re-wraps under the same recovery code, so the code probably still works |
-| DI-12 | `decision-investigation/SPEC.md` §7.1, §13: parser errors must be visible without discarding unaffected events | `src/lib/parsers/claude-code.ts:41-43` swallows malformed JSONL lines into a bare `console.warn`; nothing reaches the import result or UI |
-| ORPH-13 | `territories/search-and-browse.md:129`: conversation deletion cleans up dependents | `src/lib/db/conversations.ts:40-58` cascades 13 tables but not `entityTags` (the territory doc itself records this as violated) |
+| ID | Document said | Code did | Fix |
+|---|---|---|---|
+| INV-29 | `auth-architecture.md:111`: after recovery re-enrollment `wrapped_by_recovery_*` and `recovery_code_hash` stay unchanged | `/recover-finish` overwrote the recovery wrap from the request body; its comment claimed the hash was regenerated | `69e00c0`: route no longer accepts a recovery wrap, client no longer sends one, comment matches the doc; guarded by `auth.test.ts` |
+| DI-12 | `decision-investigation/SPEC.md` §7.1, §13: parser errors visible without discarding unaffected events | `parsers/claude-code.ts` swallowed malformed JSONL lines into a `console.warn` | `db060a6`: per-line warnings flow through `ImportResult.parseWarnings` to the import screen; guarded by parser + import tests |
+| ORPH-13 | `territories/search-and-browse.md:129`: conversation deletion cleans up dependents | `db/conversations.ts` cascaded 13 tables but not `entityTags` | `9b59690`: `removeEntityTagsFor` in both the local cascade and the sync-engine mirror; guarded by db + engine tests |
 
 ### 3. Required by spec, not found in code (5)
 
@@ -97,7 +88,7 @@ Nine of twelve are backend. The single highest-leverage action in this register 
 - **`sync/engine.ts:262-263` rehydrates pulled `verdict_revision` rows with `put`**, which could overwrite a locally finalized revision under last-write-wins. Not traced end-to-end.
 - **DR-10 (no importance score) has no negative guard.** Adding a relevance score to the decision browser would fail no test.
 - **Decision Investigation has zero component tests.** Every UI-level guarantee (scroll never counts as reviewed, verbatim rendering, finalize confirmation) is `implemented-unguarded` regardless of how clearly the code does it.
-- **Backend-side guarantees in every capability** (DR-25, UW-33, ORPH-7, ORPH-8) collapse to the same root cause as Finding 1: one backend test file.
+- ~~Backend-side guarantees collapse to one backend test file~~ Resolved by `8cd29d8`: `backend/` now has its own vitest config, a PGlite-backed harness (`backend/src/test/harness.ts`), and route tests for the relay, sync, and auth.
 
 ### 6. Proposed contracts that would conflict with shipped rules
 
@@ -128,7 +119,7 @@ Owners: `CLAUDE.md`, `docs/architecture/architecture.md`, `docs/architecture/aut
 | INV-8 | Detectors are pluggable: registering one requires no pipeline, storage, or UI change. | CLAUDE.md:59 (inv 5) | `src/lib/detection/registry.ts:35-46`; `src/lib/detection/pipeline.ts:61-66,88-96` | `src/lib/detection/pipeline.test.ts::analyzeSession — persistence (acceptance: stub detector persists) > persists findings and the DetectorRun to IndexedDB` (ad-hoc stub detector drives whole pipeline) | guarded |
 | INV-9 | Detector rules/thresholds are configurable via `DetectorConfig` with documented defaults — no inline magic numbers. | CLAUDE.md:154 | `src/lib/detection/registry.ts:31`; `src/lib/detection/pipeline.ts:55-66` | `src/lib/detection/autoAnalyze.test.ts::analyzeConversation — stored config overrides (settings page) > applies stored overrides to analysis and records them on the run` | guarded |
 | INV-10 | No conversation content goes to a provider without the user having enabled synthesis and supplied their own credentials. | CLAUDE.md:64 (inv 6, bullet 1) | `src/lib/providers/relayClient.ts` (throws `No API key` before any fetch); `src/lib/providers/credentials.ts` | `src/lib/providers/providers.test.ts::relay client > refuses to call without a configured key` | guarded |
-| INV-11 | The backend relay is transit-only: it never persists or logs request/response content; error paths return only status codes and provider error types. | CLAUDE.md:65 (inv 6, bullet 2), :171 | `backend/src/routes/llm.ts:1-7` (stated), `:134-137` (`safeErrorType`), `:149-160`, `:299-305`, `:408-421`; no DB import, no logger call in file | none — `backend/src/llm/sse.test.ts` covers only SSE framing | implemented-unguarded |
+| INV-11 | The backend relay is transit-only: it never persists or logs request/response content; error paths return only status codes and provider error types. | CLAUDE.md:65 (inv 6, bullet 2), :171 | `backend/src/routes/llm.ts:1-7` (stated), `:134-137` (`safeErrorType`), `:149-160`, `:299-305`, `:408-421`; no DB import, no logger call in file | `backend/src/routes/llm.test.ts::POST /api/llm/complete > forwards the content to the provider and returns the normalized completion` (marker never in logs or error bodies, across all five error paths); `::relay source hygiene > routes/llm.ts imports nothing from the database layer`; `> routes/llm.ts never logs` | guarded (2026-09-09, `8cd29d8`) |
 | INV-12 | Cross-provider sends are disclosed: the UI states which provider receives which sources before the first such call. | CLAUDE.md:66 (inv 6, bullet 3) | `src/lib/understanding/runDiscovery.ts` (`buildDisclosure`); `src/components/understanding/DisclosureModal.tsx` | `src/lib/understanding/runDiscovery.test.ts::buildDisclosure > flags sources going to a non-native provider`; `src/pages/IntentTracePage.test.tsx::IntentTracePage — per-row trace > cancelling the disclosure sends nothing` | guarded |
 | INV-13 | Decision-recovery disclosure states the session, hunk, and repository-excerpt counts before any provider call. | CLAUDE.md:68 (inv 6, bullet 5) | `src/lib/understanding/decisions/runRecovery.ts` (`planRecovery`) | `src/lib/understanding/decisions/runRecovery.test.ts::planRecovery (§9.2, law 2.6) > assembles the disclosure inputs without calling the provider` | guarded |
 | INV-14 | The GitHub token is device-local, goes only to api.github.com in an Authorization header, and never enters a relay body, a prompt, or sync. | CLAUDE.md:69 (inv 6, bullet 6) | `src/lib/github/credentials.ts:6`; `src/lib/github/client.ts:15` | `src/lib/providers/relayBody.test.ts::relay request body > carries only provider fields — no github key, no token string`; `src/lib/sync/engine.test.ts::device-local sync state exclusion > never pushes github.* metadata`; `src/lib/github/client.test.ts::transport > hits the constant API host with the right headers and the token only in Authorization` | guarded |
@@ -138,15 +129,15 @@ Owners: `CLAUDE.md`, `docs/architecture/architecture.md`, `docs/architecture/aut
 | INV-18 | Zustand stores do not hold the master key. | architecture.md:211 | `src/stores/` — no `masterKey`/`getMasterKey` reference (grep) | none | implemented-unguarded |
 | INV-19 | The PRF output never touches the network; only the PRF salt and wrapped ciphertext are server-visible. | auth-architecture.md:58-63 | `src/lib/auth/webauthn.ts:105` (`prfOutputToKey`); `src/lib/auth/session.ts:143-169,196-206` (posts only wrapped blobs) | none — `src/lib/auth/` has no test files | implemented-unguarded |
 | INV-20 | No password/Argon2id KDF path exists; do not reintroduce one without a spec change. | CLAUDE.md:78; auth-architecture.md:14 | absence — no `argon2`/`pbkdf2`/`deriveKey`/`hash-wasm` in `src/`, `backend/src/`, or either package.json | none | implemented-unguarded |
-| INV-21 | `JWT_SECRET` must be set and ≥32 chars, enforced at boot, and is the sole signer for both JWTs and challenge tokens. | architecture.md:132 | `backend/src/middleware/auth.ts:25-28`; `backend/src/utils/challengeToken.ts:24-30` | none | implemented-unguarded |
-| INV-22 | Challenge-token verification is timing-safe; tampering or replay outside the 5-minute window fails. | architecture.md:133 | `backend/src/utils/challengeToken.ts:63` (`timingSafeEqual`), `:67` (expiry) | none | implemented-unguarded |
-| INV-23 | The recovery code is never stored in cleartext; it is salt-hashed and verified in constant time. | architecture.md:134; auth-architecture.md:75 | `backend/src/utils/passwordHash.ts:11-26`; `backend/src/routes/auth.ts:296-301,366-371` | none | implemented-unguarded |
-| INV-24 | Every sync read/write is scoped to the authenticated user (`userId` from the verified JWT). | architecture.md:85, :116 | `backend/src/routes/sync.ts:79,134,153`; `backend/src/middleware/auth.ts:31-41` | none | implemented-unguarded |
-| INV-25 | Sync conflict resolution is atomic last-write-wins by `updatedAt`; the server skips writes when the existing row is newer or equal. | architecture.md:84, :86 | `backend/src/routes/sync.ts:87-89`, `:100-113` | none (no backend route tests exist) | implemented-unguarded |
+| INV-21 | `JWT_SECRET` must be set and ≥32 chars, enforced at boot, and is the sole signer for both JWTs and challenge tokens. | architecture.md:132 | `backend/src/middleware/auth.ts:25-28`; `backend/src/utils/challengeToken.ts:24-30` | `backend/src/routes/auth.test.ts::boot guard > refuses to build the app without a secret or with a short one`; `backend/src/utils/challengeToken.test.ts::refuses to sign or verify without a 32+ char JWT_SECRET` | guarded (2026-09-09) |
+| INV-22 | Challenge-token verification is timing-safe; tampering or replay outside the 5-minute window fails. | architecture.md:133 | `backend/src/utils/challengeToken.ts:63` (`timingSafeEqual`), `:67` (expiry) | `backend/src/utils/challengeToken.test.ts::rejects a token whose body was tampered with`; `::rejects a token whose signature was tampered with, including a length change`; `::rejects replay after the 5-minute window` | guarded (2026-09-09) |
+| INV-23 | The recovery code is never stored in cleartext; it is salt-hashed and verified in constant time. | architecture.md:134; auth-architecture.md:75 | `backend/src/utils/passwordHash.ts:11-26`; `backend/src/routes/auth.ts:296-301,366-371` | `backend/src/utils/passwordHash.test.ts::stores a 32-byte digest that does not contain the code`; `::verifies the same code under the same salt and nothing else`; `::treats a stored hash of the wrong length as a mismatch` | guarded (2026-09-09) |
+| INV-24 | Every sync read/write is scoped to the authenticated user (`userId` from the verified JWT). | architecture.md:85, :116 | `backend/src/routes/sync.ts:79,134,153`; `backend/src/middleware/auth.ts:31-41` | `backend/src/routes/sync.test.ts::user scoping > two users can hold the same record id and each pulls only their own`; `> one user's push cannot overwrite the other's row with the same id`; `> DELETE /all wipes only the caller` | guarded (2026-09-09) |
+| INV-25 | Sync conflict resolution is atomic last-write-wins by `updatedAt`; the server skips writes when the existing row is newer or equal. | architecture.md:84, :86 | `backend/src/routes/sync.ts:87-89`, `:100-113` | `backend/src/routes/sync.test.ts::last-write-wins by updatedAt > skips an older or equal write and applies a newer one` | guarded (2026-09-09) |
 | INV-26 | Application code uses Drizzle's typed query builder exclusively — no raw SQL outside migrations. | architecture.md:117 | absence — no `sql\``/`.execute(`/`.raw(` in `backend/src/` | none | implemented-unguarded |
-| INV-27 | The WebAuthn signature counter is updated on each assertion for clone detection. | architecture.md:50 | `backend/src/routes/auth.ts:252-256` | none | implemented-unguarded (updates but never rejects a non-increasing counter — "clone detection" is not actually implemented) |
+| INV-27 | The WebAuthn signature counter is checked on each assertion for clone detection: `verifyAuthenticationResponse` throws when the counter did not increase (library, `@simplewebauthn/server` `verifyAuthenticationResponse.js:144-150`), the route answers 401, and a verified higher counter is stored | architecture.md:50 | `backend/src/routes/auth.ts` (login-finish try/catch → 401; counter update) | `backend/src/routes/auth.test.ts::login > a non-increasing counter (SimpleWebAuthn throws) is a 401 with no detail`; `> a verified assertion stores the new counter and returns the material` | guarded (2026-09-09, `69e00c0`) |
 | INV-28 | Device-local sync state (`sync.*`) is never pushed and incoming server copies are ignored. | architecture.md:82; CLAUDE.md:52 | `src/lib/sync/engine.ts` (kind filter) | `src/lib/sync/engine.test.ts::device-local sync state exclusion > never pushes sync.* metadata, while other metadata still syncs`; same file `> ignores incoming sync.* metadata records from the server` | guarded |
-| INV-29 | After a recovery re-enrollment, `wrapped_by_recovery_*` and `recovery_code_hash` stay unchanged so the recovery code remains valid. | auth-architecture.md:111 | `backend/src/routes/auth.ts:394-395` overwrites `wrappedByRecoveryIv/Ct` from the request body | none | spec-drift — hash is preserved, wrap rows are not; comment at `auth.ts:343` claims the opposite of both |
+| INV-29 | After a recovery re-enrollment, `wrapped_by_recovery_*` and `recovery_code_hash` stay unchanged so the recovery code remains valid. | auth-architecture.md:111 | `backend/src/routes/auth.ts` (`RecoverFinishSchema` no longer accepts `wrappedByRecovery`; the update sets passkey fields only); client `src/lib/auth/session.ts` no longer sends one | `backend/src/routes/auth.test.ts::recovery > recover-finish replaces the passkey and its wrap, and leaves the recovery wrap and hash untouched` (also ignores a stale client-sent recovery wrap; the same code works afterwards) | guarded (drift fixed 2026-09-09, `69e00c0`) |
 | INV-30 | Never touch `src/lib/crypto/` without explicit instruction. | CLAUDE.md:97, :155 | — | — | policy |
 | INV-31 | Don't invent new failure-pattern detectors beyond the spec'd three without asking. | CLAUDE.md:174 | `src/lib/detection/registerAll.ts:14-16` registers exactly three | — | policy |
 | INV-32 | Don't broaden detector heuristics without adding the corresponding suppression tests. | CLAUDE.md:173 | — | — | policy |
@@ -249,8 +240,7 @@ Owner: `docs/capabilities/understanding-workspace/PRD.md` (its contract lives in
 | UW-30 | Uncertainty allowed: contradiction and unresolved states are legitimate | §24 | `types/understanding.ts:125-132`; `currentUnderstanding.ts:115-165` | `currentUnderstanding.test.ts::collects pending events into pendingChanges…`; `::excludes rejected events…; keeps pending ones` — no test asserts a contradiction co-existing with a leaning | guarded (partial) |
 | UW-31 | Old/superseded ideas not presented as current | §25.3, §8 | `currentUnderstanding.ts:136` | `currentUnderstanding.test.ts::keeps superseded/resolved objects out of sections…`; `::excludes rejected objects everywhere` | guarded |
 | UW-32 | Before content is sent, UI states which provider receives which sources; cross-provider called out | §4; INV-12 | `runDiscovery.ts:18-65`; `DisclosureModal.tsx:9-80`; `ProjectsPage.tsx:160,456` | `runDiscovery.test.ts::flags sources going to a non-native provider`; `::counts conversations per source, largest first`; `::reports no cross-provider sources when everything is native` — no test asserts the modal blocks the first send on the Projects page | guarded (computation); UI gate unasserted |
-| UW-33 | Backend relay is transit-only | §4; INV-11 | `backend/src/routes/llm.ts:4-5,133,352` | none | implemented-unguarded (see INV-11) |
-
+| UW-33 | Backend relay is transit-only | §4; INV-11 | `backend/src/routes/llm.ts:4-5,133,352` | see INV-11 (`backend/src/routes/llm.test.ts`) | guarded (via INV-11) |
 ### Decision Investigation (DI)
 
 Owner: `docs/capabilities/decision-investigation/SPEC.md`. Quarantine verified: the complete import set under `src/lib/investigation/` and all investigation pages/components contains no provider, understanding-synthesis, chat, or API module. The two near-misses (`../db/understanding`, `db.understandingProjects`) are Dexie helpers only. Runtime backstop: `constraints.test.ts` stubs fetch/XHR/WebSocket and asserts zero calls across the full flow.
@@ -268,7 +258,7 @@ Owner: `docs/capabilities/decision-investigation/SPEC.md`. Quarantine verified: 
 | DI-9 | Raw payload retained per imported source with SHA-256 hash and parser version; never mutated | §7.1, §2.3, §11 | `src/lib/db/rawSources.ts:20-49` | `db/rawSources.test.ts::storeRawSources — immutable raw retention > stores a capture with its SHA-256 content hash and provenance` | guarded |
 | DI-10 | A materially changed re-import becomes a new source version, not an update | §7.1, §21 dec 6 | `rawSources.ts:31-46` | `rawSources.test.ts::stores a changed re-import as a new source version, not an update`; `src/lib/import.test.ts::records a grown session file as a new raw version…` | guarded |
 | DI-11 | Stored source integrity re-verifiable against its hash | §2.3, §7.1 | `rawSources.ts:66-71` | `rawSources.test.ts::verifyRawSource — integrity check > fails verification when stored text no longer matches its hash` | guarded |
-| DI-12 | Parser errors visible without discarding unaffected events | §7.1, §13 | `src/lib/parsers/claude-code.ts:38-45` — malformed lines swallowed into a bare `console.warn`; nothing reaches import result or UI | none | **spec-drift** (`claude-code.ts:41-43`) |
+| DI-12 | Parser errors visible without discarding unaffected events | §7.1, §13 | `src/lib/parsers/claude-code.ts` (`ParseWarning` per skipped line) → `parsers/index.ts` (`ImportWarning` with filename) → `import.ts` (`ImportResult.parseWarnings`) → `components/import/ImportProgress.tsx` (amber notice) | `src/lib/parsers/claude-code.test.ts::skips malformed lines and parses valid ones` (asserts the warning); `::numbers malformed-line warnings by source line, counting blank lines`; `src/lib/import.test.ts::surfaces skipped malformed lines on the import result, attributed to the file` | guarded (drift fixed 2026-09-09, `db060a6`) |
 | DI-13 | Raw payloads live in a local-only Dexie table excluded from sync; only hash + provenance may sync | §7.1, §21 dec 3 | `db/schema.ts:122`; `sync/engine.ts:603-605` (no hook registered) | `constraints.test.ts::keeps the sync tables untouched for local-only investigation data` — row counts only; does not assert absence of a sync hook | implemented-unguarded |
 | DI-14 | Source events and derived anchors never sync (recomputable per device) | §11, §21 dec 4-5 | `schema.ts:126-129`; `sync/syncApi.ts:30-34`; `engine.ts:512-516` | none | implemented-unguarded |
 | DI-15 | Normalize only directly represented facts; never inferred intent, rationale, category, importance, topic, sentiment, ownership | §7.2, §11 | `anchors.ts:84`; `src/types/investigation.ts` (no such fields) | none | implemented-unguarded |
@@ -367,7 +357,7 @@ Owner: `docs/capabilities/decision-recovery/SPEC.md`, as amended by `docs/change
 | DR-22 | `scrubSecrets` on hunks, excerpts, and every stored AI string/quote | §9.1, §13.1 S3 | `decisions/candidates.ts:92,118`; `runRecovery.ts:374`; `firewall.ts:76-80` | `candidates.test.ts::scrubs secrets from agent text and drops the oldest edits first when over the cap` | guarded |
 | DR-23 | `isFetchAllowed` on every repository path; sensitive denylist honoured | §9.1, §13.1 S4 | `candidates.ts:197` | `candidates.test.ts::marks pre-existing vs created paths, resolves suffixes, and refuses sensitive paths` | guarded |
 | DR-24 | Excerpt caps (user msgs 4000, hunks 1500/side, total 60000, drop-oldest + warn); last 2 closing agent statements always included | §9.1, §13.1 S5 | `candidates.ts:16-22,86-158` | `candidates.test.ts::always includes the closing agent statements after the last edit, even under the cap` | guarded |
-| DR-25 | Relay untouched, transit-only — no persistence or logging of content | §13.1 S6 | `backend/src/routes/llm.ts:1-7` | none — no backend route tests | implemented-unguarded (see INV-11) |
+| DR-25 | Relay untouched, transit-only — no persistence or logging of content | §13.1 S6 | `backend/src/routes/llm.ts:1-7` | see INV-11 (`backend/src/routes/llm.test.ts`) | guarded (via INV-11) |
 | DR-26 | Blast radius makes zero network calls, is never stored, labelled `verification:'heuristic'` | §11.2, §13.1 S8 | `decisions/blastRadius.ts` | `blastRadius.test.ts::finds references outside own files… — heuristic, zero network` (stubs fetch, asserts never called) | guarded |
 | DR-27 | Challenge results land as contradicted/supported with `origin:'ai'`, `reviewState:'pending'` only | §11.4 | `decisions/challenge.ts` | `challenge.test.ts::plans without calling the provider… and records a pending event per verdict` | guarded |
 | DR-28 | `VerdictOrigin → basis/madeBy/flags` promotion map (7 rows); no `DecisionTrace` created on DI promotion | §7.4 | `decisions/fromInvestigation.ts` | `fromInvestigation.test.ts::maps every VerdictOrigin and derives the unsupported flag` | guarded ("no trace created" half unasserted) |
@@ -735,13 +725,13 @@ Code presence: YES but half-dead. Built artifacts (no source) committed at `dist
 | ORPH-4 | A detection / derivation failure can never fail an import | `import-a-conversation.md:138` | `autoAnalyze.ts:47-56`; `import.ts:50-65` | none | implemented-unguarded |
 | ORPH-5 | One `StoredConversation` per Claude Code JSONL file; a subagent transcript never collides with or replaces its parent | `import-a-conversation.md:135` | `parsers/claude-code.ts:80-86` | `claude-code.sidechain.test.ts::gives a subagent transcript its own conversation id, links the parent, and marks messages delegated` | guarded |
 | ORPH-6 | `conversationsAdded + conversationsSkipped === parsed.conversations.length` | `import-a-conversation.md:137` | `import.ts:113,135-136` | none | implemented-unguarded |
-| ORPH-7 | The subscription bridge must strip provider API keys from the subprocess env (a key in env silently switches billing to pay-per-token) | `relay-llm-calls.md:53-54` | `backend/src/llm/subscription.ts:44-47,99-106` | none (no backend tests) | implemented-unguarded |
-| ORPH-8 | Relay request caps: 1–500 messages, `maxTokens` ≤64000, `temperature` 0–2 | `relay-llm-calls.md:35` | `backend/src/routes/llm.ts:33-35` | none | implemented-unguarded |
+| ORPH-7 | The subscription bridge must strip provider API keys from the subprocess env (a key in env silently switches billing to pay-per-token) | `relay-llm-calls.md:53-54` | `backend/src/llm/subscription.ts:44-47,99-106` | `backend/src/llm/subscription.test.ts::strips ANTHROPIC_API_KEY from the Claude subprocess env and keeps everything else`; `::strips OPENAI_API_KEY and CODEX_API_KEY from the Codex env and keeps everything else` | guarded (2026-09-09) |
+| ORPH-8 | Relay request caps: 1–500 messages, `maxTokens` ≤64000, `temperature` 0–2 | `relay-llm-calls.md:35` | `backend/src/routes/llm.ts:33-35` | `backend/src/routes/llm.test.ts::POST /api/llm/complete > enforces the request caps with a content-free 400`; `> accepts exactly the documented limits` | guarded (2026-09-09) |
 | ORPH-9 | Only accepted understanding reaches the chat system prompt; pending withheld | `synthesize-understanding.md:102,161-163` | `chat/context.ts:81-84` | `chat/context.test.ts::injects accepted objects and excludes pending ones` | guarded |
 | ORPH-10 | Native-chat messages carry strictly increasing `createdAt` per conversation | `search-and-browse.md:127`; `README.md:41` | `chat/chats.ts:143-149` | none (only indirect ordering in `chats.test.ts`) | implemented-unguarded |
 | ORPH-11 | Understanding objects/events survive conversation deletion | `sync-encrypted-state.md:71,139`; `synthesize-understanding.md:135` | `sync/engine.ts:112-114`; `db/conversations.ts:40-58` | `db/understanding.test.ts::deleting a conversation deletes its associations only` | guarded |
 | ORPH-12 | `entityTags` uniqueness backs `tagEntity` idempotence; `usageCount` mutated only inside those transactions | `search-and-browse.md:128` | `db/tags.ts:49-62,71-80` | `db/index.test.ts::tagging an entity is idempotent and bumps usageCount once`; `::untag decrements usageCount and removes link` | guarded |
-| ORPH-13 | Conversation deletion cleans up dependents | `search-and-browse.md:129` (stated there as violated) | `db/conversations.ts:40-58` cascades 13 tables but **not `entityTags`** | none | **spec-drift** |
+| ORPH-13 | Conversation deletion cleans up dependents | `search-and-browse.md:129` (stated there as violated) | `src/lib/db/conversations.ts` + `src/lib/sync/engine.ts` via `removeEntityTagsFor` (`src/lib/db/tags.ts`) | `src/lib/db/index.test.ts::conversations > cascades delete to tag links and gives usage counts back`; `src/lib/sync/engine.test.ts::conversation deletion from the server > cascades to tag links and gives usage counts back (mirrors deleteConversation)` | guarded (drift fixed 2026-09-09, `9b59690`) |
 | ORPH-14 | The living document is a pure deterministic projection — no LLM, never stored, clock injected | `synthesize-understanding.md:104` | `understanding/livingDocument.ts` | `livingDocument.test.ts::is deterministic and only stamps a date when given one` | guarded |
 | ORPH-15 | The vault gates only sync — import, search, detection, understanding, chat all work locked, offline, accountless | `README.md:21`; `unlock-the-vault.md:39,200-202` ("No doc states this threat model explicitly") | absence-enforced: `src/App.tsx` has zero auth/lock references; lock checks only in `sync/engine.ts:396,422,495` | none | implemented-unguarded |
 

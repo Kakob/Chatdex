@@ -139,6 +139,8 @@ lint (fix):                npm run lint:fix
 unit tests (frontend):     npm test               # vitest run
 unit tests (watch):        npm run test:watch
 unit tests (all):          npm run test:all       # frontend + backend vitest
+unit tests (backend):      cd backend && npm test # vitest on an in-process PGlite Postgres; no service needed
+typecheck (backend+tests): cd backend && npm run typecheck
 coverage:                  npm run test:coverage
 build (frontend):          npm run build          # tsc -b && vite build
 build (all):               npm run build:all

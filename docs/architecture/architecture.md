@@ -47,7 +47,7 @@ The components below are ordered by load-bearing weight in the system.
 
 - *Register init.* Server generates a random 32-byte challenge and 32-byte PRF salt, mints a 5-minute HMAC-signed challenge token carrying `{intent, email, challenge, prfSalt, pendingUserId, exp}`, and returns WebAuthn registration options with the PRF extension requesting evaluation of `prfSalt`.
 - *Register finish.* Browser invokes `navigator.credentials.create()` with the PRF extension; the authenticator returns an attestation plus a 32-byte PRF output. The client uses the PRF output as an AES-256 wrapping key, generates a fresh master key (`generateMasterKey`), and wraps it twice — once with the PRF key, once with a SHA-256 hash of a generated recovery code. The server verifies the attestation with `@simplewebauthn/server`, stores the COSE public key + counter + transports, persists both wrapped master-key blobs and a salted SHA-256 hash of the recovery code, and returns a JWT.
-- *Authenticate init/finish.* Server issues a new challenge token, returns the user's stored wrapping material so the client knows what to PRF-evaluate. After the assertion verifies, the server updates the signature counter (clone detection) and returns the JWT plus wrapped key blobs; the client unwraps the master key with the PRF output.
+- *Authenticate init/finish.* Server issues a new challenge token, returns the user's stored wrapping material so the client knows what to PRF-evaluate. After the assertion verifies, the server stores the new signature counter and returns the JWT plus wrapped key blobs; the client unwraps the master key with the PRF output. Clone detection is the library's: `verifyAuthenticationResponse` throws when the counter did not increase, and the route answers 401 (`backend/src/routes/auth.test.ts`).
 - *Recovery.* Recovery-code flow re-derives the wrapping key by SHA-256 of the 25-byte (base32 Crockford-encoded) code, unwraps the master key, enrolls a new passkey, and re-wraps under the new PRF output while keeping the same recovery hash.
 
 **Dependencies** `@simplewebauthn/browser` and `@simplewebauthn/server` (v13.x). JWT issued by `@fastify/jwt`. PRF output feeds directly into the crypto layer (§2).
@@ -108,6 +108,8 @@ The components below are ordered by load-bearing weight in the system.
 ## 5. Backend Postgres Schema
 
 **Location** `backend/src/db/schema.ts`, `backend/src/db/index.ts`, `backend/drizzle.config.ts`
+
+**App construction** `backend/src/app.ts` exports `buildApp({ db, logger })`, which registers CORS, JWT, and the route plugins without listening; `backend/src/index.ts` calls it and listens. Routes receive the database through plugin options, so the tests in `backend/src/routes/*.test.ts` run the same app against an in-process PGlite database migrated from `backend/drizzle/migrations` (`backend/src/test/harness.ts`). The `bytea` custom type normalizes driver output to `Buffer` for both postgres-js and PGlite.
 
 **What it does** Stores two kinds of data: the user's auth material and wrapped encryption keys (in `users`), and per-user ciphertext blobs for sync (`sync_records`). The server never sees plaintext user data.
 
