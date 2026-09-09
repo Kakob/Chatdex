@@ -250,12 +250,9 @@ export async function recoverWithCode(
   const wrappingKey = await prfOutputToKey(prfOutput);
   const wrappedByPasskey = await encryptBytes(wrappingKey, masterKeyRaw);
 
-  // 4. Recovery code stays the same on the server (we re-send it so the
-  //    server can re-hash with the same value). The wrappedByRecovery doesn't
-  //    actually need to change — it's the same master key — but we re-encrypt
-  //    so the server replaces the row atomically.
-  const wrappedByRecovery = await encryptBytes(recoveryKey, masterKeyRaw);
-
+  // 4. The recovery code and its wrap stay exactly as they are on the server
+  //    (the code is re-sent only so the server can re-verify it). Only the
+  //    passkey credential and passkey wrap are replaced.
   const finished = await postJson<{ token: string; userId: string; email: string }>(
     '/api/auth/recover-finish',
     {
@@ -264,7 +261,6 @@ export async function recoverWithCode(
       token: init.token,
       attestationResponse: response,
       wrappedByPasskey: sealedToWire(wrappedByPasskey),
-      wrappedByRecovery: sealedToWire(wrappedByRecovery),
     }
   );
 

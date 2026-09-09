@@ -56,13 +56,16 @@ const RecoverInitSchema = z.object({
   recoveryCode: z.string().min(1),
 });
 
+// Recovery re-enrolls a passkey only. The recovery wrap and the recovery
+// code hash are deliberately not accepted here: they stay as they are so the
+// same recovery code keeps working (auth-architecture.md, Path B). Rotating
+// the recovery code is a separate, logged-in flow.
 const RecoverFinishSchema = z.object({
   email: z.string().email(),
   recoveryCode: z.string().min(1),
   token: z.string().min(1),
   attestationResponse: z.unknown(),
   wrappedByPasskey: SealedSchema,
-  wrappedByRecovery: SealedSchema,
 });
 
 function userMaterial(u: typeof users.$inferSelect) {
@@ -237,18 +240,27 @@ export async function authRoutes(app: FastifyInstance, opts: { db: Db }): Promis
     if (found.length === 0) return reply.code(404).send({ error: 'Unknown account' });
     const u = found[0];
 
-    const verification = await verifyAuthenticationResponse({
-      response: body.assertionResponse as AuthenticationResponseJSON,
-      expectedChallenge: challengePayload.challenge,
-      expectedOrigin: ORIGIN,
-      expectedRPID: RP_ID,
-      credential: {
-        id: u.passkeyCredentialId,
-        publicKey: new Uint8Array(u.passkeyPublicKey),
-        counter: u.passkeyCounter,
-        transports: (u.passkeyTransports ?? undefined) as AuthenticatorTransportFuture[] | undefined,
-      },
-    });
+    // verifyAuthenticationResponse throws (rather than returning verified:
+    // false) on a signature counter that did not increase — the cloned-
+    // authenticator signal (architecture.md §Backend). Treat that like any
+    // other failed assertion: 401, no detail.
+    let verification: Awaited<ReturnType<typeof verifyAuthenticationResponse>>;
+    try {
+      verification = await verifyAuthenticationResponse({
+        response: body.assertionResponse as AuthenticationResponseJSON,
+        expectedChallenge: challengePayload.challenge,
+        expectedOrigin: ORIGIN,
+        expectedRPID: RP_ID,
+        credential: {
+          id: u.passkeyCredentialId,
+          publicKey: new Uint8Array(u.passkeyPublicKey),
+          counter: u.passkeyCounter,
+          transports: (u.passkeyTransports ?? undefined) as AuthenticatorTransportFuture[] | undefined,
+        },
+      });
+    } catch {
+      return reply.code(401).send({ error: 'Assertion failed' });
+    }
     if (!verification.verified) return reply.code(401).send({ error: 'Assertion failed' });
 
     if (verification.authenticationInfo.newCounter > u.passkeyCounter) {
@@ -340,10 +352,11 @@ export async function authRoutes(app: FastifyInstance, opts: { db: Db }): Promis
     };
   });
 
-  // Step 2: client has unwrapped the master key, enrolled a new passkey, and
-  // re-wrapped the master key. Server verifies the new attestation and writes
-  // the new credential + wraps + recovery hash (regenerated for the new
-  // recovery code, which the client also resent).
+  // Step 2: client has unwrapped the master key with the recovery code,
+  // enrolled a new passkey, and re-wrapped the master key under the new PRF
+  // output. Server verifies the attestation and replaces the passkey
+  // credential + passkey wrap. wrapped_by_recovery_* and recovery_code_hash
+  // are left untouched so the recovery code remains valid.
   app.post('/recover-finish', async (req, reply) => {
     const parsed = RecoverFinishSchema.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: parsed.error.message });
@@ -393,8 +406,6 @@ export async function authRoutes(app: FastifyInstance, opts: { db: Db }): Promis
         prfSalt: Buffer.from(challengePayload.prfSalt, 'base64url'),
         wrappedByPasskeyIv: b64ToBuf(body.wrappedByPasskey.iv),
         wrappedByPasskeyCt: b64ToBuf(body.wrappedByPasskey.ciphertext),
-        wrappedByRecoveryIv: b64ToBuf(body.wrappedByRecovery.iv),
-        wrappedByRecoveryCt: b64ToBuf(body.wrappedByRecovery.ciphertext),
         updatedAt: new Date(),
       })
       .where(eq(users.id, u.id));
