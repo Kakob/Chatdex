@@ -1,6 +1,6 @@
 # Decision Authoring & Evidence — proposed contract
 
-Status: Proposed, 2026-09-08. [PLAN.md](PLAN.md) owns delivery; [PRD.md](PRD.md) owns purpose.
+Status: Proposed — revised 2026-09-09; no implementation. [PLAN.md](PLAN.md) owns delivery; [PRD.md](PRD.md) owns purpose.
 
 ## 1. Ownership and compatibility
 
@@ -21,7 +21,7 @@ Proposed records use stable IDs, schema versions, project IDs and ISO timestamps
 
 | Record | Contract |
 | --- | --- |
-| DecisionInvestigationWorkspace | Question, project, parent/source links, selected source references, conversation ID, decision IDs, status/open notes. Distinct from protected DI cases. |
+| DecisionInvestigationWorkspace | Question, project, parent/source links, ordered source selections with stable IDs, inclusion notes/origins, pin state and contextual connections, conversation ID, optional decision IDs, status/open notes. Distinct from protected DI cases. |
 | DecisionRevision | Decision ID, parent revision(s), statement, interpretation kind, optional rationale/alternatives/tradeoffs/ramifications, author/origin, adoptedBy/at, recordedAt, subject snapshot/time, evidence links and annotation references. |
 | DecisionEvidenceLink | Revision and claim/field ID, supports/contradicts/context role, source locator and bounded quote, linking author, integrity status. |
 | SearchCoverage | Query/method, source set and revisions, actor, attemptedAt, results, exclusions, failures, unavailable sources and explicit completeness limits. |
@@ -77,9 +77,34 @@ from question, decision, code, spec or chat. Preserve existing decision routes a
 links. Question creation from a selection records the source and optional parent
 question. Project ID must match every loaded referenced object.
 
-Source panes show exact selections, snapshot/availability and attach-as-evidence
-controls. Users edit statement and individual evidence links directly. Keyboard
-navigation, focus restoration and a responsive tab layout must preserve selections.
+Source panes include an assembled reading view over ranges from multiple files.
+Each selection retains a stable ID, source locator, exact revision, bounded excerpt,
+inclusion note/origin and ordering/pin state. Reuse §3 integrity validation and existing
+excerpt caps; larger displays come from device-local source access, not enlarged sync
+payloads. Selection connections retain their endpoints, description, origin and basis;
+label source-observed references separately from user interpretations and AI hypotheses.
+No complete call graph or automatic dependency discovery is promised.
+
+Users add, reorder, pin and remove working selections without changing source files or
+prior DecisionRevision evidence. Saving/reopening restores this collection even with
+no decision authored. Attaching evidence to a claim creates a separate evidence link;
+removing exploratory context does not delete that link. Any new persisted selection or
+connection representation follows §5 schema/sync/deletion requirements.
+
+Show path, revision, source availability and attach-as-evidence controls on selections.
+Allow expansion into surrounding available code and navigation to referenced source,
+with return to the original question and reading position. A missing source retains
+its locator and eligible saved excerpt with an unavailable-context state. Do not replace
+it silently with another revision. Repository changes do not rewrite historical evidence;
+source freshness does not establish that an interpretation has been revalidated.
+
+Users edit statements and individual evidence links directly. Keyboard navigation,
+focus restoration and responsive reading/chat tabs preserve selections and reading
+position during source exploration and conversation switches. Verify the core read,
+select, ask, inspect-citation and return flow on a phone-sized viewport. Full files
+and credentials are not synced to make mobile rendering work; retrieval, if available,
+uses the existing device-authorized read-only source path. Native packaging, built-in
+voice, remote host access and automatic source watching are outside this slice.
 
 Explain/Find support/Challenge/Suggest actions create one durable request and one
 conversation turn. Show disclosure with provider and actual selected sources, including
@@ -91,7 +116,8 @@ and make newly selected context explicit. Failed/cancelled requests keep honest 
 retry does not overwrite the first response. No claim to reveal hidden model reasoning.
 
 Selecting sources, opening the workspace and manual edits make no provider calls.
-Generated patches remain suggestions until explicitly applied to a revision. Reuse
+Generated interpretation edits remain suggestions until explicitly adopted into a
+decision revision; this action never applies a patch to repository files. Reuse
 current opt-in provider credentials and transit-only relay, not a new logging backend.
 
 ## 5. Integration and persistence
@@ -123,8 +149,12 @@ into private story material; it is not publication or disclosure of all linked s
 
 Test code-only manual creation, unsupported-state display, quote integrity, evidence
 role edits, revision ancestry/origin/adoption, stale-base edits and branches, legacy
-baseline idempotency, scoped missing-support searches, source refresh, and new spec
-support. Exercise one request rendered in preview and chat, provider disclosure,
+baseline idempotency, scoped missing-support searches, explicit loading of later source
+revisions without rewriting historical evidence, and new spec support. Verify ordered
+multi-file collections without decisions, pin/remove persistence, context expansion
+and return, selection-to-chat source identity, connection origins, unavailable mobile
+sources and preservation of claim evidence when working selections are removed.
+Exercise one request rendered in preview and chat, provider disclosure,
 failed retries, no automatic writes, project isolation, offline manual use and sync
 ordering/conflicts/deletion. Preserve recovery firewall tests and DI boundary guards.
 

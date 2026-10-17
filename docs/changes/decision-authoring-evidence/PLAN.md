@@ -1,13 +1,15 @@
 # Decision Authoring & Evidence
 
-Status: Proposed — documentation prepared 2026-09-08; no implementation.
+Status: Proposed — revised 2026-09-09; no implementation.
 Primary capability: Decision Authoring (proposed); extraction remains Decision Recovery.
 [PRD.md](PRD.md) defines the experience; [SPEC.md](SPEC.md) defines proposed behavior.
 Related: [Experiment Lab](../experiment-lab/PLAN.md), [Share Build Story](../share-build-story/PLAN.md).
 
 ## Problem and agreed scope
 
-AI-generated decisions are useful starting points, but users need to author statements,
+Users need to explore relevant code across files around a question, save that context,
+and develop understanding without first writing a decision or mapping the repository.
+AI-generated decisions are useful starting points, but users also need to author statements,
 select evidence from code/specs/chats, revise interpretations and preserve provenance.
 Support question-led and source-led entry, connected chat/actions, scoped documentation
 gaps, and unresolved inventories without forced implementation or specification edits.
@@ -37,11 +39,15 @@ silently reuse legacy unsupported-autonomous labels as proof of authorship.
 1. **DA-0: Baseline and adapters.** Trace existing decision storage, review, quote
    validation and sync. Define legacy baseline projection and fixtures for code/spec/
    chat with unavailable sources. Map exact amendment points before touching contracts.
-2. **DA-1: Manual investigation.** Question/source entry, source panes, statement and
-   evidence authoring, annotations, revisions and unresolved inventory. Implement
+2. **DA-1: Manual investigation.** Question/source entry, ordered and pinned multi-file
+   source collections, inclusion notes/connections, surrounding context and return
+   navigation, statement/evidence authoring, annotations, revisions and unresolved
+   inventory. Support saved
+   investigations without decisions and phone-sized reading/chat layouts. Implement
    synchronized records, ordering/conflict handling and erase/reset before rollout.
 3. **DA-2: Grounded assistance.** Shared conversation/scoped actions, source disclosure,
-   contextual preview, proposed revisions, provenance and coverage records. Preserve
+   contextual preview, source-grounded suggestions for collection additions/connections,
+   proposed revisions, provenance and coverage records. Preserve
    deterministic manual workflow and recovery/DI boundaries.
 4. **DA-3: Follow-through.** Source-born question branches, later-document support,
    lab/Prepare Change handoffs and story collection hook. Missing companion features
@@ -49,9 +55,42 @@ silently reuse legacy unsupported-autonomous labels as proof of authorship.
 5. **DA-4: Acceptance.** Automated checks plus the real GitHub investigation. Reconcile
    capability contracts and record results/limitations before marking completed.
 
+## Follow-up boundaries and open design choices
+
+The product direction includes living source connections and eventual human/AI edits
+from the workspace. These are follow-ups, not delivered by DA-1 through DA-4:
+
+- **Source tracking:** design explicit refresh/comparison, anchors across code movement,
+  ambiguous or deleted selections, and review of interpretations affected by changes.
+  Preserve historical evidence; never silently point an old claim at new code.
+- **Repository editing:** a separate cross-capability package must define execution host,
+  reviewed multi-file writes, conflict handling, verification and recovery. It must
+  propose amendments to Repository Integration §4 and Change Workspace's no-write
+  boundary before implementation. This proposal changes neither current contract.
+- **Broader mobile source access:** decide how a phone obtains uncached code under the
+  device-local credential/cache rules. The first slice supports eligible saved excerpts,
+  available device-authorized reads and honest unavailable states. Desktop cache sync,
+  remote computer access, native packaging and built-in voice are not assumed.
+- **Capability entry and deeper navigation:** validate named capability entry into the
+  same investigations and symbol/caller discovery incrementally. No compulsory code
+  classification, whole-repository graph or language-server implementation is selected.
+
+DA-0 should validate stacked code versus pane layouts, excerpt limits/context loading,
+and restoration behavior with a phone-sized prototype and representative sources.
+These engineering choices remain open; the question-centered experience is the direction.
+Use Experiment Lab for optional interaction trials. The existing completed decision-review
+package stays historical; it is an entry point, not the owner of this new workspace.
+
 ## Acceptance
 
 - [ ] Start from a question or selected code/spec/chat; preserve branching context.
+- [ ] Save/reopen an investigation with no decision and an ordered multi-file collection.
+- [ ] Pin/reorder/remove selections without source writes or deleting claim evidence.
+- [ ] Inspect inclusion reasons, connection origins and incomplete search scope.
+- [ ] Expand source context and follow a reference, then return to the question and position.
+- [ ] On a phone-sized viewport, select code, ask AI, inspect citations and resume reading.
+- [ ] A device without source cache shows saved excerpts and unavailable context honestly.
+- [ ] Later source loading preserves historical evidence and does not imply revalidation.
 - [ ] Author a code-only or unsupported decision without invented transcript evidence.
 - [ ] Capture historical, observed-choice and proposed interpretations distinctly.
 - [ ] Revise an AI suggestion with exact origin, evidence changes and adoption history.
@@ -65,7 +104,10 @@ silently reuse legacy unsupported-autonomous labels as proof of authorship.
 
 ## Shared acceptance scenario
 
-Investigate GitHub retrieval and evidence use. Ask AI for candidates grounded in chosen
+Investigate GitHub retrieval and evidence use. Assemble retrieval, cache and citation
+ranges across files with inclusion notes; inspect surrounding code and return. Save and
+reopen before creating a decision. Repeat the read/select/ask/return flow on a phone-sized
+viewport, including unavailable source context. Ask AI for candidates grounded in chosen
 sources, edit one interpretation after finding contrary code, add a manually defined
 choice and record a scoped no-support search. Continue an Explain action in chat.
 Leave an item unresolved, seed a lab idea from another, and prepare a change only for
@@ -84,3 +126,14 @@ Local Markdown targets and change-index entries checked; `git diff --check`,
 `npm run typecheck`, `npm run lint`, and `npm run test:all` passed (973 frontend
 tests and 6 backend tests). These checks validate the current repository after a
 documentation-only edit; they do not satisfy the feature acceptance checklist above.
+
+### Documentation verification — 2026-09-09
+
+Revised the PRD, proposed contract, delivery/acceptance plan and change index for
+question-centered multi-file exploration and mobile reading. Live source tracking,
+repository editing and broader mobile source access remain explicit follow-ups.
+Local Markdown links outside example code blocks, `git diff --check` and
+`npm run typecheck` passed. `npm run test:all` passed all 978 frontend tests; the
+backend run failed with JWT_SECRET configuration errors (6 failed, 13 passed and
+34 skipped tests). No application or test code was changed in this documentation
+revision. Feature acceptance remains open; these checks do not establish implementation.
