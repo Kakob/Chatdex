@@ -58,6 +58,7 @@ export async function clearAllData(): Promise<void> {
       db.decisionTraces,
       db.agentInspections,
       db.decisionDiffs,
+      db.researchSources, db.researchSnapshots, db.researchExhibits, db.questionRelations,
     ],
     async () => {
       await db.conversations.clear();
@@ -89,6 +90,10 @@ export async function clearAllData(): Promise<void> {
       await db.decisionTraces.clear();
       await db.agentInspections.clear();
       await db.decisionDiffs.clear();
+      await db.researchSources.clear();
+      await db.researchSnapshots.clear();
+      await db.researchExhibits.clear();
+      await db.questionRelations.clear();
     }
   );
 }

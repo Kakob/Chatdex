@@ -76,7 +76,10 @@ export interface InvestigationCase {
   id: string;
   /** Present for project-scoped question-first investigations. */
   projectId?: string;
+  /** Empty only for additive research cases; use researchSourceIds there. */
   conversationId: string;
+  research?: boolean;
+  researchSourceIds?: string[];
   /** Missing for question-first investigations that begin from a source. */
   primaryAnchorStableKey?: string;
   linkedAnchorStableKeys: string[];
@@ -114,6 +117,9 @@ export interface InvestigationFinding {
   exhibitIds: string[];
   reviewScopeIds: string[];
   state: InvestigationFindingState;
+  researchExhibitIds?: string[];
+  conflictingExhibitIds?: string[];
+  revisions?: Array<{ title: string; body?: string; exhibitIds: string[]; conflictingExhibitIds: string[]; revisedAt: Date }>;
   promotedUnderstandingObjectId?: string;
   createdAt: Date;
   updatedAt: Date;

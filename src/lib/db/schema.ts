@@ -1,6 +1,7 @@
 // Dexie (IndexedDB) schema for Chatdex local-first storage.
 // Source of truth for all user data. Cloud sync (Phase 2) replicates this layer.
 
+import type { ResearchSource, ResearchSnapshot, ResearchExhibit, QuestionRelation } from '../../types/research';
 import Dexie, { type Table } from 'dexie';
 import type {
   StoredConversation,
@@ -70,8 +71,13 @@ export class ChatdexDB extends Dexie {
   agentInspections!: Table<AgentInspection, string>;
   decisionDiffs!: Table<DecisionDiff, string>;
 
-  constructor() {
-    super('chatdex');
+  researchSources!: Table<ResearchSource, string>;
+  researchSnapshots!: Table<ResearchSnapshot, string>;
+  researchExhibits!: Table<ResearchExhibit, string>;
+  questionRelations!: Table<QuestionRelation, string>;
+
+  constructor(name = 'chatdex') {
+    super(name);
     this.version(1).stores({
       conversations: '&id, source, updatedAt, importedAt, [source+updatedAt]',
       messages: '&id, conversationId, [conversationId+createdAt], createdAt',
@@ -189,6 +195,13 @@ export class ChatdexDB extends Dexie {
         '&id, projectId, decisionObjectId, runId, createdAt, [projectId+createdAt], [decisionObjectId+createdAt], [projectId+runId]',
       agentInspections: '&id, conversationId, path, [conversationId+stepIndex]',
       decisionDiffs: '&id, projectId, toRunId, createdAt',
+    });
+    // Additive only. Private source inventory, text and locators never sync.
+    this.version(14).stores({
+      researchSources: '&id, projectId, [projectId+registryId]',
+      researchSnapshots: '&id, sourceId, &[sourceId+contentHash]',
+      researchExhibits: '&id, caseId, sourceId',
+      questionRelations: '&id, projectId',
     });
   }
 }

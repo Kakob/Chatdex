@@ -429,6 +429,7 @@ export function envelopeInvestigationFinding(
     updatedAt: finding.updatedAt,
     payload: {
       ...finding,
+      ...(finding.revisions ? { revisions: finding.revisions.map(r => ({ ...r, revisedAt: dateToIso(r.revisedAt) })) } : {}),
       createdAt: dateToIso(finding.createdAt),
       updatedAt: dateToIso(finding.updatedAt),
       ...(finding.finalizedAt ? { finalizedAt: dateToIso(finding.finalizedAt) } : {}),
@@ -444,6 +445,7 @@ export function rehydrateInvestigationFinding(payload: unknown): InvestigationFi
   };
   return {
     ...finding,
+    ...(finding.revisions ? { revisions: finding.revisions.map(r => ({ ...r, revisedAt: isoToDate(r.revisedAt as unknown as string) })) } : {}),
     createdAt: isoToDate(finding.createdAt),
     updatedAt: isoToDate(finding.updatedAt),
     ...(finding.finalizedAt
