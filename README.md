@@ -26,6 +26,20 @@ immutable source → exact evidence → human finding → accepted understanding
 
 You can also create a project, import a ChatGPT/Claude/Claude Code export, attach the conversation as a project source, and start a new question-first investigation.
 
+## Investigate research across documents and conversations
+
+Open **Projects → Open / create MIT Investigations → Research sources & questions**.
+The research shelf is also linked in every project header. It supports question-only
+cases, text/Markdown exports, reference-only leads, pinned excerpts, human finding
+revisions, and question lineage. **Open synthetic walkthrough** creates a separate
+fabricated Fern Harbor example; it does not populate the MIT project with evidence.
+
+The supplied [handoff](docs/changes/experience-inquiry/CODEX_HANDOFF_CHATDEX_INQUIRY.md)
+and [walkthrough](docs/changes/experience-inquiry/WALKTHROUGH.md) are in the docs.
+The private inventory is local at `research-data/mit/mit_research_sources.private.json`
+and deliberately gitignored. Select it in **Private registry leads**, review the
+preview, then register it. Source documents still require your exports.
+
 ## What is implemented
 
 - Project-scoped workspace with exactly three primary destinations

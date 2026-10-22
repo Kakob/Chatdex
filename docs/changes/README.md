@@ -12,6 +12,7 @@ plan; these summaries are navigation aids, not independent checklists.
 
 | Change | Primary capability | Related capabilities | Summary |
 |---|---|---|---|
+| [Experience inquiry](./experience-inquiry/PLAN.md) | Decision Investigation | Understanding Workspace | Local research slice; original handoff, source-preparation walkthrough, and remaining acceptance work in the linked plan |
 | [Branch Binding](./branch-binding/PLAN.md) | Repository Integration | Intent Trace, Decision Recovery, Change Workspace | Implementation recorded; manual acceptance checks remain |
 | [Decision review experience](./decision-review-experience/PLAN.md) | Decision Recovery | Repository Integration (snapshot context only) | Completed locally; verification and limitations in the linked plan/build log |
 | [Experiment Lab](./experiment-lab/PLAN.md) | Experiment Lab (proposed) | Decision Authoring, Change Workspace, Private → Shared | Proposed — developing project idea collection, next moves, attempts and outcomes |

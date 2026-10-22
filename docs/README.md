@@ -16,6 +16,14 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 - **[changes/](./changes/README.md)** — bounded fixes and refinements, active work index, lifecycle rules, and a lightweight plan template.
 - Start with the capability to understand what applies now; open a change plan to understand what is proposed or how a change shipped.
 
+### Experience inquiry handoff
+
+- [Original implementation handoff](./changes/experience-inquiry/CODEX_HANDOFF_CHATDEX_INQUIRY.md) — preserved from the supplied bundle.
+- [Research walkthrough and source preparation](./changes/experience-inquiry/WALKTHROUGH.md) — where to open the workflow and load the private registry.
+- [Implementation plan and verification](./changes/experience-inquiry/PLAN.md).
+
+The companion private JSON lives in local, gitignored `research-data/mit/`, not in tracked docs. It lists source leads; it contains no imported primary-source evidence.
+
 ### Everything else
 
 | Folder | What lives there |
