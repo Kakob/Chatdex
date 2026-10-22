@@ -1,3 +1,4 @@
+import { ensureMITProject } from '../lib/research/service';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -240,6 +241,7 @@ export function ProjectsPage() {
 
   return (
     <div>
+      <MITResearchStart />
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Projects</h1>
@@ -462,4 +464,9 @@ export function ProjectsPage() {
       )}
     </div>
   );
+}
+
+function MITResearchStart() {
+  const [error, setError] = useState('');
+  return <div className="mb-4"><button className="rounded-lg bg-violet-600 px-4 py-2 text-white" onClick={() => { void ensureMITProject().then(p => { window.location.assign(`/projects/${p.id}/investigate/research`); }).catch(e => setError(String(e))); }}>Open / create MIT Investigations</button>{error && <p role="alert">{error}</p>}</div>;
 }

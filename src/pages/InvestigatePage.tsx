@@ -87,7 +87,7 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
         .filter((investigation) => investigation.kind === 'question')
         .map(async (investigation) => ({
           investigation,
-          sourceName: names.get(investigation.conversationId) ?? investigation.conversationId,
+          sourceName: investigation.research ? 'Cross-source research' : names.get(investigation.conversationId) ?? investigation.conversationId,
           findingCount: (await getFindingsForCase(investigation.id)).length,
         }))
     );
@@ -175,6 +175,7 @@ export function InvestigatePage({ projectScoped = false }: { projectScoped?: boo
 
   return (
     <div>
+      {projectId && <Link to={`/projects/${projectId}/investigate/research`} className="mb-4 inline-block rounded-lg bg-violet-600 px-4 py-2 text-white">Research sources & question lineage · start without a conversation</Link>}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <FileSearch size={24} className="text-violet-500" />

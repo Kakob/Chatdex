@@ -82,8 +82,14 @@ export function ProjectWorkspaceLayout() {
             <span className="font-semibold truncate">{project.name}</span>
           </Link>
           <span className="text-xs text-gray-400">
-            {sourceCount} source{sourceCount === 1 ? '' : 's'}
+            {sourceCount} conversation source{sourceCount === 1 ? '' : 's'}
           </span>
+          <Link
+            to={`/projects/${id}/investigate/research`}
+            className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
+          >
+            Research sources & questions
+          </Link>
           {pendingCount > 0 && (
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
               {pendingCount} proposal{pendingCount === 1 ? '' : 's'} to review

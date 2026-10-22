@@ -1,3 +1,4 @@
+import { ResearchCase } from '../components/research/ResearchCase';
 import {
   Fragment,
   useCallback,
@@ -82,6 +83,14 @@ const STEP_LABELS: Record<Step['kind'], string> = {
 };
 
 export function QuestionInvestigationPage() {
+  const { id = '', caseId = '' } = useParams();
+  const [research, setResearch] = useState<boolean | null>(null);
+  useEffect(() => { let active = true; void getInvestigationCase(caseId).then(row => { if (active) setResearch(!!row?.research); }); return () => { active = false; }; }, [caseId]);
+  if (research === null) return <p>Loading investigation…</p>;
+  return research ? <ResearchCase key={caseId} caseId={caseId} projectId={id} /> : <LegacyQuestionInvestigationPage />;
+}
+
+function LegacyQuestionInvestigationPage() {
   const { id: projectId, caseId } = useParams<{ id: string; caseId: string }>();
   const addToast = useToastStore((state) => state.addToast);
   const [data, setData] = useState<InvestigationData | null>(null);

@@ -1,3 +1,4 @@
+import { ResearchShelfPage } from './pages/ResearchShelfPage';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import {
@@ -48,6 +49,7 @@ export function App() {
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
             <Route path="investigate" element={<InvestigatePage projectScoped />} />
+            <Route path="investigate/research" element={<ResearchShelfPage />} />
             <Route
               path="investigate/questions/:caseId"
               element={<QuestionInvestigationPage />}
