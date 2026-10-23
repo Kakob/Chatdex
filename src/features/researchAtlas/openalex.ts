@@ -109,20 +109,18 @@ function awardsToImport(awards: OpenAlexAward[]): AtlasImport {
 }
 
 function authorsToImport(authors: OpenAlexAuthor[]): AtlasImport {
-  const researchers: Researcher[] = authors
-    .filter((author) => author.id && author.display_name)
-    .map((author) => {
-      const us = author.last_known_institutions?.find((i) => i.country_code === 'US');
-      if (!us) return null;
-      return {
-        id: author.id, name: author.display_name ?? 'Unknown author',
-        institution: us.display_name ?? 'U.S. institution',
-        role: 'Publication author (faculty appointment not verified)',
-        topics: topicNames(author.topics), projectIds: [], sourceUrl: author.id,
-        origin: 'openalex' as const, orcid: author.orcid ?? undefined,
-      };
-    })
-    .filter((person): person is Researcher => person !== null);
+  const researchers: Researcher[] = [];
+  for (const author of authors) {
+    const us = author.last_known_institutions?.find((i) => i.country_code === 'US');
+    if (!author.id || !author.display_name || !us) continue;
+    researchers.push({
+      id: author.id, name: author.display_name,
+      institution: us.display_name ?? 'U.S. institution',
+      role: 'Publication author (faculty appointment not verified)',
+      topics: topicNames(author.topics), projectIds: [], sourceUrl: author.id,
+      origin: 'openalex', orcid: author.orcid ?? undefined,
+    });
+  }
   return { researchers, projects: [], papers: [], matched: researchers.length };
 }
 
