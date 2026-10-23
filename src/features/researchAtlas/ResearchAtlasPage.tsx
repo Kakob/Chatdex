@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   BookOpen, ChevronRight, Database, Download, ExternalLink, FileText, FolderOpen,
   GraduationCap, Loader2, MessageSquare, Search, Sparkles, Users,
@@ -48,7 +48,7 @@ function OriginLabel({ origin, checkedAt }: { origin: string; checkedAt?: string
   );
 }
 
-function ResearchLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function ResearchLink({ children, onClick }: { children: ReactNode; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick}
       className="text-left text-sm font-medium text-violet-700 hover:underline dark:text-violet-400">
