@@ -4,8 +4,8 @@ import type { ResearchProject } from './types';
 
 afterEach(() => vi.unstubAllGlobals());
 
-function mockResponse(results: unknown[]): ReturnType<typeof vi.fn> {
-  const mock = vi.fn(async () => ({
+function mockResponse(results: unknown[]) {
+  const mock = vi.fn(async (_request: RequestInfo | URL) => ({
     ok: true,
     status: 200,
     json: async () => ({ results }),
