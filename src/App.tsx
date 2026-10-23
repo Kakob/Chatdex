@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout } from './components/layout';
+import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import {
   SearchPage,
   AnalyticsPage,
@@ -36,6 +37,7 @@ export function App() {
           <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
           <Route path="ledger" element={<LedgerPage />} />
           <Route path="projects" element={<ProjectsPage />} />
+          <Route path="research" element={<ResearchAtlasPage />} />
           <Route path="projects/:id" element={<ProjectUnderstandingPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
