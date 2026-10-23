@@ -9,6 +9,7 @@ import {
   Anchor,
   FileSearch,
   FolderKanban,
+  Microscope,
   Scale,
   Upload,
   Settings,
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/investigate', icon: FileSearch, label: 'Investigate' },
   { to: '/ledger', icon: Scale, label: 'Ledger' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/research', icon: Microscope, label: 'Research Atlas' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 
