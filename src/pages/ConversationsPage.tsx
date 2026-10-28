@@ -7,6 +7,7 @@ import { TagBadge } from '../components/common/TagBadge';
 import { ALL_SOURCES, SOURCE_META } from '../components/common/sourceMeta';
 import { useConversations, useConversation, useConversationTags } from '../hooks';
 import { useFindingSummaries } from '../hooks/useFindingSummaries';
+import { useConversationStorage } from '../hooks/useStorageLocation';
 import { useTagStore } from '../stores/tagStore';
 import type { StoredConversation, DataSource } from '../types';
 
@@ -49,6 +50,7 @@ export function ConversationsPage() {
     [conversations]
   );
   const { tagsMap, refresh: refreshTags } = useConversationTags(conversationIds);
+  const conversationStorage = useConversationStorage(conversationIds);
   const findingSummaries = useFindingSummaries(conversationIds);
 
   // Filter conversations by selected tags
@@ -240,6 +242,7 @@ export function ConversationsPage() {
         selectable={selectionMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
+        conversationStorage={conversationStorage}
       />
 
       {/* Batch tag bar */}

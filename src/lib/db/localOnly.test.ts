@@ -30,14 +30,15 @@ beforeEach(async () => {
 const sha = 'a'.repeat(40);
 
 describe('Dexie v12/v13 local-only tables', () => {
-  it('is at schema version 14', () => {
-    expect(db.verno).toBe(14);
+  it('is at schema version 15', () => {
+    expect(db.verno).toBe(15);
     expect(db.tables.map((t) => t.name)).toEqual(
       expect.arrayContaining([
         'repoFiles',
         'inspections',
         'decisionTraces',
         'agentInspections',
+        'syncLedger',
         'decisionDiffs',
       ])
     );
@@ -103,5 +104,16 @@ describe('Dexie v12/v13 local-only tables', () => {
         /repoFiles|inspections|agentInspections|decisionDiffs|researchSources|researchSnapshots|researchExhibits|questionRelations/
       );
     }
+  });
+
+  it('keeps the sync ledger content-free, unhooked, and cleared with local data', async () => {
+    const engine = readFileSync(resolve(__dirname, '../sync/engine.ts'), 'utf8');
+    // Written by the engine, but never a sync source itself.
+    expect(engine).not.toMatch(/syncLedger\.hook\(/);
+    expect(db.syncLedger.schema.indexes.map((i) => i.name)).toEqual(['kind']);
+
+    await db.syncLedger.put({ kind: 'conversation', id: 'c1', syncedAt: new Date() });
+    await clearAllData();
+    expect(await db.syncLedger.count()).toBe(0);
   });
 });

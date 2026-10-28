@@ -1,6 +1,7 @@
 // Auth session orchestration. Drives the WebAuthn passkey ceremonies on the
 // browser side and the encrypted-key handoff with the server. JWT lives in
-// localStorage; the master key lives only in keyManager memory.
+// localStorage; the master key lives in keyManager memory and, when "Stay
+// unlocked on this device" is on, as a non-extractable copy in deviceKey.ts.
 
 import {
   generateMasterKey,
@@ -10,6 +11,12 @@ import {
   decryptBytes,
   setUnlocked,
   lock as lockVault,
+  isUnlocked,
+  getMasterKey,
+  getCurrentUserId,
+  saveDeviceKey,
+  loadDeviceKey,
+  clearDeviceKey,
   generateRecoveryCode,
   recoveryCodeToKey,
   parseRecoveryCode,
@@ -31,6 +38,7 @@ const BACKEND_URL =
 
 const TOKEN_KEY = 'chatdex.authToken';
 const USER_KEY = 'chatdex.user';
+const STAY_UNLOCKED_KEY = 'chatdex.stayUnlocked';
 
 export interface SessionUser {
   userId: string;
@@ -164,7 +172,7 @@ export async function signup(email: string): Promise<SignupResult> {
     }
   );
 
-  setUnlocked(finished.userId, masterKey);
+  await finishUnlock(finished.userId, masterKeyRaw);
   const user = { userId: finished.userId, email: finished.email };
   persistSession(finished.token, user);
   return { user, recoveryCode };
@@ -199,9 +207,8 @@ export async function login(email: string): Promise<SessionUser> {
 
   const wrappingKey = await prfOutputToKey(prfOutput);
   const masterKeyRaw = await decryptBytes(wrappingKey, wireToSealed(finished.material.wrappedByPasskey));
-  const masterKey = await importRawKey(masterKeyRaw);
 
-  setUnlocked(finished.userId, masterKey);
+  await finishUnlock(finished.userId, masterKeyRaw);
   const user = { userId: finished.userId, email: finished.email };
   persistSession(finished.token, user);
   return user;
@@ -243,7 +250,6 @@ export async function recoverWithCode(
   const recoveryRaw = parseRecoveryCode(recoveryCode);
   const recoveryKey = await recoveryCodeToKey(recoveryRaw);
   const masterKeyRaw = await decryptBytes(recoveryKey, wireToSealed(init.wrappedByRecovery));
-  const masterKey = await importRawKey(masterKeyRaw);
 
   // 3. Enroll a new passkey on this device.
   const { response, prfOutput } = await enrollPasskey(init.options);
@@ -264,7 +270,7 @@ export async function recoverWithCode(
     }
   );
 
-  setUnlocked(finished.userId, masterKey);
+  await finishUnlock(finished.userId, masterKeyRaw);
   const user = { userId: finished.userId, email: finished.email };
   persistSession(finished.token, user);
   return user;
@@ -292,10 +298,76 @@ export async function logout(): Promise<void> {
   }
   clearSession();
   lockVault();
+  await forgetDeviceKey();
 }
 
-export function lock(): void {
+/**
+ * Lock this device: drop the in-memory key AND the remembered copy, so the
+ * next unlock (including after a reload) needs the passkey again.
+ */
+export async function lock(): Promise<void> {
   lockVault();
+  await forgetDeviceKey();
+}
+
+// --- device-remembered key ("Stay unlocked on this device") ---
+
+export function getStayUnlocked(): boolean {
+  return localStorage.getItem(STAY_UNLOCKED_KEY) !== '0';
+}
+
+export async function setStayUnlocked(on: boolean): Promise<void> {
+  localStorage.setItem(STAY_UNLOCKED_KEY, on ? '1' : '0');
+  if (!on) {
+    await forgetDeviceKey();
+    return;
+  }
+  const userId = getCurrentUserId();
+  if (isUnlocked() && userId) await rememberDeviceKey(userId, getMasterKey());
+}
+
+/**
+ * Silent unlock after a reload: if this device remembers the key for the
+ * signed-in user, put it back in memory. No passkey ceremony, no network.
+ */
+export async function resumeFromDevice(): Promise<SessionUser | null> {
+  const user = getCurrentUser();
+  if (!user || !getAuthToken() || !getStayUnlocked()) return null;
+  let key: CryptoKey | null = null;
+  try {
+    key = await loadDeviceKey(user.userId);
+  } catch (err) {
+    console.warn('[auth] could not read the device key', err);
+  }
+  if (!key) return null;
+  setUnlocked(user.userId, key);
+  return user;
+}
+
+// Every unlock path ends here: the live key is a non-extractable import of
+// the raw bytes, so the in-memory key and the remembered copy are the same
+// opaque handle and neither can be exported.
+async function finishUnlock(userId: string, masterKeyRaw: Uint8Array): Promise<void> {
+  const key = await importRawKey(masterKeyRaw, false);
+  setUnlocked(userId, key);
+  if (getStayUnlocked()) await rememberDeviceKey(userId, key);
+}
+
+async function rememberDeviceKey(userId: string, key: CryptoKey): Promise<void> {
+  try {
+    await saveDeviceKey(userId, key);
+  } catch (err) {
+    // Unlocking still succeeded; only the reload convenience is lost.
+    console.warn('[auth] could not remember the key on this device', err);
+  }
+}
+
+async function forgetDeviceKey(): Promise<void> {
+  try {
+    await clearDeviceKey();
+  } catch (err) {
+    console.warn('[auth] could not clear the device key', err);
+  }
 }
 
 // Used by the tests (and a future "is the JWT still valid?" check).

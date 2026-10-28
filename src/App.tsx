@@ -1,5 +1,6 @@
 import { ResearchShelfPage } from './pages/ResearchShelfPage';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useSyncLifecycle } from './hooks';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import {
   LandingPage,
@@ -27,6 +28,7 @@ import {
 } from './pages';
 
 export function App() {
+  useSyncLifecycle();
   return (
     <BrowserRouter>
       <Routes>

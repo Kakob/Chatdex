@@ -23,6 +23,8 @@ export {
   lock,
 } from './keyManager';
 
+export { saveDeviceKey, loadDeviceKey, clearDeviceKey } from './deviceKey';
+
 export {
   generateRecoveryCode,
   formatRecoveryCode,

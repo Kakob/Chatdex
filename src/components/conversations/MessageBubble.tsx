@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { StorageDot } from '../common/StorageBadge';
+import type { StorageLocation } from '../../lib/sync/storageLocation';
 import { User, Bot, Wrench, Anchor } from 'lucide-react';
 import { HighlightedText } from '../search/HighlightedText';
 import { ContentBlocks } from './ContentBlocks';
@@ -18,9 +20,11 @@ interface MessageBubbleProps {
   findings?: StoredFinding[];
   /** Normalized step label ("#5"), shown for agent-trace sessions. */
   stepLabel?: string;
+  /** Where this message is saved; shown as a tiny cloud marker. */
+  storage?: StorageLocation;
 }
 
-export function MessageBubble({ message, highlightQuery, conversationId, messages, messageIndex, findings = [], stepLabel }: MessageBubbleProps) {
+export function MessageBubble({ message, highlightQuery, conversationId, messages, messageIndex, findings = [], stepLabel, storage }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
   const isTool = message.sender === 'tool';
   const [anchorModalOpen, setAnchorModalOpen] = useState(false);
@@ -76,6 +80,7 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
               {stepLabel && <StepLabel label={stepLabel} />}
               <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{message.toolName || 'Tool'}</span>
               <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+              {storage && <StorageDot location={storage} />}
               <FindingMarkers findings={findings} />
             </div>
             <ContentBlocks blocks={message.contentBlocks} highlightQuery={highlightQuery} />
@@ -94,6 +99,7 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
             {stepLabel && <StepLabel label={stepLabel} />}
             <span className="text-sm font-medium text-amber-700 dark:text-amber-400">{message.toolName || 'Tool'}</span>
             <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+              {storage && <StorageDot location={storage} />}
             <FindingMarkers findings={findings} />
           </div>
           {message.toolInput && (
@@ -126,6 +132,7 @@ export function MessageBubble({ message, highlightQuery, conversationId, message
               <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[200px]">in {message.conversationName}</span>
             )}
             <span className="text-xs text-gray-400">{formatTime(message.createdAt)}</span>
+              {storage && <StorageDot location={storage} />}
             <FindingMarkers findings={findings} />
             {conversationId && (
               <button

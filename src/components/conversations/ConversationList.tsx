@@ -3,6 +3,7 @@ import { ConversationCard } from './ConversationCard';
 import type { StoredConversation } from '../../types';
 import type { ApiTag } from '../../lib/api';
 import type { FindingChipSummary } from '../../lib/detection/stats';
+import type { ConversationStorage } from '../../lib/sync/storageLocation';
 
 interface ConversationListProps {
   conversations: StoredConversation[];
@@ -17,6 +18,7 @@ interface ConversationListProps {
   selectable?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  conversationStorage?: Map<string, ConversationStorage> | null;
 }
 
 export function ConversationList({
@@ -32,6 +34,7 @@ export function ConversationList({
   selectable = false,
   selectedIds,
   onToggleSelect,
+  conversationStorage,
 }: ConversationListProps) {
   return (
     <div className="space-y-3">
@@ -47,6 +50,7 @@ export function ConversationList({
           selectable={selectable}
           selected={selectedIds?.has(conversation.id)}
           onToggleSelect={() => onToggleSelect?.(conversation.id)}
+          storage={conversationStorage?.get(conversation.id)}
         />
       ))}
 

@@ -2,6 +2,8 @@ import { MessageSquare, Calendar } from 'lucide-react';
 import { TagBadge } from '../common/TagBadge';
 import { SourceIcon } from '../common/sourceMeta';
 import { FindingChips } from '../detection/FindingChips';
+import { StorageBadge } from '../common/StorageBadge';
+import type { ConversationStorage } from '../../lib/sync/storageLocation';
 import type { StoredConversation } from '../../types';
 import type { ApiTag } from '../../lib/api';
 import type { FindingChipSummary } from '../../lib/detection/stats';
@@ -16,6 +18,7 @@ interface ConversationCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  storage?: ConversationStorage;
 }
 
 export function ConversationCard({
@@ -28,6 +31,7 @@ export function ConversationCard({
   selectable = false,
   selected = false,
   onToggleSelect,
+  storage,
 }: ConversationCardProps) {
   const formatDate = (date: Date) => {
     const now = new Date();
@@ -99,6 +103,11 @@ export function ConversationCard({
             {conversation.gitBranch && (
               <span className="text-emerald-600 dark:text-emerald-400">
                 {conversation.gitBranch}
+              </span>
+            )}
+            {storage && (
+              <span className="ml-auto">
+                <StorageBadge location={storage.location} messages={storage.messages} />
               </span>
             )}
           </div>

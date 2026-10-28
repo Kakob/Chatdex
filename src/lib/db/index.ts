@@ -2,7 +2,7 @@
 // Every read/write of user data should go through this module — IndexedDB is
 // the source of truth. Cloud sync (Phase 2) will replicate from here.
 
-export { db, type ChatdexDB, type KnowledgeFolderRow } from './schema';
+export { db, type ChatdexDB, type KnowledgeFolderRow, type SyncLedgerRow } from './schema';
 export * from './conversations';
 export * from './messages';
 export * from './activities';
@@ -59,6 +59,7 @@ export async function clearAllData(): Promise<void> {
       db.agentInspections,
       db.decisionDiffs,
       db.researchSources, db.researchSnapshots, db.researchExhibits, db.questionRelations,
+      db.syncLedger,
     ],
     async () => {
       await db.conversations.clear();
@@ -94,6 +95,7 @@ export async function clearAllData(): Promise<void> {
       await db.researchSnapshots.clear();
       await db.researchExhibits.clear();
       await db.questionRelations.clear();
+      await db.syncLedger.clear();
     }
   );
 }

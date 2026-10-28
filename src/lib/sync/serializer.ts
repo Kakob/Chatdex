@@ -332,7 +332,8 @@ export function envelopeInvestigationCase(
 ): SyncEnvelope<'investigation_case'> {
   return {
     kind: 'investigation_case',
-    parentId: c.conversationId,
+    // Question and research cases have no primary conversation ('').
+    parentId: c.conversationId || null,
     updatedAt: c.updatedAt,
     payload: {
       ...c,

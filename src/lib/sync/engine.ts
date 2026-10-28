@@ -2,9 +2,11 @@
 // local writes and pushes them up, and pulls down encrypted records from the
 // server and applies them locally.
 //
-// The engine is intentionally small: it polls in two directions on a fixed
-// interval and serializes work through a single in-flight promise per
-// direction. Last-write-wins by record `updatedAt`. Conflict-free merge for
+// The engine is intentionally small. Uploads are change-driven: a local write
+// schedules a push shortly after writes go quiet. Downloads poll on a slow
+// interval (other devices are rare) and on returning to the tab; a hidden tab
+// stops polling so the database can idle. All work is serialized through a
+// single in-flight promise. Last-write-wins by record `updatedAt`. Conflict-free merge for
 // conversations is good enough at v1 (messages are append-only, anchors are
 // rarely edited concurrently).
 
@@ -71,6 +73,13 @@ import {
 
 const PULL_CURSOR_KEY = 'sync.pullCursor';
 const DIRTY_KEY = 'sync.dirty'; // queue of { id, kind, deleted? } pending push
+
+/** Upload this long after local writes go quiet. */
+export const PUSH_DELAY_MS = 2_000;
+/** ...but never hold changes longer than this during a continuous burst (an import). */
+export const PUSH_MAX_WAIT_MS = 10_000;
+/** Check for changes from other devices this often while the tab is visible. */
+export const PULL_INTERVAL_MS = 90_000;
 
 // Metadata under the `sync.` prefix is per-device engine state (dirty queue,
 // pull cursor). It must never enter the sync stream: pushing it leaks local
@@ -391,57 +400,263 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
   }
 }
 
+// Every table that syncs, with its wire kind. Local-only tables are
+// deliberately absent (guarded by db/localOnly.test.ts); the sync ledger is
+// the one local-only table the engine writes, and it holds only kinds/ids.
+function syncedTables(): Array<[SyncKind, { toCollection(): { primaryKeys(): Promise<unknown[]> } }]> {
+  return [
+    ['conversation', db.conversations],
+    ['message', db.messages],
+    ['activity', db.activities],
+    ['anchor', db.anchors],
+    ['tag', db.tags],
+    ['entity_tag', db.entityTags],
+    ['folder', db.knowledgeFolders],
+    ['daily_stats', db.dailyStats],
+    ['metadata', db.metadata],
+    ['finding', db.findings],
+    ['detector_run', db.detectorRuns],
+    ['understanding_project', db.understandingProjects],
+    ['project_association', db.projectAssociations],
+    ['understanding_object', db.understandingObjects],
+    ['understanding_event', db.understandingEvents],
+    ['investigation_case', db.investigationCases],
+    ['case_exhibit', db.caseExhibits],
+    ['review_scope', db.reviewScopes],
+    ['verdict_revision', db.verdictRevisions],
+    ['investigation_finding', db.investigationFindings],
+    ['prepared_change', db.preparedChanges],
+    ['intent_trace', db.intentTraces],
+    ['decision_trace', db.decisionTraces],
+  ];
+}
+
+export function storageKey(kind: string, id: string): string {
+  return `${kind}\u0000${id}`;
+}
+
+export interface SyncStatus {
+  /** Engine running (vault unlocked and start() called). */
+  running: boolean;
+  /** A push/pull is in flight. */
+  syncing: boolean;
+  /** Local changes waiting to upload. */
+  pending: number;
+  lastSyncAt: Date | null;
+  lastError: string | null;
+}
+
+type StatusListener = (status: SyncStatus) => void;
+
 class SyncEngine {
   private timer: ReturnType<typeof setInterval> | null = null;
-  private hookHandles: Array<() => void> = [];
+  private pushTimer: ReturnType<typeof setTimeout> | null = null;
+  private pushDueBy = 0;
+  private pushDelayMs = PUSH_DELAY_MS;
+  private pageListeners = false;
+  private attached: Promise<void> | null = null;
   private inflight = false;
+  private current: Promise<void> | null = null;
   private suspended = false;
   private dirty: DirtyEntry[] = [];
+  private lastSyncAt: Date | null = null;
+  private lastError: string | null = null;
+  private listeners = new Set<StatusListener>();
 
-  async start(intervalMs = 10_000): Promise<void> {
+  getStatus(): SyncStatus {
+    return {
+      running: this.timer !== null,
+      syncing: this.inflight,
+      pending: this.dirty.length,
+      lastSyncAt: this.lastSyncAt,
+      lastError: this.lastError,
+    };
+  }
+
+  /** `${kind}\u0000${id}` for every change waiting to upload. */
+  getPendingKeys(): Set<string> {
+    return new Set(this.dirty.map((d) => storageKey(d.kind, d.id)));
+  }
+
+  subscribe(listener: StatusListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private emit(): void {
+    const status = this.getStatus();
+    for (const listener of this.listeners) listener(status);
+  }
+
+  /**
+   * Start recording local changes. Call once at app boot, whether or not the
+   * vault is unlocked: changes made while locked or signed out queue up (ids
+   * and kinds only) and upload once sync starts. Idempotent.
+   */
+  attach(): Promise<void> {
+    this.attached ??= (async () => {
+      // Restore the dirty queue from a previous session. Filter out
+      // device-local metadata entries that older engine versions enqueued.
+      const saved = (await getMetadata<DirtyEntry[]>(DIRTY_KEY)) ?? [];
+      const restored = saved.filter(isSyncableEntry);
+      // Keep anything hooks queued while the metadata read was in flight.
+      const queuedMeanwhile = this.dirty;
+      this.dirty = restored.filter(
+        (r) => !queuedMeanwhile.some((q) => q.id === r.id && q.kind === r.kind)
+      );
+      this.dirty.push(...queuedMeanwhile);
+      this.installHooks();
+      this.emit();
+    })();
+    return this.attached;
+  }
+
+  async start(pullIntervalMs = PULL_INTERVAL_MS, pushDelayMs = PUSH_DELAY_MS): Promise<void> {
     if (this.timer) return;
     if (!isUnlocked()) {
       throw new Error('Cannot start sync engine while vault is locked');
     }
 
-    // Restore dirty queue from a previous session. Filter out device-local
-    // metadata entries that older engine versions enqueued.
-    const saved = (await getMetadata<DirtyEntry[]>(DIRTY_KEY)) ?? [];
-    this.dirty = saved.filter(isSyncableEntry);
-
-    this.installHooks();
+    await this.attach();
+    this.pushDelayMs = pushDelayMs;
     this.timer = setInterval(() => {
+      // Hidden tab: skip the poll so the server (and Neon) can idle. Local
+      // changes still upload via schedulePush.
+      if (isPageHidden()) return;
       void this.tick();
-    }, intervalMs);
-    // Fire one sync immediately.
+    }, pullIntervalMs);
+    this.installPageListeners();
+    this.emit();
+    // Catch up on rows the server has never seen, then sync immediately.
+    await this.reconcile();
     void this.tick();
   }
 
+  /** Stop syncing. Hooks stay attached, so changes keep queueing. */
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    for (const off of this.hookHandles) off();
-    this.hookHandles = [];
+    this.cancelScheduledPush();
+    this.emit();
   }
 
-  /** Force a flush + pull. Useful for tests and a manual "Sync now" button. */
-  async tick(): Promise<void> {
-    if (this.inflight || this.suspended || !isUnlocked()) return;
+  /** Upload queued changes now, without pulling. Waits out a running tick. */
+  async push(): Promise<void> {
+    this.cancelScheduledPush();
+    while (this.current) await this.current;
+    if (this.dirty.length === 0) return;
+    await this.run(false);
+  }
+
+  /**
+   * Debounced upload after a local write: PUSH_DELAY_MS after writes go quiet,
+   * capped at PUSH_MAX_WAIT_MS from the first write so a long import still
+   * uploads as it goes.
+   */
+  private schedulePush(): void {
+    if (!this.timer || this.suspended) return;
+    const now = Date.now();
+    if (!this.pushTimer) this.pushDueBy = now + PUSH_MAX_WAIT_MS;
+    else clearTimeout(this.pushTimer);
+    const delay = Math.max(0, Math.min(this.pushDelayMs, this.pushDueBy - now));
+    this.pushTimer = setTimeout(() => {
+      this.pushTimer = null;
+      void this.push();
+    }, delay);
+  }
+
+  private cancelScheduledPush(): void {
+    if (this.pushTimer) clearTimeout(this.pushTimer);
+    this.pushTimer = null;
+  }
+
+  /**
+   * Back on the tab: catch up on other devices right away. Leaving it (tab
+   * switch, minimize, close): upload what's queued now. Best-effort on close —
+   * the queue is persisted, so anything cut off uploads on the next open.
+   */
+  private installPageListeners(): void {
+    if (this.pageListeners || typeof document === 'undefined') return;
+    this.pageListeners = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!this.timer) return;
+      if (isPageHidden()) void this.push();
+      else void this.tick();
+    });
+    window.addEventListener('pagehide', () => {
+      if (this.timer) void this.push();
+    });
+  }
+
+  /**
+   * Force a flush + pull. Useful for tests and a manual "Sync now" button.
+   * While a tick is already running, callers join it instead of returning
+   * before anything has synced.
+   */
+  tick(): Promise<void> {
+    if (this.current) return this.current;
+    return this.run(true);
+  }
+
+  private run(pull: boolean): Promise<void> {
+    if (this.current) return this.current;
+    if (this.suspended || !isUnlocked()) return Promise.resolve();
+    this.current = this.runTick(pull).finally(() => {
+      this.current = null;
+    });
+    return this.current;
+  }
+
+  private async runTick(pull: boolean): Promise<void> {
     this.inflight = true;
+    this.emit();
     try {
-      await this.flushDirty();
-      await this.pullDelta();
+      // Drain the whole queue, not one batch per tick: catch-up after a long
+      // locked period can be thousands of rows.
+      let guard = 1_000;
+      while (this.dirty.length > 0 && guard-- > 0) await this.flushDirty();
+      if (pull) await this.pullDelta();
+      this.lastSyncAt = new Date();
+      this.lastError = null;
     } catch (err) {
       console.error('[sync] tick failed', err);
+      this.lastError = err instanceof Error ? err.message : String(err);
     } finally {
       this.inflight = false;
+      this.emit();
     }
+  }
+
+  /**
+   * Queue every syncable row the ledger has no record of: rows written before
+   * the hooks were attached (older builds, signed-out periods), or before
+   * this device ever synced. Content-free: compares kinds and ids only.
+   */
+  async reconcile(): Promise<number> {
+    const known = new Set(
+      (await db.syncLedger.toArray()).map((row) => storageKey(row.kind, row.id))
+    );
+    const queued = this.getPendingKeys();
+    let added = 0;
+    for (const [kind, table] of syncedTables()) {
+      for (const key of await table.toCollection().primaryKeys()) {
+        const tag = storageKey(kind, String(key));
+        if (known.has(tag) || queued.has(tag)) continue;
+        const before = this.dirty.length;
+        this.markDirty({ id: String(key), kind });
+        if (this.dirty.length > before) added++;
+      }
+    }
+    return added;
   }
 
   async wipeLocalCursor(): Promise<void> {
     await setMetadata(PULL_CURSOR_KEY, null);
     this.dirty = [];
     await setMetadata(DIRTY_KEY, []);
+    this.emit();
   }
 
   /**
@@ -475,6 +690,7 @@ class SyncEngine {
       await setMetadata(DIRTY_KEY, []);
       await setMetadata(PULL_CURSOR_KEY, null);
     });
+    this.emit();
   }
 
   /**
@@ -490,7 +706,10 @@ class SyncEngine {
       await setMetadata(DIRTY_KEY, []);
       await wipeServerData();
       await setMetadata(PULL_CURSOR_KEY, null);
+      // The server holds nothing now; the ledger must not claim otherwise.
+      await db.syncLedger.clear();
     });
+    this.emit();
   }
 
   /**
@@ -500,31 +719,7 @@ class SyncEngine {
    */
   async resyncAll(): Promise<void> {
     if (!isUnlocked()) throw new Error('Cannot re-upload while vault is locked');
-    const tables: Array<[SyncKind, { toCollection(): { primaryKeys(): Promise<unknown[]> } }]> = [
-      ['conversation', db.conversations],
-      ['message', db.messages],
-      ['activity', db.activities],
-      ['anchor', db.anchors],
-      ['tag', db.tags],
-      ['entity_tag', db.entityTags],
-      ['folder', db.knowledgeFolders],
-      ['daily_stats', db.dailyStats],
-      ['metadata', db.metadata],
-      ['finding', db.findings],
-      ['detector_run', db.detectorRuns],
-      ['understanding_project', db.understandingProjects],
-      ['project_association', db.projectAssociations],
-      ['understanding_object', db.understandingObjects],
-      ['understanding_event', db.understandingEvents],
-      ['investigation_case', db.investigationCases],
-      ['case_exhibit', db.caseExhibits],
-      ['review_scope', db.reviewScopes],
-      ['verdict_revision', db.verdictRevisions],
-      ['investigation_finding', db.investigationFindings],
-      ['prepared_change', db.preparedChanges],
-      ['intent_trace', db.intentTraces],
-      ['decision_trace', db.decisionTraces],
-    ];
+    const tables = syncedTables();
     for (const [kind, table] of tables) {
       for (const key of await table.toCollection().primaryKeys()) {
         this.markDirty({ id: String(key), kind });
@@ -644,8 +839,8 @@ class SyncEngine {
     db.decisionTraces.hook('updating', (_m, k) => upsert('decision_trace')(k as string));
     db.decisionTraces.hook('deleting', remove('decision_trace'));
 
-    // Dexie hooks have no portable unsubscribe; stop() relies on the engine
-    // being long-lived for the page lifetime. Tests should not call start().
+    // Dexie hooks have no portable unsubscribe; attach() installs them once
+    // for the page lifetime and stop() leaves them in place.
   }
 
   private markDirty(entry: DirtyEntry): void {
@@ -654,6 +849,8 @@ class SyncEngine {
     // upsert (or vice versa), the latter wins.
     this.dirty = this.dirty.filter((d) => !(d.id === entry.id && d.kind === entry.kind));
     this.dirty.push(entry);
+    this.emit();
+    this.schedulePush();
     // Persist asynchronously; best-effort (flushDirty re-persists after every
     // push). setTimeout escapes the caller's Dexie transaction zone: hooks
     // fire inside transactions that usually don't include the metadata store,
@@ -690,7 +887,9 @@ class SyncEngine {
       wire.push({
         id: entry.id,
         kind: env.kind,
-        parentId: env.parentId,
+        // The server rejects an empty-string parent (and the whole batch with
+        // it); "no parent" is null on the wire.
+        parentId: env.parentId || null,
         iv: bufToB64(sealed.iv),
         ciphertext: bufToB64(sealed.ciphertext),
         updatedAt: env.updatedAt.toISOString(),
@@ -701,6 +900,7 @@ class SyncEngine {
     try {
       await pushRecords(wire);
       await setMetadata(DIRTY_KEY, this.dirty);
+      await recordInLedger(wire);
     } catch (err) {
       // Re-queue so we retry on the next tick.
       this.dirty = [...batch, ...this.dirty];
@@ -723,7 +923,16 @@ class SyncEngine {
             iv: b64ToBuf(rec.iv),
             ciphertext: b64ToBuf(rec.ciphertext),
           });
+          const queuedBefore = new Set(this.dirty);
           await applyIncomingRecord(rec, payload);
+          // Applying the record fires our own hooks; don't queue the server's
+          // copy straight back up to the server.
+          this.dirty = this.dirty.filter(
+            (d) => queuedBefore.has(d) || d.id !== rec.id || d.kind !== rec.kind
+          );
+          if (!(rec.kind === 'metadata' && isDeviceLocalMetadata(rec.id))) {
+            await recordInLedger([rec]);
+          }
         } catch (err) {
           console.error('[sync] failed to apply record', rec.id, err);
         }
@@ -734,6 +943,24 @@ class SyncEngine {
       }
       hasMore = result.hasMore;
     }
+    await setMetadata(DIRTY_KEY, this.dirty);
+    this.emit();
+  }
+}
+
+// The server now holds these records (pushed or pulled): remember upserts,
+// forget tombstones.
+async function recordInLedger(
+  records: Array<{ id: string; kind: SyncKind; deleted?: boolean }>
+): Promise<void> {
+  const syncedAt = new Date();
+  const live = records.filter((r) => !r.deleted);
+  const gone = records.filter((r) => r.deleted);
+  if (live.length > 0) {
+    await db.syncLedger.bulkPut(live.map((r) => ({ kind: r.kind, id: r.id, syncedAt })));
+  }
+  if (gone.length > 0) {
+    await db.syncLedger.bulkDelete(gone.map((r) => [r.kind, r.id] as [string, string]));
   }
 }
 
@@ -748,6 +975,10 @@ function b64ToBuf(b64: string): Uint8Array {
   const out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
+}
+
+function isPageHidden(): boolean {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
 }
 
 export const syncEngine = new SyncEngine();

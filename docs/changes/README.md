@@ -12,6 +12,7 @@ plan; these summaries are navigation aids, not independent checklists.
 
 | Change | Primary capability | Related capabilities | Summary |
 |---|---|---|---|
+| [Reliable sync and storage labels](./reliable-sync/PLAN.md) | none (shared infrastructure) | Sync, auth key lifetime (auth-architecture §4; CLAUDE.md inv. 1 preserved) | Implemented, acceptance pending — sync starts and unlocks automatically, catches up on changes made while locked, header sync menu, Backed up / Waiting / This device only labels on conversations and messages |
 | [Experience inquiry](./experience-inquiry/PLAN.md) | Decision Investigation | Understanding Workspace | Local research slice; original handoff, source-preparation walkthrough, and remaining acceptance work in the linked plan |
 | [Branch Binding](./branch-binding/PLAN.md) | Repository Integration | Intent Trace, Decision Recovery, Change Workspace | Implementation recorded; manual acceptance checks remain |
 | [Decision review experience](./decision-review-experience/PLAN.md) | Decision Recovery | Repository Integration (snapshot context only) | Completed locally; verification and limitations in the linked plan/build log |

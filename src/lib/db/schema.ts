@@ -40,6 +40,17 @@ export interface KnowledgeFolderRow {
   createdAt: Date;
 }
 
+/**
+ * One row per record the server is known to hold (pushed by this device or
+ * pulled from it). LOCAL-ONLY: never hooked into the sync engine. Holds only
+ * the record kind and id — no content.
+ */
+export interface SyncLedgerRow {
+  kind: string;
+  id: string;
+  syncedAt: Date;
+}
+
 export class ChatdexDB extends Dexie {
   conversations!: Table<StoredConversation, string>;
   messages!: Table<StoredMessage, string>;
@@ -75,6 +86,7 @@ export class ChatdexDB extends Dexie {
   researchSnapshots!: Table<ResearchSnapshot, string>;
   researchExhibits!: Table<ResearchExhibit, string>;
   questionRelations!: Table<QuestionRelation, string>;
+  syncLedger!: Table<SyncLedgerRow, [string, string]>;
 
   constructor(name = 'chatdex') {
     super(name);
@@ -202,6 +214,12 @@ export class ChatdexDB extends Dexie {
       researchSnapshots: '&id, sourceId, &[sourceId+contentHash]',
       researchExhibits: '&id, caseId, sourceId',
       questionRelations: '&id, projectId',
+    });
+    // v15: sync ledger (docs/changes/reliable-sync). LOCAL-ONLY bookkeeping of
+    // which records have reached the server, so sync can catch up on rows
+    // written while it was off and the UI can say where each record lives.
+    this.version(15).stores({
+      syncLedger: '&[kind+id], kind',
     });
   }
 }

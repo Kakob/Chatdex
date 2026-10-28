@@ -147,7 +147,8 @@ it('upgrades a v13 database additively without altering legacy cases, verdicts, 
   for (let i = 0; i < tables.length; i++) await old.table(tables[i]).add(records[i]);
   old.close();
   const upgraded = new ChatdexDB(name); await upgraded.open();
-  expect(upgraded.verno).toBe(14);
+  expect(upgraded.verno).toBe(15);
+  expect(await upgraded.syncLedger.count()).toBe(0);
   for (let i = 0; i < tables.length; i++) expect(await upgraded.table(tables[i]).get(records[i].id)).toEqual(records[i]);
   expect(await upgraded.researchSources.count()).toBe(0);
   await upgraded.delete();

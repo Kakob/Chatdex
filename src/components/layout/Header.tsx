@@ -1,5 +1,6 @@
-import { Menu, Sun, Moon, ShieldCheck } from 'lucide-react';
+import { Menu, Sun, Moon } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { SyncStatusMenu } from './SyncStatusMenu';
 
 export function Header() {
   const { theme, setTheme, toggleSidebar, conversationCount } = useAppStore();
@@ -38,12 +39,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span
-          className="hidden sm:flex items-center gap-1.5 px-2 py-1 text-xs text-gray-500 dark:text-gray-400"
-          title="Primary history and project artifacts stay in this browser unless encrypted sync is configured"
-        >
-          <ShieldCheck size={14} className="text-emerald-500" /> Local-first
-        </span>
+        <SyncStatusMenu />
 
         <button
           onClick={toggleTheme}
