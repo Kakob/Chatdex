@@ -244,7 +244,8 @@ export function ProjectUnderstandingPage({
   workspaceMode?: boolean;
 }) {
   const { id } = useParams<{ id: string }>();
-  const projectId = id === UNASSIGNED_ROUTE_ID ? null : id;
+  // `/projects/unassigned` is its own route with no `:id` param.
+  const projectId = id === undefined || id === UNASSIGNED_ROUTE_ID ? null : id;
   const addToast = useToastStore((s) => s.addToast);
 
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
@@ -263,7 +264,6 @@ export function ProjectUnderstandingPage({
   const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
-    if (projectId === undefined) return Promise.resolve();
     return Promise.all([loadProjectUnderstanding(projectId), listReadyProviders()]).then(
       ([loaded, configured]) => {
         setData(loaded);
@@ -280,7 +280,7 @@ export function ProjectUnderstandingPage({
   // Map data loads lazily on first Map view; `data` in the deps refreshes it
   // after reviews (accept/reject changes chains and statuses).
   useEffect(() => {
-    if (view !== 'map' || projectId === undefined) return;
+    if (view !== 'map') return;
     let cancelled = false;
     void loadProjectMap(projectId).then((loaded) => {
       if (!cancelled) setMap(loaded);
