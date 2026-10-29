@@ -45,6 +45,7 @@ import {
   envelopePreparedChange,
   envelopeIntentTrace,
   envelopeDecisionTrace,
+  envelopeLandscapeRegion,
   rehydrateConversation,
   rehydrateMessage,
   rehydrateActivity,
@@ -68,6 +69,7 @@ import {
   rehydratePreparedChange,
   rehydrateIntentTrace,
   rehydrateDecisionTrace,
+  rehydrateLandscapeRegion,
   type SyncEnvelope,
 } from './serializer';
 
@@ -218,6 +220,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       case 'decision_trace':
         await db.decisionTraces.delete(rec.id);
         return;
+      case 'landscape_region':
+        await db.landscapeRegions.delete(rec.id);
+        return;
     }
   }
   switch (rec.kind) {
@@ -289,6 +294,9 @@ async function applyIncomingRecord(rec: PullRecord, payload: unknown): Promise<v
       return;
     case 'decision_trace':
       await db.decisionTraces.put(rehydrateDecisionTrace(payload));
+      return;
+    case 'landscape_region':
+      await db.landscapeRegions.put(rehydrateLandscapeRegion(payload));
       return;
   }
 }
@@ -397,6 +405,10 @@ async function buildEnvelope(entry: DirtyEntry): Promise<SyncEnvelope | null> {
       const trace = await db.decisionTraces.get(entry.id);
       return trace ? envelopeDecisionTrace(trace) : null;
     }
+    case 'landscape_region': {
+      const region = await db.landscapeRegions.get(entry.id);
+      return region ? envelopeLandscapeRegion(region) : null;
+    }
   }
 }
 
@@ -428,6 +440,7 @@ function syncedTables(): Array<[SyncKind, { toCollection(): { primaryKeys(): Pro
     ['prepared_change', db.preparedChanges],
     ['intent_trace', db.intentTraces],
     ['decision_trace', db.decisionTraces],
+    ['landscape_region', db.landscapeRegions],
   ];
 }
 
@@ -838,6 +851,10 @@ class SyncEngine {
     db.decisionTraces.hook('creating', upsert('decision_trace'));
     db.decisionTraces.hook('updating', (_m, k) => upsert('decision_trace')(k as string));
     db.decisionTraces.hook('deleting', remove('decision_trace'));
+
+    db.landscapeRegions.hook('creating', upsert('landscape_region'));
+    db.landscapeRegions.hook('updating', (_m, k) => upsert('landscape_region')(k as string));
+    db.landscapeRegions.hook('deleting', remove('landscape_region'));
 
     // Dexie hooks have no portable unsubscribe; attach() installs them once
     // for the page lifetime and stop() leaves them in place.

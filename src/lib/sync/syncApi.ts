@@ -34,7 +34,8 @@ export type SyncKind =
   | 'investigation_finding'
   | 'prepared_change'
   | 'intent_trace'
-  | 'decision_trace';
+  | 'decision_trace'
+  | 'landscape_region';
 
 export interface PushRecord extends WireSealed {
   id: string;

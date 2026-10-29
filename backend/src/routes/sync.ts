@@ -29,6 +29,7 @@ const KindSchema = z.enum([
   'prepared_change',
   'intent_trace',
   'decision_trace',
+  'landscape_region',
 ]);
 
 const PushRecordSchema = z.object({

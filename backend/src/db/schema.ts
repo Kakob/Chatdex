@@ -117,6 +117,7 @@ export const syncRecords = pgTable(
         | 'prepared_change'
         | 'intent_trace'
         | 'decision_trace'
+        | 'landscape_region'
       >(),
     parentId: text('parent_id'),
     iv: bytea('iv').notNull(),

@@ -30,8 +30,8 @@ beforeEach(async () => {
 const sha = 'a'.repeat(40);
 
 describe('Dexie v12/v13 local-only tables', () => {
-  it('is at schema version 15', () => {
-    expect(db.verno).toBe(15);
+  it('is at schema version 16', () => {
+    expect(db.verno).toBe(16);
     expect(db.tables.map((t) => t.name)).toEqual(
       expect.arrayContaining([
         'repoFiles',

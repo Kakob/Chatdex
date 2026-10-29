@@ -138,7 +138,7 @@ describe('private research vertical slice', () => {
 it('upgrades a v13 database additively without altering legacy cases, verdicts, findings, conversations or prepared changes', async () => {
   const name = 'synthetic-migration-inquiry';
   const old = new Dexie(name);
-  const newTables = new Set(['researchSources', 'researchSnapshots', 'researchExhibits', 'questionRelations']);
+  const newTables = new Set(['researchSources', 'researchSnapshots', 'researchExhibits', 'questionRelations', 'landscapeRegions']);
   const schema = Object.fromEntries(db.tables.filter(t => !newTables.has(t.name)).map(t => [t.name, [t.schema.primKey.src, ...t.schema.indexes.map(i => i.src)].join(', ')]));
   old.version(13).stores(schema);
   await old.open();
@@ -147,7 +147,7 @@ it('upgrades a v13 database additively without altering legacy cases, verdicts, 
   for (let i = 0; i < tables.length; i++) await old.table(tables[i]).add(records[i]);
   old.close();
   const upgraded = new ChatdexDB(name); await upgraded.open();
-  expect(upgraded.verno).toBe(15);
+  expect(upgraded.verno).toBe(16);
   expect(await upgraded.syncLedger.count()).toBe(0);
   for (let i = 0; i < tables.length; i++) expect(await upgraded.table(tables[i]).get(records[i].id)).toEqual(records[i]);
   expect(await upgraded.researchSources.count()).toBe(0);

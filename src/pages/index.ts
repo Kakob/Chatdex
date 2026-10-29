@@ -20,3 +20,4 @@ export { DecisionDetailPage } from './DecisionDetailPage';
 export { DecisionComparePage } from './DecisionComparePage';
 export { SettingsPage } from './SettingsPage';
 export { HowDetectionWorksPage } from './HowDetectionWorksPage';
+export { LandscapePage } from './LandscapePage';

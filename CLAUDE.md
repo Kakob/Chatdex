@@ -99,6 +99,7 @@ src/
 │  ├─ sync/               # encrypted sync engine
 │  ├─ api.ts              # backend REST client
 │  ├─ analytics.ts, search.ts, import.ts, license.ts
+│  ├─ landscape/          # Understanding Landscape projection, URL state, lenses, geometry (docs/territories/explore-the-landscape.md)
 │  ├─ aipkms/             # planned AIPKMS feature layer
 │  ├─ exporters/, fs/, utils/
 └─ test/

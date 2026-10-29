@@ -25,7 +25,9 @@ import {
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
+  LandscapePage,
 } from './pages';
+import { LandscapeLabPage } from './pages/LandscapeLabPage';
 
 export function App() {
   useSyncLifecycle();
@@ -46,6 +48,9 @@ export function App() {
           <Route path="investigate" element={<InvestigatePage />} />
           <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
           <Route path="ledger" element={<LedgerPage />} />
+          <Route path="landscape" element={<LandscapePage />} />
+          {/* Dev-only synthetic scale lab: in-memory fixtures, never the user's DB. */}
+          {import.meta.env.DEV && <Route path="landscape/lab" element={<LandscapeLabPage />} />}
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>

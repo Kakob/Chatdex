@@ -33,6 +33,7 @@ import type { PreparedChange } from '../../types/preparedChange';
 import type { IntentTrace } from '../../types/intentTrace';
 import type { RepoFileRow, InspectionRow } from '../../types/repo';
 import type { DecisionTrace, AgentInspection, DecisionDiff } from '../../types/decision';
+import type { LandscapeRegion } from '../../types/landscape';
 
 export interface KnowledgeFolderRow {
   id: string;
@@ -87,6 +88,7 @@ export class ChatdexDB extends Dexie {
   researchExhibits!: Table<ResearchExhibit, string>;
   questionRelations!: Table<QuestionRelation, string>;
   syncLedger!: Table<SyncLedgerRow, [string, string]>;
+  landscapeRegions!: Table<LandscapeRegion, string>;
 
   constructor(name = 'chatdex') {
     super(name);
@@ -220,6 +222,13 @@ export class ChatdexDB extends Dexie {
     // written while it was off and the UI can say where each record lives.
     this.version(15).stores({
       syncLedger: '&[kind+id], kind',
+    });
+    // v16: Understanding Landscape regions (docs/changes/understanding-landscape).
+    // Additive. User organization records — they SYNC (encrypted) as kind
+    // 'landscape_region'. Resume state is NOT here: it reuses the local-only
+    // `inspections` log.
+    this.version(16).stores({
+      landscapeRegions: '&id, projectId, parentRegionId, updatedAt',
     });
   }
 }

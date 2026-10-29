@@ -438,6 +438,14 @@ The visualization must help navigation.
 
 A tree, outline, document, graph, timeline, or combination may prove superior.
 
+**Amended 2026-10-29 — built as the Understanding Landscape** ([change plan](../../changes/understanding-landscape/PLAN.md)).
+Navigation is a nested, click-to-enter landscape (projects → user-defined regions →
+findings → evidence), not a force-directed graph. Regions are organization records
+(`landscapeRegions`, synced as ciphertext), never understanding objects, so they assert
+nothing and never enter counts, proposals, or agent context. The only edges drawn are
+shared-source co-associations between projects, labeled as such. The supersession
+History map (§12) remains available unchanged.
+
 ---
 
 ## 14. Living understanding document

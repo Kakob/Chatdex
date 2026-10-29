@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
 import { FolderKanban, GitCompare, History, Lightbulb, PencilRuler, Scale } from 'lucide-react';
 import { getUnderstandingProject, getAssociationsForProject } from '../../lib/db/understanding';
 import { countPendingForProject } from '../../lib/understanding/pendingReviews';
+import { landscapeHref } from '../../lib/landscape/route';
 import type { UnderstandingProject } from '../../types/understanding';
 
 const WORKFLOW_TABS = [
@@ -84,6 +85,12 @@ export function ProjectWorkspaceLayout() {
           <span className="text-xs text-gray-400">
             {sourceCount} conversation source{sourceCount === 1 ? '' : 's'}
           </span>
+          <Link
+            to={landscapeHref({ project: id })}
+            className="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
+          >
+            View on landscape
+          </Link>
           <Link
             to={`/projects/${id}/investigate/research`}
             className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"

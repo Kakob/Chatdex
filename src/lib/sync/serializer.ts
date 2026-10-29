@@ -28,6 +28,7 @@ import type { SyncKind } from './syncApi';
 import type { PreparedChange } from '../../types/preparedChange';
 import type { IntentTrace, CommitEvidence } from '../../types/intentTrace';
 import type { DecisionTrace } from '../../types/decision';
+import type { LandscapeRegion } from '../../types/landscape';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
   kind: TKind;
@@ -564,4 +565,31 @@ export function envelopeDecisionTrace(t: DecisionTrace): SyncEnvelope<'decision_
 export function rehydrateDecisionTrace(payload: unknown): DecisionTrace {
   const { createdAt, ...rest } = payload as Omit<DecisionTrace, 'createdAt'> & { createdAt: string };
   return { ...rest, createdAt: isoToDate(createdAt) };
+}
+
+// --- Landscape regions (docs/changes/understanding-landscape) ---------------
+// User organization records. parentId is the project; titles, summaries, and
+// membership stay inside the ciphertext.
+
+export function envelopeLandscapeRegion(r: LandscapeRegion): SyncEnvelope<'landscape_region'> {
+  return {
+    kind: 'landscape_region',
+    parentId: r.projectId,
+    updatedAt: r.updatedAt,
+    payload: { ...r, createdAt: dateToIso(r.createdAt), updatedAt: dateToIso(r.updatedAt) },
+  };
+}
+
+export function rehydrateLandscapeRegion(payload: unknown): LandscapeRegion {
+  const { createdAt, updatedAt, ...rest } = payload as Omit<
+    LandscapeRegion,
+    'createdAt' | 'updatedAt'
+  > & { createdAt: string; updatedAt: string };
+  return {
+    ...rest,
+    memberObjectIds: rest.memberObjectIds ?? [],
+    pinnedObjectIds: rest.pinnedObjectIds ?? [],
+    createdAt: isoToDate(createdAt),
+    updatedAt: isoToDate(updatedAt),
+  };
 }

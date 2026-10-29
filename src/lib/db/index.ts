@@ -60,6 +60,7 @@ export async function clearAllData(): Promise<void> {
       db.decisionDiffs,
       db.researchSources, db.researchSnapshots, db.researchExhibits, db.questionRelations,
       db.syncLedger,
+      db.landscapeRegions,
     ],
     async () => {
       await db.conversations.clear();
@@ -96,6 +97,7 @@ export async function clearAllData(): Promise<void> {
       await db.researchExhibits.clear();
       await db.questionRelations.clear();
       await db.syncLedger.clear();
+      await db.landscapeRegions.clear();
     }
   );
 }

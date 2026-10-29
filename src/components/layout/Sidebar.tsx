@@ -4,6 +4,7 @@ import {
   Search,
   MessageSquare,
   FolderKanban,
+  Map as MapIcon,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -12,6 +13,7 @@ import { loadPendingReviewCounts } from '../../lib/understanding/pendingReviews'
 
 const navItems = [
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
+  { to: '/landscape', icon: MapIcon, label: 'Landscape' },
   { to: '/conversations', icon: MessageSquare, label: 'Sources' },
   { to: '/search', icon: Search, label: 'Global search' },
   { to: '/import', icon: Upload, label: 'Import' },

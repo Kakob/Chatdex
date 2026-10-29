@@ -16,6 +16,12 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 - **[changes/](./changes/README.md)** — bounded fixes and refinements, active work index, lifecycle rules, and a lightweight plan template.
 - Start with the capability to understand what applies now; open a change plan to understand what is proposed or how a change shipped.
 
+### Understanding Landscape
+
+- [Implementation plan, decisions, and verification](./changes/understanding-landscape/PLAN.md) — `/landscape`, acceptance pending.
+- [Code walkthrough](./territories/explore-the-landscape.md) — projection → URL state → scenes → inspector.
+- [Original handoff](./changes/understanding-landscape/START-HERE.md) and [visual reference](./changes/understanding-landscape/visual-guide.html).
+
 ### Experience inquiry handoff
 
 - [Original implementation handoff](./changes/experience-inquiry/CODEX_HANDOFF_CHATDEX_INQUIRY.md) — preserved from the supplied bundle.

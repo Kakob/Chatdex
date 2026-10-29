@@ -7,6 +7,7 @@ import {
   HelpCircle,
   History,
   Loader2,
+  Map as MapIcon,
   Plus,
   Sparkles,
   X,
@@ -255,6 +256,13 @@ export function ProjectsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/landscape"
+            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-emerald-200 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+          >
+            <MapIcon size={16} />
+            Landscape
+          </Link>
           <button
             type="button"
             onClick={() => void handleSampleWorkspace()}
