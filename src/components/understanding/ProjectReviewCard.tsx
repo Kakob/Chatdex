@@ -93,28 +93,37 @@ export function ProjectReviewCard({
       </div>
 
       {pendingAssociations.length > 0 && (
-        <ul className="mt-3 space-y-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-          {pendingAssociations.map(({ association, conversationName }) => (
-            <li key={association.id} className="flex items-center justify-between gap-2 text-sm">
-              <div className="min-w-0">
-                <Link
-                  to={`/conversations/${association.conversationId}`}
-                  className="text-gray-800 dark:text-gray-200 hover:text-violet-600 dark:hover:text-violet-400 truncate block"
-                >
-                  {conversationName}
-                </Link>
-                <div className="text-xs text-gray-400">
-                  {Math.round(association.confidence * 100)}% confidence
-                  {association.reason && <> — {association.reason}</>}
+        <section className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+          <h4 className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            Suggested sources ({pendingAssociations.length})
+          </h4>
+          <p className="mt-0.5 mb-2 text-xs text-gray-400">
+            Conversations the AI thinks belong to this project. Accepting one links it as a source;
+            findings come from running Update understanding on the project.
+          </p>
+          <ul className="space-y-2">
+            {pendingAssociations.map(({ association, conversationName }) => (
+              <li key={association.id} className="flex items-center justify-between gap-2 text-sm">
+                <div className="min-w-0">
+                  <Link
+                    to={`/conversations/${association.conversationId}`}
+                    className="text-gray-800 dark:text-gray-200 hover:text-violet-600 dark:hover:text-violet-400 truncate block"
+                  >
+                    {conversationName}
+                  </Link>
+                  <div className="text-xs text-gray-400">
+                    {Math.round(association.confidence * 100)}% confidence
+                    {association.reason && <> — {association.reason}</>}
+                  </div>
                 </div>
-              </div>
-              <ReviewButtons
-                small
-                onReview={(state) => onAssociationReview(association.id, state)}
-              />
-            </li>
-          ))}
-        </ul>
+                <ReviewButtons
+                  small
+                  onReview={(state) => onAssociationReview(association.id, state)}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );
