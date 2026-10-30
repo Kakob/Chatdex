@@ -87,6 +87,7 @@ src/
 ├─ App.tsx, main.tsx
 ├─ index.css              # Tailwind entry
 ├─ components/            # shared UI
+├─ features/researchAtlas/ # /research directory; own unsynced IndexedDB (docs/changes/research-atlas/PLAN.md)
 ├─ pages/                 # route views
 ├─ hooks/
 ├─ stores/                # Zustand stores (appStore.ts, etc.)

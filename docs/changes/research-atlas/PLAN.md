@@ -1,8 +1,22 @@
 # Research Atlas MVP
 
-**Status:** Feature branch (not deployed)
-**Built:** October 23, 2026
-**Local URL:** http://localhost:4000/research
+Status: Implemented — acceptance pending
+Primary capability: none (standalone feature; no capability spec yet)
+Affected contracts: none. Uses its own `chatdex-research-atlas` IndexedDB database, outside
+Chatdex's Dexie schema and sync (CLAUDE.md invariant 1 untouched); OpenAlex calls carry only
+the user's search text, never conversation content (invariant 6 not engaged).
+
+Built October 23, 2026; merged to `main` 2026-10-30 as PR #2 (`0162a66`). Route `/research`.
+
+## Acceptance
+
+- [x] `npm run typecheck`, full `npm test`, and the PR's CI build pass (2026-10-30).
+- [ ] Browser pass: seed loads on first visit; search, detail panels and cross-links work;
+      an OpenAlex import and a grant-linked paper lookup return records; investigation
+      status/notes persist across reload; JSON export downloads.
+- [ ] Decide whether Research Atlas keeps a top-level sidebar entry in the slimmed nav, and
+      whether its name needs separating from the project-scoped Research shelf
+      (`/projects/:id/investigate/research`).
 
 ## Purpose
 
