@@ -2,6 +2,7 @@ import { ResearchShelfPage } from './pages/ResearchShelfPage';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useSyncLifecycle } from './hooks';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
+import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import {
   LandingPage,
   SearchPage,
@@ -52,6 +53,7 @@ export function App() {
           {/* Dev-only synthetic scale lab: in-memory fixtures, never the user's DB. */}
           {import.meta.env.DEV && <Route path="landscape/lab" element={<LandscapeLabPage />} />}
           <Route path="projects" element={<ProjectsPage />} />
+          <Route path="research" element={<ResearchAtlasPage />} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
