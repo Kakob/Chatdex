@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Filter, CheckSquare } from 'lucide-react';
 import { ConversationList, ConversationView } from '../components/conversations';
 import { BatchTagBar } from '../components/conversations/BatchTagBar';
@@ -15,6 +15,7 @@ export function ConversationsPage() {
   const { id: urlId } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [sourceFilter, setSourceFilter] = useState<DataSource | undefined>(undefined);
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
@@ -64,11 +65,14 @@ export function ConversationsPage() {
   }, [conversations, selectedTagIds, tagsMap]);
 
   const handleSelect = (conversation: StoredConversation) => {
-    navigate(`/conversations/${conversation.id}`, { replace: true });
+    navigate(`/conversations/${conversation.id}`);
   };
 
+  // Return to wherever the conversation was opened from (a project, the
+  // landscape, search…); one opened directly falls back to the list.
   const handleBack = () => {
-    navigate('/conversations', { replace: true });
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/conversations', { replace: true });
   };
 
   const toggleTagFilter = (tagId: string) => {

@@ -209,6 +209,8 @@ export function ConversationView({
       <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-4">
         <button
           onClick={onBack}
+          title="Back"
+          aria-label="Back"
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
