@@ -8,6 +8,7 @@ import {
   getUnderstandingProject,
 } from '../lib/db/understanding';
 import { getObjectsForProject } from '../lib/db/understanding';
+import { loadProjectSummary, type ProjectSummary } from '../lib/understanding/projectSummary';
 import { useToastStore } from '../stores/toastStore';
 import { RepoBindingCard } from '../components/intents/RepoBindingCard';
 import type { StoredConversation } from '../types';
@@ -19,14 +20,16 @@ interface OverviewData {
   conversations: StoredConversation[];
   allConversations: StoredConversation[];
   acceptedUnderstandingCount: number;
+  summary: ProjectSummary | null;
 }
 
 async function loadOverviewData(id: string): Promise<OverviewData | null> {
-  const [project, associations, allConversations, objects] = await Promise.all([
+  const [project, associations, allConversations, objects, summary] = await Promise.all([
     getUnderstandingProject(id),
     getAssociationsForProject(id),
     db.conversations.orderBy('updatedAt').reverse().toArray(),
     getObjectsForProject(id, 'current'),
+    loadProjectSummary(id),
   ]);
   if (!project) return null;
   const visibleAssociations = associations.filter(
@@ -45,7 +48,80 @@ async function loadOverviewData(id: string): Promise<OverviewData | null> {
     acceptedUnderstandingCount: objects.filter(
       (object) => object.reviewState === 'accepted' || object.reviewState === 'edited'
     ).length,
+    summary,
   };
+}
+
+interface StepStat {
+  value: number;
+  label: string;
+  detail?: string;
+}
+
+interface StepStatus {
+  stats: StepStat[];
+  /** One plain sentence: what is (or isn't) there yet, or what to do next. */
+  note: string;
+}
+
+const plural = (n: number, word: string, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+const day = (d: Date) => d.toLocaleDateString();
+
+function investigateStatus(s: ProjectSummary['investigate']): StepStatus {
+  const sourceDetail = [
+    s.suggestedSources ? `+${s.suggestedSources} suggested` : '',
+    s.researchSources ? `+${plural(s.researchSources, 'research source')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const stats: StepStat[] = [
+    { value: s.sources, label: s.sources === 1 ? 'accepted source' : 'accepted sources', detail: sourceDetail || undefined },
+    { value: s.investigations, label: s.investigations === 1 ? 'investigation' : 'investigations', detail: s.openInvestigations ? `${s.openInvestigations} open` : undefined },
+    { value: s.findings, label: s.findings === 1 ? 'finding' : 'findings', detail: s.findings ? `${s.promotedFindings} promoted${s.draftFindings ? ` · ${s.draftFindings} draft` : ''}` : undefined },
+    { value: s.pinnedEvidence, label: 'pinned evidence' },
+  ];
+  let note: string;
+  if (s.investigations === 0 && s.sources === 0 && s.suggestedSources > 0) {
+    note = `No investigations yet. Accept the ${plural(s.suggestedSources, 'suggested source')} on the Projects page to investigate ${s.suggestedSources === 1 ? 'it' : 'them'}.`;
+  } else if (s.investigations === 0) {
+    note = s.sources ? 'No investigations yet. Ask a question to start one.' : 'No sources or investigations yet.';
+  } else {
+    const lead = s.findings ? 'Findings are written by you.' : 'No findings written yet.';
+    note = `${lead}${s.lastActivityAt ? ` Last worked on ${day(s.lastActivityAt)}.` : ''}`;
+  }
+  return { stats, note };
+}
+
+function understandingStatus(s: ProjectSummary['understanding']): StepStatus {
+  const stats: StepStat[] = [
+    { value: s.current, label: s.current === 1 ? 'current item' : 'current items', detail: s.current ? `${s.byYou} by you · ${s.byAi} by AI` : undefined },
+    { value: s.awaitingReview, label: 'awaiting review', detail: s.proposedChanges ? `+${plural(s.proposedChanges, 'proposed change')}` : undefined },
+    { value: s.openQuestions, label: s.openQuestions === 1 ? 'open question' : 'open questions' },
+    {
+      value: s.ideasAndDecisions,
+      label: 'ideas & decisions',
+      detail: [s.direction ? `+${s.direction} direction` : '', s.earlier ? `${s.earlier} superseded or resolved` : '']
+        .filter(Boolean)
+        .join(' · ') || undefined,
+    },
+  ];
+  const updated = s.lastUpdatedAt
+    ? `Last updated from conversations ${day(s.lastUpdatedAt)}.`
+    : 'Update understanding has not been run on this project yet.';
+  const note = s.current === 0 ? `Nothing in current understanding yet. ${updated}` : updated;
+  return { stats, note };
+}
+
+function prepareStatus(s: ProjectSummary['prepare']): StepStatus {
+  const stats: StepStat[] = [
+    { value: s.changes, label: s.changes === 1 ? 'prepared change' : 'prepared changes', detail: s.changes ? `${s.inProgress} in progress · ${s.finished} done` : undefined },
+    { value: s.readyPoints, label: 'accepted items to use' },
+  ];
+  let note: string;
+  if (s.changes > 0) note = s.lastEditedAt ? `Last edited ${day(s.lastEditedAt)}.` : '';
+  else if (s.readyPoints === 0) note = 'No changes prepared yet. Prepare Change uses accepted understanding, so accept some items first.';
+  else note = 'No changes prepared yet.';
+  return { stats, note };
 }
 
 const FLOW_CARDS = [
@@ -122,21 +198,50 @@ export function ProjectOverviewPage() {
         )}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
-        {FLOW_CARDS.map(({ segment, title, description, icon: Icon }) => (
-          <Link
-            key={segment}
-            to={`/projects/${id}/${segment}`}
-            className="group rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
-          >
-            <div className="flex items-center gap-2 text-gray-900 dark:text-white font-semibold">
-              <Icon size={18} className="text-violet-500" />
-              {title}
-              <ArrowRight size={15} className="ml-auto text-gray-300 group-hover:text-violet-500" />
-            </div>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{description}</p>
-          </Link>
-        ))}
+      <section className="grid gap-4 lg:grid-cols-3" aria-label="Project workflow summary">
+        {FLOW_CARDS.map(({ segment, title, description, icon: Icon }) => {
+          const status = data.summary
+            ? segment === 'investigate'
+              ? investigateStatus(data.summary.investigate)
+              : segment === 'understanding'
+                ? understandingStatus(data.summary.understanding)
+                : prepareStatus(data.summary.prepare)
+            : null;
+          return (
+            <Link
+              key={segment}
+              to={`/projects/${id}/${segment}`}
+              className="group rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-gray-900 dark:text-white font-semibold">
+                <Icon size={18} className="text-violet-500" />
+                {title}
+                <ArrowRight size={15} className="ml-auto text-gray-300 group-hover:text-violet-500" />
+              </div>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">{description}</p>
+              {status && (
+                <>
+                  <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-gray-100 dark:border-gray-800 pt-4">
+                    {status.stats.map((stat) => (
+                      <li key={stat.label} className="min-w-0">
+                        <span className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {stat.value}
+                        </span>{' '}
+                        <span className="text-sm text-gray-600 dark:text-gray-300">{stat.label}</span>
+                        {stat.detail && (
+                          <span className="block text-xs text-gray-400">{stat.detail}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {status.note && (
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">{status.note}</p>
+                  )}
+                </>
+              )}
+            </Link>
+          );
+        })}
       </section>
 
       <RepoBindingCard
