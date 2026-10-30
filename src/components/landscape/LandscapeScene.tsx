@@ -17,6 +17,7 @@ import {
 import type {
   Landscape,
   LandscapeConnection,
+  LandscapeCounts,
   LandscapeFinding,
   LandscapeRegionNode,
 } from '../../lib/landscape/projection';
@@ -145,14 +146,17 @@ function hitCount(ids: string[], landscape: Landscape, matches: (f: LandscapeFin
 }
 
 function countsLine(
-  node: { counts: { total: number; pending: number; open: number; historical: number } },
+  node: { counts: LandscapeCounts },
   extra?: string,
   compact = false
 ): string {
   const c = node.counts;
-  if (!c.total) return extra ? `No findings yet · ${extra}` : 'No findings yet';
-  const parts = [`${c.total} finding${c.total === 1 ? '' : 's'}`];
-  if (c.pending) parts.push(compact ? `${c.pending} pending` : `${c.pending} pending review`);
+  if (!c.current) {
+    const empty = c.historical ? `No current findings · ${c.historical} earlier` : 'No findings yet';
+    return extra ? `${empty} · ${extra}` : empty;
+  }
+  const parts = [`${c.current} finding${c.current === 1 ? '' : 's'}`];
+  if (c.toReview) parts.push(`${c.toReview} to review`);
   if (c.open) parts.push(compact ? `${c.open} open` : `${c.open} open question${c.open === 1 ? '' : 's'}`);
   if (extra) parts.push(extra);
   return parts.join(' · ');
@@ -339,7 +343,7 @@ export function AllProjectsScene({ landscape, view, lens, matches, filtering, wi
         const small = place.rx < 118;
         const inner = place.rx * 1.7;
         const summary = p.description || p.previews[0]?.title || (p.sourceCount ? 'Sources are linked. Understanding has not been synthesized yet.' : 'No understanding records or linked sources yet.');
-        const caption = mark.caption ?? countsLine(p, p.sample ? 'built-in sample' : p.counts.total ? undefined : `${p.sourceCount} source${p.sourceCount === 1 ? '' : 's'}`, true);
+        const caption = mark.caption ?? countsLine(p, p.sample ? 'built-in sample' : p.counts.current || p.counts.historical ? undefined : `${p.sourceCount} source${p.sourceCount === 1 ? '' : 's'}`, true);
         const selected = view.resume?.key === p.key;
         const href = lens.id === 'recent' && p.project
           ? toHref(withLocation(params, { resume: p.key }))

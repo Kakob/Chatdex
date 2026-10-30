@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { assembleOverview } from '../understanding/overview';
 import { assembleLandscape, regionNode, UNASSIGNED_KEY, UNCATEGORIZED_ID, type LandscapeInput } from './projection';
 import type {
   ProjectAssociation,
@@ -66,7 +67,7 @@ describe('assembleLandscape eligibility', () => {
     expect(l.findings.get('q')!.tone).toBe('open');
     expect(l.findings.get('q')!.object.reviewState).toBe('pending');
     const p1 = l.projects[0].counts;
-    expect(p1).toEqual({ total: 4, pending: 2, open: 1, historical: 2 });
+    expect(p1).toEqual({ current: 2, toReview: 2, open: 1, historical: 2 });
   });
 });
 
@@ -134,7 +135,7 @@ describe('regions', () => {
       })
     );
     const p = l.projects[0];
-    expect(p.counts.total).toBe(3);
+    expect(p.counts.current).toBe(3);
     expect(p.regions.map((r) => r.id)).toEqual(['r1', 'r2', UNCATEGORIZED_ID]);
     expect(regionNode(l, 'p1', UNCATEGORIZED_ID)!.directIds).toEqual(['c']);
     expect(l.findings.get('a')!.regionIds).toEqual(['r1', 'r2']);
@@ -170,7 +171,7 @@ describe('regions', () => {
     );
     const parent = regionNode(l, 'p1', 'parent')!;
     expect(parent.children.map((c) => c.id)).toEqual(['child']);
-    expect(parent.counts.total).toBe(2);
+    expect(parent.counts.current).toBe(2);
     expect(regionNode(l, 'p1', 'child')!.depth).toBe(1);
     expect(l.projects[0].regions.map((r) => r.id)).toEqual(['parent', 'c1', 'c2', 'orphan']);
   });
@@ -190,7 +191,7 @@ describe('regions', () => {
 
   it('handles an empty project honestly', () => {
     const l = assembleLandscape(input({ associations: [association('p1', 'c1')] }));
-    expect(l.projects[0]).toMatchObject({ regions: [], sourceCount: 1, previews: [], counts: { total: 0, pending: 0, open: 0, historical: 0 } });
+    expect(l.projects[0]).toMatchObject({ regions: [], sourceCount: 1, previews: [], counts: { current: 0, toReview: 0, open: 0, historical: 0 } });
   });
 });
 
@@ -214,5 +215,42 @@ describe('connections', () => {
       ['p1~p2', false, ['Shared']],
       ['p2~p3', true, [null]],
     ]);
+  });
+});
+
+describe('counts match the Projects page', () => {
+  it('reports the same current, to-review, and open numbers as assembleOverview', () => {
+    const projects = [project('p1'), project('p2', { createdAt: day(1) }), project('gone', { reviewState: 'rejected' })];
+    const objects = [
+      object('a'),
+      object('b', { reviewState: 'pending' }),
+      object('q', { type: 'question' }),
+      object('old', { status: 'superseded' }),
+      object('done', { type: 'question', status: 'resolved', reviewState: 'pending' }),
+      object('i', { type: 'intent', reviewState: 'pending' }),
+      object('rej', { reviewState: 'rejected' }),
+      object('c', { projectId: 'p2' }),
+      object('hidden', { projectId: 'gone' }),
+    ];
+    const events = [
+      event('e1', 'a', { reviewState: 'pending' }),
+      event('e2', 'old', { reviewState: 'pending' }),
+      event('e3', 'a', { reviewState: 'rejected' }),
+      event('e4', 'i', { reviewState: 'pending' }),
+      event('e5', 'c'),
+    ];
+    const l = assembleLandscape(input({ projects, objects, events }));
+    const overview = assembleOverview(projects, objects, events);
+    expect(overview.projects.map((s) => s.project.id).sort()).toEqual(l.projects.filter((p) => p.project).map((p) => p.key).sort());
+    for (const stats of overview.projects) {
+      const place = l.projects.find((p) => p.key === stats.project.id)!;
+      expect([place.counts.current, place.counts.toReview, place.counts.open]).toEqual([
+        stats.objectCount,
+        stats.pendingReviewCount,
+        stats.openQuestionCount,
+      ]);
+    }
+    expect(l.projects.find((p) => p.key === 'p1')!.counts).toEqual({ current: 3, toReview: 4, open: 1, historical: 2 });
+    expect(l.totals.open).toBe(overview.openQuestions.length);
   });
 });

@@ -79,6 +79,20 @@ describe('assembleOverview', () => {
     expect(stats.pendingReviewCount).toBe(2);
   });
 
+  it('leaves intents out, as the per-project panel does (they have their own tab)', () => {
+    const p = proj({ id: 'p1' });
+    const objects = [
+      obj({ id: 'a' }),
+      obj({ id: 'i', type: 'intent', reviewState: 'pending' }),
+      obj({ id: 'loose', type: 'intent', projectId: null }),
+    ];
+    const events = [...objects.map((o) => evt(o.id)), evt('i', { op: 'refined', reviewState: 'pending' })];
+    const overview = assembleOverview([p], objects, events);
+    expect(overview.projects[0]).toMatchObject({ objectCount: 1, pendingReviewCount: 0 });
+    expect(overview.unassignedCount).toBe(0);
+    expect(overview.recentChanges.map((c) => c.event.objectId)).toEqual(['a']);
+  });
+
   it('excludes rejected projects and everything under them', () => {
     const kept = proj({ id: 'p1' });
     const rejected = proj({ id: 'p2', reviewState: 'rejected' });

@@ -29,7 +29,8 @@ export function passesFilter(finding: LandscapeFinding, filter: LandscapeFilter)
     case 'all':
       return true;
     case 'pending':
-      return finding.object.reviewState === 'pending';
+      // Same as the "to review" count: the finding or a change to it awaits review.
+      return finding.object.reviewState === 'pending' || finding.pendingEventCount > 0;
     case 'open':
       return finding.object.type === 'question' && finding.object.status === 'current';
     case 'historical':

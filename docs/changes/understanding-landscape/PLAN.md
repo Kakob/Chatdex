@@ -70,7 +70,11 @@ Map is a supersession-chain timeline, not a spatial landscape.
 4. **Eligible-record policy** (projection header): rejected objects and intents excluded
    (Intent Trace keeps its own contract), objects under rejected projects excluded, every
    lifecycle status included, unassigned objects shown in a virtual "No project" place.
-   Counts are distinct findings; "pending review" = the finding's own review state is pending.
+   Counts match the Projects page (`understanding/overview.ts`), guarded by a parity test:
+   distinct *current* findings (pending included), "to review" = pending findings + pending
+   changes to findings, open = current questions. Superseded/resolved findings stay on the map
+   and are counted separately. The Projects page overview now leaves intents out, as its own
+   header and the per-project panel already did (2026-10-29).
 5. **Evidence support.** "Reviewed" only when an accepted/edited event cites the conversation
    *and* the object itself is accepted/edited. (Found in live testing: a pending AI object's
    `introduced` event is stored as accepted, which would otherwise have read as reviewed.)

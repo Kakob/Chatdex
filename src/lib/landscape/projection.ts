@@ -16,6 +16,12 @@
 //   - objects under a rejected or missing project are excluded with it;
 //     objects with no project land in the virtual "No project" place.
 //
+// Counts follow the Projects page (understanding/overview.ts) so the two
+// surfaces agree: `current` counts current findings, pending included;
+// `toReview` is pending findings plus pending changes to findings; `open`
+// is current questions. Superseded/resolved findings stay on the map and
+// are counted separately as `historical`.
+//
 // Evidence: rejected events contribute nothing. A conversation is 'reviewed'
 // support only when an accepted/edited event cites it AND the object itself
 // has been accepted/edited — a pending object's auto-applied 'introduced'
@@ -80,10 +86,10 @@ export interface LandscapeFinding {
 }
 
 export interface LandscapeCounts {
-  /** Distinct findings. */
-  total: number;
-  /** Findings whose own review state is pending. */
-  pending: number;
+  /** Distinct current findings, pending included (Projects page "understanding objects"). */
+  current: number;
+  /** Pending findings plus pending changes to findings (Projects page "to review"). */
+  toReview: number;
   /** Current questions. */
   open: number;
   /** Superseded or resolved findings. */
@@ -214,14 +220,17 @@ function buildEvidence(
 }
 
 function countOf(ids: string[], findings: Map<string, LandscapeFinding>): LandscapeCounts {
-  const counts: LandscapeCounts = { total: 0, pending: 0, open: 0, historical: 0 };
+  const counts: LandscapeCounts = { current: 0, toReview: 0, open: 0, historical: 0 };
   for (const id of ids) {
     const f = findings.get(id);
     if (!f) continue;
-    counts.total += 1;
-    if (f.object.reviewState === 'pending') counts.pending += 1;
-    if (f.object.status !== 'current') counts.historical += 1;
-    else if (f.object.type === 'question') counts.open += 1;
+    counts.toReview += f.pendingEventCount + Number(f.object.reviewState === 'pending');
+    if (f.object.status !== 'current') {
+      counts.historical += 1;
+      continue;
+    }
+    counts.current += 1;
+    if (f.object.type === 'question') counts.open += 1;
   }
   return counts;
 }
@@ -362,7 +371,7 @@ export function assembleLandscape(input: LandscapeInput): Landscape {
         directIds: ordered,
         allIds: [],
         previews: [],
-        counts: { total: 0, pending: 0, open: 0, historical: 0 },
+        counts: { current: 0, toReview: 0, open: 0, historical: 0 },
       };
     });
     const nodeById = new Map(nodes.map((n) => [n.id, n]));

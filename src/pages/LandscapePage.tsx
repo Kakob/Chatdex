@@ -232,11 +232,14 @@ function LandscapeView({
   const project = view.project;
   const scope = project ?? null;
   const counts = scope ? scope.counts : landscape.totals;
+  // The virtual "No project" place is not a project (matches the Projects page count).
+  const realProjectCount = landscape.projects.filter((p) => p.project).length;
   const title = project ? project.name : params.lens === 'recent' ? 'Where you left things' : 'A landscape of your projects';
   const subhead = project
     ? [
         `${project.sourceCount} conversation source${project.sourceCount === 1 ? '' : 's'}`,
-        `${project.counts.total} understanding record${project.counts.total === 1 ? '' : 's'}`,
+        `${project.counts.current} understanding object${project.counts.current === 1 ? '' : 's'}`,
+        project.counts.historical ? `${project.counts.historical} superseded or resolved` : '',
         project.regionCount ? `${project.regionCount} region${project.regionCount === 1 ? '' : 's'}` : 'not organized yet',
         project.sample ? 'Synthetic sample supplied by Chatdex' : project.project?.reviewState === 'pending' ? 'Project awaiting review' : '',
       ]
@@ -273,12 +276,12 @@ function LandscapeView({
           </div>
           <div className="countbar" aria-label="Counts">
             <div>
-              <strong>{scope ? counts.total : landscape.projects.length}</strong>
-              <span>{scope ? (counts.total === 1 ? 'finding' : 'findings') : 'projects'}</span>
+              <strong>{scope ? counts.current : realProjectCount}</strong>
+              <span>{scope ? (counts.current === 1 ? 'finding' : 'findings') : realProjectCount === 1 ? 'project' : 'projects'}</span>
             </div>
             <div>
-              <strong>{counts.pending}</strong>
-              <span>pending review</span>
+              <strong>{counts.toReview}</strong>
+              <span>to review</span>
             </div>
             <div>
               <strong>{counts.open}</strong>
@@ -440,7 +443,7 @@ function LandscapeView({
 
         <footer className="foot">
           <span>
-            Counts are distinct findings: a finding in two regions counts once. Pending review means not yet accepted. Viewing and navigating never change a record or a review.
+            Counts match the Projects page: current findings, counted once even when in two regions. To review means a finding or a change to it is not yet accepted; superseded and resolved findings stay on the map but are not counted. Viewing and navigating never change a record or a review.
           </span>
           <button type="button" className="about" onClick={() => setAboutOpen((v) => !v)} aria-expanded={aboutOpen}>
             About this view

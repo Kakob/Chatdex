@@ -29,7 +29,7 @@ describe.each(SYNTHETIC_SIZES)('synthetic landscape at %i records', (size) => {
     const eligible = input.objects.filter((o) => o.reviewState !== 'rejected');
     expect(landscape.findings.size).toBe(eligible.length);
     expect(landscape.findings.has('syn-rejected')).toBe(false);
-    expect(landscape.projects.reduce((n, p) => n + p.counts.total, 0)).toBe(eligible.length);
+    expect(landscape.projects.reduce((n, p) => n + p.counts.current + p.counts.historical, 0)).toBe(eligible.length);
   });
 
   it('reaches every distinct eligible id through regions and Uncategorized', () => {

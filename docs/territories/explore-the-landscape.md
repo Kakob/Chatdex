@@ -73,7 +73,7 @@ Regions are organization, not claims: nothing in `src/lib/db/landscape.ts` reads
 - **Eligibility:** drop rejected objects, intents, objects under rejected/missing projects; keep every lifecycle status. [CODE, TEST]
 - **Review vs lifecycle:** `tone` is historical / open (current question) / pending / reviewed; pills always show review state and status separately. [CODE, TEST]
 - **Evidence support:** `reviewed` only when an accepted/edited event cites the conversation *and* the object is accepted/edited; otherwise `proposed`. A conversation missing locally has `conversationName: null` → "not on this device". [CODE, TEST]
-- **Counts:** distinct ids; a finding in two regions counts once; foreign/duplicate/rejected member ids are ignored but left in the record. [CODE, TEST]
+- **Counts:** same rules as the Projects page (`assembleOverview`): `current` = distinct current findings, pending included; `toReview` = pending findings + pending changes; `open` = current questions; `historical` counted separately. A finding in two regions counts once; foreign/duplicate/rejected member ids are ignored but left in the record. The "Pending review" filter matches `toReview`. [CODE, TEST `projection.test.ts` parity]
 - **Tree safety:** a region whose parent is missing or cyclic is lifted to top level. Writes refuse cycles and cross-project parents (`organize.ts::wouldCreateCycle`). [CODE, TEST]
 - **Statements:** pins first, then the region's own current findings, accepted before pending, in stable order. [CODE, TEST]
 - **Clocks:** `sourceAt` = latest event `occurredAt`; `recordedAt` = object `createdAt`; user activity only from visit rows. [CODE, TEST]

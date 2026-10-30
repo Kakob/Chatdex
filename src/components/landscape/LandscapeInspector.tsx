@@ -517,7 +517,7 @@ export function ListPanel({ landscape, view, matches, filtering }: { landscape: 
             <Link key={p.key} className="list-row" to={toHref(withLocation(params, { project: p.key }))}>
               {p.name}
               <small>
-                {p.counts.total} findings · {p.regionCount} regions · {p.sourceCount} sources
+                {p.counts.current} findings · {p.regionCount} regions · {p.sourceCount} sources
               </small>
             </Link>
           )}
@@ -557,7 +557,7 @@ export function ListPanel({ landscape, view, matches, filtering }: { landscape: 
           {subregions.map((n) => (
             <Link key={n.id} className="list-row" to={toHref(withLocation(params, { project: project.key, region: n.id }))} style={{ paddingLeft: (n.depth - (region?.depth ?? -1) - 1) * 14 }}>
               {n.title}
-              <small>{n.counts.total} findings</small>
+              <small>{n.counts.current} findings</small>
             </Link>
           ))}
         </>
@@ -704,7 +704,7 @@ function RegionEditor({
         </select>
       </div>
       <small style={{ color: '#8b9886', fontSize: 10 }}>
-        {node.directIds.length} placed here · {node.counts.total} including subregions
+        {node.directIds.length} placed here · {node.allIds.length} including subregions
       </small>
     </div>
   );
