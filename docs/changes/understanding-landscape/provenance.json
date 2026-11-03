@@ -1,0 +1,35 @@
+{
+  "prepared": "2026-10-29",
+  "prototype_commit": "90d02d859e2963e036d4e3b25989786d3ef244b4",
+  "chatdex_review_commit": "76affe11f0d9c7a83c338688b290147696ddc84d",
+  "capture": {
+    "viewport": [
+      1440,
+      1000
+    ],
+    "fullPage": true,
+    "pageErrors": []
+  },
+  "files": {
+    "ACCEPTANCE.md": "5efe5265542f4c5f7b6bdaa3ea1662d5de4311eb6bc87c4a87551e608885a264",
+    "AGENT-PROMPT.txt": "5c757ce196f2addb93a68f9a49c7f3dda07c1dd42340aaeb294a0d164cd5ec25",
+    "START-HERE.md": "adfdd7e642382ec491196c0abeb2d338517151c6942aa99cba73aa9f11355c97",
+    "VISUAL-CONTRACT.md": "2a7bb511ea6ff6df3ccd197ba291784be5a09e2b46a26de21d462391bf384d20",
+    "reference/index.html": "ea3ddf8a4aa6dc2b6f94cc7cfb2be2961f3a05a6bad96235a90864b603169d8b",
+    "reference/lab.html": "247d6f126619186f371901afed592a381b01cdfa6ceda398b16fc556d6ed1184",
+    "reference/recent.html": "9dc4875704b0929fc05d661d3164eafb9de72f29fae24721007ed4eb7d5c602c",
+    "reference/source/atlas-data.js": "df031dc81d48923431446f2c8132f9e88d76d328b805da1c3d243764dcecd522",
+    "reference/source/atlas-shell.html": "8ead88fe3928a510f0f81d6893f0245d4f21ee66f3046a641db56f87caece2bf",
+    "reference/source/atlas.css": "1c88d2e4e0fd8c0ac638e6e881fee8a40e85f29c2bf60072b0c3a5638b385f60",
+    "reference/source/atlas.js": "319721ebadc438b08b1ea96479a3abc227fc1bc5a9fe0048823e578d28ac08bf",
+    "reference/source/recent.js": "0c6f6826020a479e3f8971619b462932bb30270fe66ea9ba9e1e4ae6efe759a6",
+    "screenshots/01-projects.png": "36b700a4d7f6f8197f58d64328a27c4ac5a36bb942c7400fcb40b9d9e2bc7712",
+    "screenshots/02-project-landscape.png": "e92d046a7dc804d22e0e7631a0022eb28640f4516c7c1f1ec9a9f6e325846d22",
+    "screenshots/03-region-findings.png": "d410e1804857047eee07345d27b630292e1991ecb07fe03464d198fb162c15c1",
+    "screenshots/04-finding-inspector.png": "b9ae20fc3fddd5f33953a20a64f487c739818ef10b379f9ca7131bedbe7d32c1",
+    "screenshots/05-source-inspector.png": "2fa3411275623c296adad0128045c37602dcaebb928fbed8e1566b8c7a6d57b0",
+    "screenshots/06-recent-work.png": "fb8afafc483790777bf73edf8942a1b7ddcfc68d670feae471176238bb8ff704",
+    "screenshots/07-resume-inspector.png": "d79ed9b9edf89dea4d24b8c1b3c4e21c43ed62ffeb597f7e9f2fe96316dfb767",
+    "visual-guide.html": "0938daadca78464d903fdef62993a9b77a5b811ffb22c04ff253739ea52fb0e8"
+  }
+}

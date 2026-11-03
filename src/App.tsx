@@ -1,7 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Layout } from './components/layout';
+import { ResearchShelfPage } from './pages/ResearchShelfPage';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { useSyncLifecycle } from './hooks';
+import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import {
+  LandingPage,
   SearchPage,
   AnalyticsPage,
   TimelinePage,
@@ -10,20 +13,30 @@ import {
   KnowledgePage,
   InvestigatePage,
   InvestigationWorkbenchPage,
+  QuestionInvestigationPage,
   LedgerPage,
   ProjectsPage,
   ProjectUnderstandingPage,
+  ProjectOverviewPage,
+  PrepareChangePage,
+  IntentTracePage,
+  DecisionsPage,
+  DecisionDetailPage,
+  DecisionComparePage,
   ImportPage,
   SettingsPage,
   HowDetectionWorksPage,
+  LandscapePage,
 } from './pages';
+import { LandscapeLabPage } from './pages/LandscapeLabPage';
 
 export function App() {
+  useSyncLifecycle();
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/search" replace />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route element={<Layout />}>
           <Route path="search" element={<SearchPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
@@ -36,9 +49,34 @@ export function App() {
           <Route path="investigate" element={<InvestigatePage />} />
           <Route path="investigate/:anchorId" element={<InvestigationWorkbenchPage />} />
           <Route path="ledger" element={<LedgerPage />} />
+          <Route path="landscape" element={<LandscapePage />} />
+          {/* Dev-only synthetic scale lab: in-memory fixtures, never the user's DB. */}
+          {import.meta.env.DEV && <Route path="landscape/lab" element={<LandscapeLabPage />} />}
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="research" element={<ResearchAtlasPage />} />
-          <Route path="projects/:id" element={<ProjectUnderstandingPage />} />
+          <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
+          <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
+            <Route index element={<ProjectOverviewPage />} />
+            <Route path="investigate" element={<InvestigatePage projectScoped />} />
+            <Route path="investigate/research" element={<ResearchShelfPage />} />
+            <Route
+              path="investigate/questions/:caseId"
+              element={<QuestionInvestigationPage />}
+            />
+            <Route
+              path="investigate/:anchorId"
+              element={<InvestigationWorkbenchPage projectScoped />}
+            />
+            <Route
+              path="understanding"
+              element={<ProjectUnderstandingPage workspaceMode />}
+            />
+            <Route path="intents" element={<IntentTracePage />} />
+            <Route path="decisions" element={<DecisionsPage />} />
+            <Route path="decisions/compare" element={<DecisionComparePage />} />
+            <Route path="decisions/:objectId" element={<DecisionDetailPage />} />
+            <Route path="prepare" element={<PrepareChangePage />} />
+          </Route>
           <Route path="import" element={<ImportPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="how-detection-works" element={<HowDetectionWorksPage />} />

@@ -14,11 +14,17 @@ export async function generateMasterKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(ALGO, true, ['encrypt', 'decrypt']);
 }
 
-export async function importRawKey(raw: Uint8Array): Promise<CryptoKey> {
+// Pass extractable=false for the live session key: it can encrypt and decrypt
+// but its bytes can never be read back, which is what makes it safe to keep
+// in IndexedDB (see deviceKey.ts).
+export async function importRawKey(raw: Uint8Array, extractable = true): Promise<CryptoKey> {
   if (raw.length !== 32) {
     throw new Error(`AES-256 key must be 32 bytes, got ${raw.length}`);
   }
-  return crypto.subtle.importKey('raw', raw as BufferSource, ALGO, true, ['encrypt', 'decrypt']);
+  return crypto.subtle.importKey('raw', raw as BufferSource, ALGO, extractable, [
+    'encrypt',
+    'decrypt',
+  ]);
 }
 
 export async function exportRawKey(key: CryptoKey): Promise<Uint8Array> {

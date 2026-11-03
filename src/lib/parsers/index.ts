@@ -14,11 +14,20 @@ export type RawSourceCapture = {
   conversationIds: string[];
 };
 
+// A source line a parser skipped, attributed to its file so the import
+// result can name it (SPEC-decision-investigation §7.1).
+export type ImportWarning = {
+  filename: string;
+  line: number;
+  reason: 'malformed-json';
+};
+
 export type ParsedData = {
   conversations: StoredConversation[];
   messages: StoredMessage[];
   source: DataSource;
   rawSources: RawSourceCapture[];
+  warnings: ImportWarning[];
 };
 
 export type FileFormat =
@@ -105,13 +114,14 @@ export async function detectFileFormat(file: File): Promise<FileFormat> {
 export async function parseFile(file: File): Promise<ParsedData> {
   if (file.name.endsWith('.jsonl')) {
     const content = await file.text();
-    const result = parseClaudeCodeContent(content, file.name);
+    const { warnings, ...result } = parseClaudeCodeContent(content, file.name);
     return {
       ...result,
       source: 'claude-code',
       rawSources: [
         capture('claude-code', file.name, content, CLAUDE_CODE_PARSER_VERSION, result.conversations),
       ],
+      warnings: warnings.map((w) => ({ filename: file.name, ...w })),
     };
   }
 
@@ -142,6 +152,7 @@ async function parseByContent(content: string, sourceFilename: string): Promise<
       rawSources: [
         capture('chatgpt', sourceFilename, content, CHATGPT_PARSER_VERSION, result.conversations),
       ],
+      warnings: [],
     };
   }
   // 'claude-ai' or 'unknown': fall through to the Claude.ai parser so its
@@ -153,6 +164,7 @@ async function parseByContent(content: string, sourceFilename: string): Promise<
     rawSources: [
       capture('claude.ai', sourceFilename, content, CLAUDE_AI_PARSER_VERSION, result.conversations),
     ],
+    warnings: [],
   };
 }
 
@@ -217,6 +229,7 @@ export async function parseFiles(
   const allConversations: StoredConversation[] = [];
   const allMessages: StoredMessage[] = [];
   const allRawSources: RawSourceCapture[] = [];
+  const allWarnings: ImportWarning[] = [];
   let primarySource: DataSource = 'claude.ai';
 
   for (let i = 0; i < files.length; i++) {
@@ -227,6 +240,7 @@ export async function parseFiles(
     allConversations.push(...result.conversations);
     allMessages.push(...result.messages);
     allRawSources.push(...result.rawSources);
+    allWarnings.push(...result.warnings);
 
     if (i === 0) {
       primarySource = result.source;
@@ -238,6 +252,7 @@ export async function parseFiles(
     messages: allMessages,
     source: primarySource,
     rawSources: allRawSources,
+    warnings: allWarnings,
   };
 }
 

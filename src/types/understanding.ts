@@ -1,4 +1,6 @@
-// Shared-understanding-workspace entities (PRD-shared-understanding-workspace.md §6-§11).
+import type { EvidenceItem } from './evidence';
+
+// Shared-understanding-workspace entities (docs/capabilities/understanding-workspace/PRD.md §6-§11).
 // Stored plaintext in IndexedDB, ciphertext in Postgres via the sync layer —
 // same privacy posture as findings/detector runs.
 //
@@ -26,6 +28,18 @@ export interface EvidenceRef {
   note?: string;
 }
 
+/**
+ * GitHub repository a project is bound to for Intent Trace
+ * (SPEC-intent-trace §8.3). Read-only; traces pin to a resolved commit sha.
+ */
+export interface ProjectRepository {
+  owner: string;
+  repo: string;
+  defaultBranch?: string;
+  /** Branch, tag, or sha to trace against instead of the default branch head. */
+  pinnedRef?: string;
+}
+
 /** A project reconstructed from conversation history (PRD §6). */
 export interface UnderstandingProject {
   id: string;
@@ -33,6 +47,20 @@ export interface UnderstandingProject {
   description?: string;
   origin: UnderstandingOrigin;
   reviewState: ReviewState;
+  /** Intent Trace repository binding (SPEC-intent-trace §8.3). Unindexed. */
+  repository?: ProjectRepository;
+  /**
+   * Intent-extraction cursor (SPEC-intent-trace §7.4): the latest conversation
+   * `updatedAt` an extraction run has processed. Same caveat as
+   * lastReconciledAt — a conversation associated later with an older
+   * updatedAt is skipped until a full re-run.
+   */
+  lastIntentExtractedAt?: Date;
+  /**
+   * Decision-recovery cursor (SPEC-decision-recovery §9.5): latest
+   * conversation `updatedAt` a recovery run has processed. Same caveat.
+   */
+  lastDecisionRecoveredAt?: Date;
   /**
    * Reconciliation cursor (U3.2): the latest conversation `updatedAt` a
    * reconcile run has processed. Runs only consider conversations newer than
@@ -83,6 +111,12 @@ export interface UnderstandingObject {
   status: UnderstandingStatus;
   origin: UnderstandingOrigin;
   reviewState: ReviewState;
+  /**
+   * Type-specific scalar attributes, unindexed. Intents (SPEC-intent-trace
+   * §11.1) carry polarity, origin, promptedByQuestion, statedAt (ISO), and
+   * confidence here rather than overloading `type` or `body`.
+   */
+  meta?: Record<string, string | number | boolean>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -113,6 +147,11 @@ export interface UnderstandingEvent {
   /** For 'superseded': the object that replaces this one, when known. */
   supersededByObjectId?: string;
   evidence: EvidenceRef[];
+  /**
+   * Code / test evidence promoted from a Change Workspace
+   * (SPEC-change-workspace §8, §12). Unindexed; optional.
+   */
+  codeEvidence?: EvidenceItem[];
   origin: UnderstandingOrigin;
   /** 'pending' events are proposals: recorded, visible, but not yet applied. */
   reviewState: ReviewState;

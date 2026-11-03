@@ -37,7 +37,7 @@ interface AppState {
 export const useAppStore = create<AppState>((set) => ({
   // Initial UI State
   theme: 'system',
-  sidebarOpen: true,
+  sidebarOpen: typeof window === 'undefined' ? true : window.innerWidth >= 768,
 
   // Initial Data State
   isLoading: true,

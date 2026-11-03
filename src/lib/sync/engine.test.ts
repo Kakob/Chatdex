@@ -37,7 +37,7 @@ vi.mock('./syncApi', async (importOriginal) => {
 
 import type { PushRecord, PullRecord } from './syncApi';
 import { syncEngine } from './engine';
-import { db, setMetadata, getMetadata, bulkPutConversations, bulkPutMessages } from '../db';
+import { db, setMetadata, getMetadata, bulkPutConversations, bulkPutMessages, tagEntity, getEntityTags } from '../db';
 import type { StoredConversation, StoredMessage } from '../../types';
 
 function makeConv(overrides: Partial<StoredConversation> = {}): StoredConversation {
@@ -104,6 +104,39 @@ describe('device-local sync state exclusion', () => {
     const ids = pushedIds();
     expect(ids).toContain('detection.configOverrides');
     expect(ids.filter((id) => id.startsWith('sync.'))).toEqual([]);
+  });
+
+  it('never pushes github.* metadata (device-local GitHub token — SPEC-intent-trace §8.1)', async () => {
+    await setMetadata('github.token', 'github_pat_secret');
+    await setMetadata('llm.apiKey.anthropic', 'sk-ant-synced');
+
+    await syncEngine.tick();
+
+    const ids = pushedIds();
+    expect(ids).toContain('llm.apiKey.anthropic');
+    expect(ids.filter((id) => id.startsWith('github.'))).toEqual([]);
+    expect(JSON.stringify(pushedRecords())).not.toContain('github_pat_secret');
+  });
+
+  it('ignores incoming github.* metadata records from the server', async () => {
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: 'github.token',
+          kind: 'metadata',
+          parentId: null,
+          iv: btoa('\x01'),
+          ciphertext: btoa(JSON.stringify({ key: 'github.token', value: 'INJECTED' })),
+          updatedAt: new Date().toISOString(),
+          deleted: false,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await getMetadata('github.token')).not.toBe('INJECTED');
   });
 
   it('does not loop when persisting the dirty queue (regression: metadata hook recursion)', async () => {
@@ -217,5 +250,199 @@ describe('resyncAll', () => {
     expect(ids).toContain(conv.id);
     for (const m of msgs) expect(ids).toContain(m.id);
     expect(ids.filter((id) => id.startsWith('sync.'))).toEqual([]);
+  });
+});
+
+describe('intent traces (SPEC-intent-trace §11.4)', () => {
+  it('pushes local traces as intent_trace records and pulls them back', async () => {
+    const traceId = crypto.randomUUID();
+    await db.intentTraces.put({
+      id: traceId,
+      projectId: 'up-1',
+      intentObjectId: 'uo-1',
+      repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: 'e'.repeat(40) },
+      specStatus: 'no_spec',
+      specEvidence: [],
+      implStatus: 'unknown',
+      implEvidence: [],
+      fetchedPaths: [],
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      warnings: [],
+      createdAt: new Date('2026-08-28T10:00:00Z'),
+    });
+    await syncEngine.tick();
+    const pushed = pushedRecords().find((r) => r.id === traceId);
+    expect(pushed?.kind).toBe('intent_trace');
+    expect(pushed?.parentId).toBe('uo-1');
+  });
+
+  it('deleting an understanding object from the server cascades to its traces', async () => {
+    const objectId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
+    await db.understandingObjects.put({
+      id: objectId,
+      projectId: 'up-1',
+      type: 'intent',
+      title: 'x',
+      status: 'current',
+      origin: 'ai',
+      reviewState: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.intentTraces.put({
+      id: traceId,
+      projectId: 'up-1',
+      intentObjectId: objectId,
+      repoRef: { owner: 'Kakob', repo: 'Chatdex', commitSha: 'f'.repeat(40) },
+      specStatus: 'no_spec',
+      specEvidence: [],
+      implStatus: 'unknown',
+      implEvidence: [],
+      fetchedPaths: [],
+      provider: 'anthropic',
+      model: 'claude-opus-5',
+      warnings: [],
+      createdAt: new Date(),
+    });
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: objectId,
+          kind: 'understanding_object',
+          parentId: 'up-1',
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await db.understandingObjects.get(objectId)).toBeUndefined();
+    expect(await db.intentTraces.get(traceId)).toBeUndefined();
+  });
+});
+
+describe('conversation deletion from the server', () => {
+  it('cascades to tag links and gives usage counts back (mirrors deleteConversation)', async () => {
+    const convId = crypto.randomUUID();
+    const now = new Date();
+    await bulkPutConversations([
+      {
+        id: convId,
+        source: 'claude.ai',
+        name: 'to delete',
+        summary: null,
+        createdAt: now,
+        updatedAt: now,
+        importedAt: now,
+        messageCount: 0,
+        userMessageCount: 0,
+        assistantMessageCount: 0,
+        estimatedTokens: 0,
+        fullText: '',
+      },
+    ]);
+    const tagId = crypto.randomUUID();
+    await db.tags.put({ id: tagId, name: 'srv', color: null, category: null, usageCount: 0, createdAt: now });
+    await tagEntity(tagId, convId, 'conversation');
+    await tagEntity(tagId, 'other-conv', 'conversation');
+    await syncEngine.tick();
+
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: convId,
+          kind: 'conversation',
+          parentId: null,
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+
+    expect(await db.conversations.get(convId)).toBeUndefined();
+    expect(await getEntityTags('conversation', convId)).toHaveLength(0);
+    expect(await getEntityTags('conversation', 'other-conv')).toHaveLength(1);
+    expect((await db.tags.get(tagId))?.usageCount).toBe(1);
+  });
+});
+
+describe('decision traces (SPEC-decision-recovery §7.6)', () => {
+  const traceRow = (id: string, decisionObjectId: string) => ({
+    id,
+    projectId: 'up-1',
+    decisionObjectId,
+    runId: 'run-1',
+    alternatives: [],
+    assumptions: [],
+    transcriptEvidence: [
+      { conversationId: 'c1', messageId: 'm1', stepIndex: 0, role: 'user_msg' as const, quote: 'x', startOffset: 0, endOffset: 1 },
+    ],
+    anchorStableKeys: [],
+    implEvidence: [],
+    symbols: [],
+    testPaths: [],
+    invalidates: [],
+    fetchedPaths: [],
+    provider: 'anthropic' as const,
+    model: 'claude-opus-5',
+    warnings: [],
+    createdAt: new Date('2026-09-07T10:00:00Z'),
+  });
+
+  it('pushes local traces as decision_trace records with the decision as parent', async () => {
+    const traceId = crypto.randomUUID();
+    await db.decisionTraces.put(traceRow(traceId, 'uo-d1'));
+    await syncEngine.tick();
+    const pushed = pushedRecords().find((r) => r.id === traceId);
+    expect(pushed?.kind).toBe('decision_trace');
+    expect(pushed?.parentId).toBe('uo-d1');
+  });
+
+  it('deleting a decision object from the server cascades to its traces', async () => {
+    const objectId = crypto.randomUUID();
+    const traceId = crypto.randomUUID();
+    await db.understandingObjects.put({
+      id: objectId,
+      projectId: 'up-1',
+      type: 'decision',
+      title: 'Deletion is permanent',
+      status: 'current',
+      origin: 'ai',
+      reviewState: 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.decisionTraces.put(traceRow(traceId, objectId));
+    await syncEngine.tick();
+    pullRecords.mockResolvedValueOnce({
+      records: [
+        {
+          id: objectId,
+          kind: 'understanding_object',
+          parentId: 'up-1',
+          iv: btoa('\x01'),
+          ciphertext: btoa('{}'),
+          updatedAt: new Date(Date.now() + 60_000).toISOString(),
+          deleted: true,
+        } as PullRecord,
+      ],
+      cursor: null,
+      hasMore: false,
+    });
+    await syncEngine.tick();
+    expect(await db.understandingObjects.get(objectId)).toBeUndefined();
+    expect(await db.decisionTraces.get(traceId)).toBeUndefined();
   });
 });

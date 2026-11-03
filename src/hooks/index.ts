@@ -7,3 +7,4 @@ export { useKeyboardShortcuts, useGlobalShortcutListener } from './useKeyboardSh
 export { useConversationTags } from './useConversationTags';
 export { useTextSelection } from './useTextSelection';
 export { useClaudeCodeFolder } from './useClaudeCodeFolder';
+export { useSyncLifecycle } from './useSyncLifecycle';

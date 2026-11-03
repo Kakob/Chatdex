@@ -107,3 +107,30 @@ export async function getEntityIdsForTag(
     .toArray();
   return links.map((l) => l.entityId);
 }
+
+/**
+ * Remove every tag link pointing at the given entities and give each tag's
+ * usageCount back. Used by deletion cascades so a deleted conversation or
+ * anchor leaves no orphan links and no inflated counts. Safe inside an
+ * enclosing transaction that already covers entityTags and tags.
+ */
+export async function removeEntityTagsFor(
+  entityType: EntityType,
+  entityIds: string[]
+): Promise<void> {
+  if (entityIds.length === 0) return;
+  await db.transaction('rw', db.entityTags, db.tags, async () => {
+    const links = await db.entityTags
+      .where('[entityType+entityId]')
+      .anyOf(entityIds.map((id) => [entityType, id]))
+      .toArray();
+    if (links.length === 0) return;
+    await db.entityTags.bulkDelete(links.map((l) => l.id));
+    const removedPerTag = new Map<string, number>();
+    for (const l of links) removedPerTag.set(l.tagId, (removedPerTag.get(l.tagId) ?? 0) + 1);
+    for (const [tagId, removed] of removedPerTag) {
+      const tag = await db.tags.get(tagId);
+      if (tag) await db.tags.update(tagId, { usageCount: Math.max(0, tag.usageCount - removed) });
+    }
+  });
+}

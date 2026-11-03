@@ -49,6 +49,19 @@ export interface StoredConversation {
 
 export type MessageSender = 'user' | 'assistant' | 'system' | 'tool';
 
+/**
+ * Source-file identity of a message (Claude Code parser ≥ 1.2.0). Optional
+ * and only present when the source carried it, so older imports and fixtures
+ * are unchanged. `isSidechain` marks steps that ran inside a delegated
+ * subagent (SPEC-decision-recovery §8.3).
+ */
+export interface MessageSourceMeta {
+  uuid?: string;
+  parentUuid?: string;
+  isSidechain?: boolean;
+  agentId?: string;
+}
+
 export interface StoredMessage {
   id: string;
   conversationId: string;
@@ -61,6 +74,7 @@ export interface StoredMessage {
   toolName?: string;
   toolInput?: string;
   toolResult?: string;
+  sourceMeta?: MessageSourceMeta;
 }
 
 export interface StoredPrompt {

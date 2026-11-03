@@ -10,11 +10,15 @@ import {
   getConversationCount,
 } from '../lib/db';
 import { syncEngine } from '../lib/sync/engine';
+import { lock as lockDevice } from '../lib/auth/session';
+import { useAuthStore } from '../stores/authStore';
 import { invalidateIndex } from '../lib/search';
 import { validateLicense } from '../lib/license';
 import { CloudSyncSection } from '../components/settings/CloudSyncSection';
 import { DetectionSettingsSection } from '../components/settings/DetectionSettingsSection';
 import { LLMProvidersSection } from '../components/settings/LLMProvidersSection';
+import { GitHubSection } from '../components/settings/GitHubSection';
+import { LocalRepositorySection } from '../components/settings/LocalRepositorySection';
 
 export function SettingsPage() {
   const { theme, setTheme, conversationCount, messageCount, setStats, isPro, setLicense } = useAppStore();
@@ -102,13 +106,19 @@ export function SettingsPage() {
   };
 
   const handleClearData = async () => {
-    if (!confirm('Delete all local data on this device? Synced data on the server is NOT affected (use "Wipe server data" in Cloud Sync for that). This cannot be undone.')) {
+    if (!confirm('Delete all local data on this device? Synced data on the server is NOT affected (use "Wipe server data" in Cloud Sync for that). Cloud sync is locked too; unlocking downloads your synced data again. This cannot be undone.')) {
       return;
     }
 
     setIsClearing(true);
     try {
       await syncEngine.clearLocalData();
+      // The remembered key is local data too. Locking also stops the engine,
+      // which would otherwise pull everything straight back down.
+      await lockDevice();
+      if (useAuthStore.getState().status === 'unlocked') {
+        useAuthStore.getState().setStatus('locked');
+      }
       setStats({ conversationCount: 0, messageCount: 0 });
       // Invalidate search index so cleared data is no longer searchable
       await invalidateIndex();
@@ -163,6 +173,8 @@ export function SettingsPage() {
 
         {/* LLM provider credentials (understanding synthesis) */}
         <LLMProvidersSection />
+        <GitHubSection />
+        <LocalRepositorySection />
 
         {/* License */}
         <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6">

@@ -14,6 +14,7 @@ export function DisclosureModal({
   actionLabel = 'Project discovery',
   sendsDescription,
   confirmLabel = 'Send and analyze',
+  title,
 }: {
   disclosure: DisclosureSummary;
   authMode: AuthMode;
@@ -27,6 +28,8 @@ export function DisclosureModal({
    */
   sendsDescription?: string;
   confirmLabel?: string;
+  /** Heading override, e.g. when repository excerpts (not understanding) are sent. */
+  title?: string;
 }) {
   const crossProvider = disclosure.crossProviderSources;
 
@@ -35,9 +38,10 @@ export function DisclosureModal({
       <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-start justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {sendsDescription
-              ? `Send project understanding to ${disclosure.providerLabel}?`
-              : `Send conversation excerpts to ${disclosure.providerLabel}?`}
+            {title ??
+              (sendsDescription
+                ? `Send project understanding to ${disclosure.providerLabel}?`
+                : `Send conversation excerpts to ${disclosure.providerLabel}?`)}
           </h2>
           <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
             <X size={18} />

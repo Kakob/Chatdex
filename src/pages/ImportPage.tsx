@@ -13,7 +13,7 @@ export function ImportPage() {
           Import Data
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Import your Claude conversations from Claude.ai or Claude Code
+          Import ChatGPT, Claude.ai, or Claude Code conversations
         </p>
       </div>
 
@@ -38,10 +38,10 @@ export function ImportPage() {
             </div>
             <div>
               <h2 className="font-semibold text-gray-900 dark:text-white">
-                Claude.ai
+                ChatGPT / Claude.ai
               </h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                ZIP export from Settings
+                ZIP or JSON export from Settings
               </p>
             </div>
           </div>
@@ -49,14 +49,14 @@ export function ImportPage() {
           <DropZone
             onFiles={handleFiles}
             accept=".zip,.json"
-            label="Drag & drop your ZIP file"
+            label="Drag & drop your ZIP or JSON export"
             hint="or click to browse"
             accentColor="violet"
             disabled={isImporting}
           />
 
           <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            Export from Claude.ai: Settings → Privacy → Export Data
+            Export from ChatGPT: Settings → Data Controls → Export Data; Claude.ai: Settings → Privacy → Export Data
           </p>
         </div>
 

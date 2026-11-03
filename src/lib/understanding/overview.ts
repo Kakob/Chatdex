@@ -7,7 +7,9 @@
 // Inclusion rules mirror the per-project panel (currentUnderstanding.ts):
 // rejected projects/objects/events are excluded everywhere; pending ones are
 // included and counted as awaiting review. Objects under a rejected project
-// are excluded with it — they're unreachable from the page.
+// are excluded with it — they're unreachable from the page. Intents are
+// excluded as in the panel (they have their own Intents tab); the
+// Understanding Landscape uses the same counts.
 
 import { db } from '../db/schema';
 import type {
@@ -75,7 +77,9 @@ export function assembleOverview(
 
   const includedObjects = objects.filter(
     (o) =>
-      o.reviewState !== 'rejected' && (o.projectId === null || projectById.has(o.projectId))
+      o.reviewState !== 'rejected' &&
+      o.type !== 'intent' &&
+      (o.projectId === null || projectById.has(o.projectId))
   );
   const objectById = new Map(includedObjects.map((o) => [o.id, o]));
 

@@ -7,6 +7,7 @@
 // least one EvidenceRef is rejected. User-origin objects may omit evidence
 // (the user asserting something directly is its own provenance).
 
+import type { EvidenceItem } from '../../types/evidence';
 import { db } from './schema';
 import { generateId } from '../utils/ids';
 import type {
@@ -36,6 +37,27 @@ export async function getAllUnderstandingProjects(): Promise<UnderstandingProjec
   return db.understandingProjects.orderBy('updatedAt').reverse().toArray();
 }
 
+export async function createHumanProject(input: {
+  name: string;
+  description?: string;
+}): Promise<UnderstandingProject> {
+  const name = input.name.trim();
+  if (!name) throw new Error('Project name cannot be empty');
+
+  const now = new Date();
+  const project: UnderstandingProject = {
+    id: generateId(),
+    name,
+    description: input.description?.trim() || undefined,
+    origin: 'user',
+    reviewState: 'accepted',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.understandingProjects.add(project);
+  return project;
+}
+
 export async function setProjectReviewState(id: string, state: ReviewState): Promise<void> {
   await db.understandingProjects.update(id, { reviewState: state, updatedAt: new Date() });
 }
@@ -47,6 +69,54 @@ export async function putProjectAssociation(a: ProjectAssociation): Promise<void
     throw new Error(`Association confidence must be in [0, 1], got ${a.confidence}`);
   }
   await db.projectAssociations.put(a);
+}
+
+export async function associateConversationWithProject(
+  projectId: string,
+  conversationId: string
+): Promise<ProjectAssociation> {
+  const [project, conversation] = await Promise.all([
+    db.understandingProjects.get(projectId),
+    db.conversations.get(conversationId),
+  ]);
+  if (!project) throw new Error(`Project not found: ${projectId}`);
+  if (project.reviewState === 'rejected') {
+    throw new Error('Rejected projects cannot receive new sources');
+  }
+  if (!conversation) throw new Error(`Conversation not found: ${conversationId}`);
+
+  const existing = await db.projectAssociations
+    .where('[projectId+conversationId]')
+    .equals([projectId, conversationId])
+    .first();
+  if (existing) {
+    if (existing.reviewState !== 'rejected') return existing;
+    const restored: ProjectAssociation = {
+      ...existing,
+      confidence: 1,
+      reason: 'Added by the user',
+      origin: 'user',
+      reviewState: 'accepted',
+      updatedAt: new Date(),
+    };
+    await db.projectAssociations.put(restored);
+    return restored;
+  }
+
+  const now = new Date();
+  const association: ProjectAssociation = {
+    id: generateId(),
+    projectId,
+    conversationId,
+    confidence: 1,
+    reason: 'Added by the user',
+    origin: 'user',
+    reviewState: 'accepted',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.projectAssociations.add(association);
+  return association;
 }
 
 export async function getAssociationsForConversation(
@@ -86,6 +156,10 @@ export interface CreateUnderstandingObjectInput {
   evidence: EvidenceRef[];
   /** Source-timeline moment the understanding was introduced. */
   occurredAt: Date;
+  /** Type-specific scalar attributes (see UnderstandingObject.meta). */
+  meta?: UnderstandingObject['meta'];
+  /** Code / test evidence promoted from a Change Workspace (SPEC-change-workspace §12). */
+  codeEvidence?: EvidenceItem[];
 }
 
 /**
@@ -111,6 +185,7 @@ export async function createUnderstandingObject(
     status: 'current',
     origin: input.origin,
     reviewState: input.origin === 'ai' ? 'pending' : 'accepted',
+    ...(input.meta ? { meta: input.meta } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -119,6 +194,7 @@ export async function createUnderstandingObject(
     objectId: object.id,
     op: 'introduced',
     evidence: input.evidence,
+    ...(input.codeEvidence && input.codeEvidence.length > 0 ? { codeEvidence: input.codeEvidence } : {}),
     origin: input.origin,
     // The object's own reviewState gates its existence; the introduced event
     // asserts nothing beyond that, so it never needs separate review.

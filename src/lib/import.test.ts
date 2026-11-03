@@ -96,6 +96,18 @@ describe('importFiles — raw source retention', () => {
     expect(sources[0].contentHash).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('surfaces skipped malformed lines on the import result, attributed to the file', async () => {
+    const withBadLine = [baseLines[0], 'this is not json', ...baseLines.slice(1)];
+    const result = await importFiles([jsonlFile(withBadLine, 'damaged.jsonl')]);
+    expect(result.conversationsAdded).toBe(1);
+    expect(result.parseWarnings).toEqual([
+      { filename: 'damaged.jsonl', line: 2, reason: 'malformed-json' },
+    ]);
+    // The raw payload is retained byte-for-byte, bad line included.
+    const sources = await getRawSourcesForConversation('session-raw-1');
+    expect(sources[0].rawText).toContain('this is not json');
+  });
+
   it('records a grown session file as a new raw version even though the conversation is skipped', async () => {
     await importFiles([jsonlFile(baseLines)]);
 

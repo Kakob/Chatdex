@@ -6,19 +6,42 @@ Project context for Claude Code. Read this before making changes.
 
 ## What Chatdex is
 
-Chatdex is a **local-first AI-conversation workspace**. It ingests conversation history from multiple providers (Claude.ai, Claude Code JSONL, ChatGPT), lets users browse/search/analyze it, detects **agent failure patterns** (loops, verification-absence, silent reversions), and is growing a **shared understanding workspace** that reconstructs projects and synthesizes current understanding from conversation history (`docs/PRD-shared-understanding-workspace.md`).
+Chatdex is a **local-first AI-conversation workspace**. It ingests conversation history from multiple providers (Claude.ai, Claude Code JSONL, ChatGPT), lets users browse/search/analyze it, detects **agent failure patterns** (loops, verification-absence, silent reversions), and is growing a **shared understanding workspace** that reconstructs projects and synthesizes current understanding from conversation history (`docs/capabilities/understanding-workspace/PRD.md`).
 
 **Positioning (updated 2026-08-09):** Chatdex is moving away from the client-side-only power-user framing toward robust LLM-provider interactions for synthesis. Detection explainability and encrypted-at-rest sync remain differentiators; the *detection layer* specifically stays fully client-side (see invariants).
 
-## Current state vs. current work
+## Current state and current work
 
-**Built and working:** JSONL ingestion, session browse/search, analytics, client-side encryption (AES-GCM master key, WebAuthn+PRF-derived wrapping key, recovery-code fallback), hybrid IndexedDB (local plaintext) + Postgres (synced ciphertext) storage.
+Read [docs/capabilities/README.md](docs/capabilities/README.md) for capability status
+and [docs/changes/README.md](docs/changes/README.md) for bounded work. Do not duplicate
+those status tables here. Capability specs retain their architectural laws, security
+requirements, and consumer-specific contracts; change plans identify proposed amendments.
 
-**Being built now:** the agent observability layer. The authoritative documents are:
-- `SPEC-agent-observability.md` — what to build and why
-- `IMPLEMENTATION_PLAN.md` — phase order, acceptance criteria, testing strategy
+Decision Investigation remains quarantined from AI recovery under its spec. Flow Map
+remains a draft capability until its outstanding design decisions are resolved. These
+boundaries are not changed by the documentation reorganization.
 
-If a request conflicts with the spec, say so and ask rather than silently diverging.
+## Where docs live
+
+Current capability contracts live in `docs/capabilities/<capability>/`. Bounded
+work packages live in `docs/changes/<change>/`. Read `docs/changes/README.md` for
+ownership, planning, spec amendments, completion, and the lightweight plan template.
+
+- `docs/capabilities/README.md` is the capability status and ownership index.
+- `docs/changes/README.md` indexes change packages; each package's PLAN.md owns its
+  delivery status and open acceptance checks. Index summaries link to that plan.
+- A proposal never silently overrides a capability spec. Identify affected sections
+  in the change plan and amend them as the corresponding behavior lands.
+- Before closing work, update affected contracts, record verification and limitations,
+  and close the plan. Small fixes need no change folder unless a durable plan helps.
+- Keep historical build logs and completed plans as history. Do not copy them into
+  current contracts. Existing capability-local plans/logs are retained legacy records;
+  new bounded work uses `docs/changes/`.
+
+Other documents: `docs/prds/` (product-level requirements), `docs/architecture/`,
+`docs/territories/` (code walkthroughs), `docs/ownership/`, `docs/assessments/`,
+`docs/vision/`, and `docs/archive/` (historical; links inside are not maintained).
+Index: `docs/README.md`.
 
 ## Hard architectural invariants
 
@@ -42,6 +65,8 @@ These are non-negotiable. Violating any of them is a bug even if the feature "wo
    - **Backend relay is transit-only.** The Chatdex backend may proxy provider calls (streaming, rate limiting), but must never persist or log request/response content. Relay handlers must not write conversation plaintext to the database, log lines, or error traces.
    - **Cross-provider disclosure is explicit.** Sending one provider's history to a different provider (e.g., ChatGPT conversations to Anthropic) is a new disclosure; the UI must state which provider will receive which sources before the first such call.
    - **Synthesis outputs are user data.** Understanding objects derived from LLM calls store like everything else: plaintext in IndexedDB, ciphertext in sync.
+   - **Transcript excerpts and edit hunks follow the same rule (Decision Recovery, 2026-09-07).** Decision recovery sends the user's messages, the agent's reasoning around each edit, its closing statements, and the edit hunks themselves to the provider under the same user-initiated, disclosed, transit-only conditions; the disclosure states the session, hunk, and repository-excerpt counts (`docs/capabilities/decision-recovery/SPEC.md` §2.6).
+   - **Repository excerpts follow the same rule (Intent Trace, 2026-08-28).** File and spec-document excerpts fetched read-only from GitHub are user data and may be sent to the provider under the same user-initiated, disclosed, transit-only conditions — the disclosure must say repository excerpts are being sent. The GitHub token is device-local, goes only to api.github.com, and never enters a relay body or a prompt (`docs/capabilities/intent-trace/SPEC.md` §13). **Whole repository files may be cached locally for Change Workspace search** (GitHub at a pinned sha, or a user-picked local directory, read-only) in a LOCAL-ONLY IndexedDB table that is never synced; synced workspace records carry only paths, shas, line ranges, and capped quotes (`docs/capabilities/change-workspace/SPEC.md` §2.5).
 
 ## Tech stack
 
@@ -51,7 +76,7 @@ These are non-negotiable. Violating any of them is a bug even if the feature "wo
 - Zustand 5 for global state (`src/stores/`); no React Query
 - Storage: IndexedDB via **Dexie 4** locally (`src/lib/db.ts`, `src/lib/db/`); Postgres via **Drizzle ORM** behind a Fastify 5 API (`backend/src/`) for encrypted sync
 - Crypto: WebCrypto AES-256-GCM (`src/lib/crypto/primitives.ts`). Key material is unlocked via **WebAuthn** (`@simplewebauthn/browser` + `@simplewebauthn/server`) — the earlier Argon2id/password KDF was removed on `main`. Do not reintroduce a password KDF path without an explicit spec change.
-- Workers: detection pipeline will run in a Web Worker (not yet wired — see `SPEC-agent-observability.md`)
+- Workers: the detection pipeline runs in a Web Worker (`src/lib/detection/worker.ts`, `workerClient.ts`); the worker computes only and the main thread persists so Dexie sync hooks fire. Falls back to the main thread only where `Worker` is undefined (tests).
 
 ## Repository layout
 
@@ -62,6 +87,7 @@ src/
 ├─ App.tsx, main.tsx
 ├─ index.css              # Tailwind entry
 ├─ components/            # shared UI
+├─ features/researchAtlas/ # /research directory; own unsynced IndexedDB (docs/changes/research-atlas/PLAN.md)
 ├─ pages/                 # route views
 ├─ hooks/
 ├─ stores/                # Zustand stores (appStore.ts, etc.)
@@ -74,6 +100,7 @@ src/
 │  ├─ sync/               # encrypted sync engine
 │  ├─ api.ts              # backend REST client
 │  ├─ analytics.ts, search.ts, import.ts, license.ts
+│  ├─ landscape/          # Understanding Landscape projection, URL state, lenses, geometry (docs/territories/explore-the-landscape.md)
 │  ├─ aipkms/             # planned AIPKMS feature layer
 │  ├─ exporters/, fs/, utils/
 └─ test/
@@ -84,22 +111,23 @@ backend/
 │  └─ db/                 # Drizzle schema
 ```
 
-**Planned addition for the observability layer** (from `SPEC-agent-observability.md` / `IMPLEMENTATION_PLAN.md` — not yet created):
+**Observability layer** (built; contract in `docs/capabilities/agent-observability/SPEC.md`):
 
 ```
 src/lib/
-├─ detection/         # NEW — the observability layer
-│  ├─ normalize.ts    # step + tool-call normalization, signatures
-│  ├─ registry.ts     # detector registry
+├─ detection/
+│  ├─ normalize.ts, signatures.ts, classify.ts   # step/tool-call normalization, signatures, tool classes
+│  ├─ registry.ts, registerAll.ts               # detector registry (three detectors registered)
 │  ├─ detectors/
 │  │  ├─ loop.ts
 │  │  ├─ verificationAbsence.ts
 │  │  └─ reversion.ts
-│  ├─ pipeline.ts     # orchestration, DetectorRun lifecycle
-│  └─ worker.ts       # Web Worker entry
+│  ├─ pipeline.ts                               # orchestration, DetectorRun lifecycle, idempotency
+│  ├─ worker.ts, workerClient.ts, workerHandler.ts
+│  ├─ autoAnalyze.ts, staleness.ts, stats.ts, findingAnchors.ts
 ```
 
-Extend `src/lib/db.ts` / `src/lib/sync/` for `Finding` and `DetectorRun` storage. Extend existing `pages/` + `components/` for the findings overlay on the session browser and observability views on the dashboard.
+`Finding` and `DetectorRun` storage lives in `src/lib/db/` and syncs as ciphertext via `src/lib/sync/`. Findings surface inside Browse, Analytics, Settings, and `HowDetectionWorksPage`; there is no dedicated route. The intervention amendment (SPEC §10, phases I0–I6) is documented but unbuilt.
 
 ## Commands
 
@@ -113,6 +141,8 @@ lint (fix):                npm run lint:fix
 unit tests (frontend):     npm test               # vitest run
 unit tests (watch):        npm run test:watch
 unit tests (all):          npm run test:all       # frontend + backend vitest
+unit tests (backend):      cd backend && npm test # vitest on an in-process PGlite Postgres; no service needed
+typecheck (backend+tests): cd backend && npm run typecheck
 coverage:                  npm run test:coverage
 build (frontend):          npm run build          # tsc -b && vite build
 build (all):               npm run build:all
@@ -124,7 +154,7 @@ db studio:                 npm run db:studio
 ## Development workflow rules
 
 - **Always run typecheck + tests before declaring a task done.** (Yes, the irony of skipping verification while building a verification-absence detector is noted. Don't be a finding.)
-- **Write tests alongside detector logic, not after.** Every detector rule and every suppression rule gets at least one golden-trace test (see `tests/golden-traces/` and IMPLEMENTATION_PLAN.md).
+- **Write tests alongside detector logic, not after.** Every detector rule and every suppression rule gets at least one golden-trace test (see `tests/golden-traces/` and `docs/capabilities/agent-observability/PLAN.md`).
 - Prefer small, reviewable diffs. One detector or one pipeline concern per change.
 - When adding a detector rule or threshold, make it configurable via `DetectorConfig` with a documented default — no magic numbers inline.
 - Never touch `src/crypto/` without being explicitly asked to.

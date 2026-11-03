@@ -13,11 +13,26 @@ import { generateId } from '../utils/ids';
 // Stamped onto RawSource rows at import (SPEC-decision-investigation §7.1).
 // Bump whenever parsing output changes for identical input.
 // 1.1.0: preserve tool_use ids / tool_use_id on ContentBlock (toolUseId).
-export const CLAUDE_CODE_PARSER_VERSION = '1.1.0';
+// 1.2.0: keep uuid / parentUuid / isSidechain / agentId (sourceMeta); subagent
+//        transcripts get their own conversation id and a parent link
+//        (SPEC-decision-recovery §8.3).
+export const CLAUDE_CODE_PARSER_VERSION = '1.2.0';
+
+/**
+ * A line the parser could not use. Surfaced, never swallowed
+ * (SPEC-decision-investigation §7.1: parser errors must be visible without
+ * discarding unaffected source events).
+ */
+export interface ParseWarning {
+  /** 1-based line number in the source file, counting blank lines. */
+  line: number;
+  reason: 'malformed-json';
+}
 
 export interface ParsedClaudeCode {
   conversations: StoredConversation[];
   messages: StoredMessage[];
+  warnings: ParseWarning[];
 }
 
 export async function parseClaudeCodeJSONL(file: File): Promise<ParsedClaudeCode> {
@@ -29,30 +44,32 @@ export function parseClaudeCodeContent(
   content: string,
   filename: string
 ): ParsedClaudeCode {
-  const lines = content.split('\n').filter((line) => line.trim());
+  const lines = content.split('\n');
   const entries: ClaudeCodeEntry[] = [];
+  const warnings: ParseWarning[] = [];
 
-  for (const line of lines) {
+  lines.forEach((line, index) => {
+    if (!line.trim()) return;
     try {
-      const entry = JSON.parse(line) as ClaudeCodeEntry;
-      entries.push(entry);
+      entries.push(JSON.parse(line) as ClaudeCodeEntry);
     } catch {
-      // Skip malformed lines
-      console.warn('Skipping malformed JSONL line');
+      // Keep going — one bad line must not discard the rest of the session —
+      // but record it so the import result can say what was skipped.
+      warnings.push({ line: index + 1, reason: 'malformed-json' });
     }
-  }
+  });
 
   if (entries.length === 0) {
     throw new Error('No valid entries found in JSONL file');
   }
 
-  return parseEntries(entries, filename);
+  return { ...parseEntries(entries, filename), warnings };
 }
 
 function parseEntries(
   entries: ClaudeCodeEntry[],
   filename: string
-): ParsedClaudeCode {
+): Omit<ParsedClaudeCode, 'warnings'> {
   const messages: StoredMessage[] = [];
   const textParts: string[] = [];
   const now = new Date();
@@ -63,15 +80,25 @@ function parseEntries(
   let sessionId: string | undefined;
   let workingDirectory: string | undefined;
   let gitBranch: string | undefined;
+  let agentId: string | undefined;
+  let sidechain = false;
 
   for (const entry of entries) {
     if (!sessionId) sessionId = entry.sessionId ?? entry.session_id;
     if (!workingDirectory) workingDirectory = entry.cwd;
     if (!gitBranch) gitBranch = entry.gitBranch ?? entry.git_branch;
-    if (sessionId && workingDirectory && gitBranch) break;
+    if (!agentId && typeof entry.agentId === 'string') agentId = entry.agentId;
+    if (entry.isSidechain === true) sidechain = true;
   }
 
-  if (!sessionId) sessionId = generateId();
+  // A subagent transcript carries its PARENT's sessionId. Give it its own
+  // conversation id so it never collides with (or silently replaces) the
+  // parent, and remember the parent for the delegation link.
+  const parentSessionId = sidechain && sessionId ? sessionId : undefined;
+  const conversationId = sidechain
+    ? `${sessionId ?? 'session'}:agent:${agentId ?? generateId()}`
+    : (sessionId ?? generateId());
+  sessionId = conversationId;
   const projectPath = workingDirectory;
 
   let firstTimestamp: Date = now;
@@ -91,6 +118,7 @@ function parseEntries(
     const entryTimestamp = timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp : now;
 
     const msgId = generateId();
+    const sourceMeta = sourceMetaOf(entry);
 
     switch (entry.type) {
       case 'user': {
@@ -109,6 +137,7 @@ function parseEntries(
           text,
           contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
           createdAt: entryTimestamp,
+          ...(sourceMeta ? { sourceMeta } : {}),
         });
         break;
       }
@@ -126,6 +155,7 @@ function parseEntries(
           text,
           contentBlocks: contentBlocks.length > 0 ? contentBlocks : undefined,
           createdAt: entryTimestamp,
+          ...(sourceMeta ? { sourceMeta } : {}),
         });
         break;
       }
@@ -179,7 +209,8 @@ function parseEntries(
   }
 
   // Derive conversation name from filename or working directory
-  const name = deriveConversationName(filename, workingDirectory);
+  const baseName = deriveConversationName(filename, workingDirectory);
+  const name = sidechain ? `${baseName} · subagent ${(agentId ?? conversationId).slice(0, 8)}` : baseName;
 
   // Set conversationName on all messages
   for (const msg of messages) {
@@ -204,13 +235,28 @@ function parseEntries(
     projectPath,
     gitBranch,
     workingDirectory,
-    providerMeta: { sourceFilename: filename },
+    providerMeta: {
+      sourceFilename: filename,
+      ...(sidechain ? { isSidechain: true } : {}),
+      ...(agentId ? { agentId } : {}),
+      ...(parentSessionId ? { parentSessionId } : {}),
+    },
   };
 
   return {
     conversations: [conversation],
     messages,
   };
+}
+
+/** Entry identity fields, only when the source carried any (keeps old fixtures unchanged). */
+function sourceMetaOf(entry: ClaudeCodeEntry): StoredMessage['sourceMeta'] | undefined {
+  const meta: NonNullable<StoredMessage['sourceMeta']> = {};
+  if (typeof entry.uuid === 'string') meta.uuid = entry.uuid;
+  if (typeof entry.parentUuid === 'string') meta.parentUuid = entry.parentUuid;
+  if (entry.isSidechain === true) meta.isSidechain = true;
+  if (typeof entry.agentId === 'string') meta.agentId = entry.agentId;
+  return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
 interface ExtractedContent {

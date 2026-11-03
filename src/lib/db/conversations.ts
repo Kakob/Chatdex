@@ -1,4 +1,5 @@
 import { db } from './schema';
+import { removeEntityTagsFor } from './tags';
 import type { StoredConversation, DataSource } from '../../types';
 
 export async function putConversation(conv: StoredConversation): Promise<void> {
@@ -46,22 +47,37 @@ export async function deleteConversation(id: string): Promise<void> {
       db.anchors,
       db.findings,
       db.detectorRuns,
+      db.projectAssociations,
       db.investigationAnchors,
+      db.agentInspections,
       db.investigationCases,
       db.caseExhibits,
       db.reviewScopes,
       db.verdictRevisions,
+      db.investigationFindings,
+      db.entityTags,
+      db.tags,
     ],
     async () => {
+      const caseIds = await db.investigationCases
+        .where('conversationId')
+        .equals(id)
+        .primaryKeys();
+      const anchorIds = await db.anchors.where('conversationId').equals(id).primaryKeys();
       await db.conversations.delete(id);
       await db.messages.where('conversationId').equals(id).delete();
       await db.anchors.where('conversationId').equals(id).delete();
+      // Tag links would otherwise dangle and keep usageCount inflated.
+      await removeEntityTagsFor('conversation', [id]);
+      await removeEntityTagsFor('anchor', anchorIds as string[]);
       await db.findings.where('conversationId').equals(id).delete();
       await db.detectorRuns.where('conversationId').equals(id).delete();
+      await db.projectAssociations.where('conversationId').equals(id).delete();
       // Derived rows go with the conversation; rawSources stay — a raw payload
       // can back multiple conversations, and deletion policy for primary
       // sources is a separate decision (spec §14).
       await db.investigationAnchors.where('conversationId').equals(id).delete();
+      await db.agentInspections.where('conversationId').equals(id).delete();
       // Cases and their evidence cannot outlive their primary source without
       // silently appearing authoritative (spec §14) — cascade for now;
       // tombstoning adjudicated cases is a DI-3 concern.
@@ -69,6 +85,9 @@ export async function deleteConversation(id: string): Promise<void> {
       await db.caseExhibits.where('conversationId').equals(id).delete();
       await db.reviewScopes.where('conversationId').equals(id).delete();
       await db.verdictRevisions.where('conversationId').equals(id).delete();
+      if (caseIds.length > 0) {
+        await db.investigationFindings.where('caseId').anyOf(caseIds).delete();
+      }
     }
   );
 }
@@ -103,13 +122,41 @@ export async function deleteConversationsBySource(source: DataSource): Promise<v
     .primaryKeys();
   await db.transaction(
     'rw',
-    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    [
+      db.conversations,
+      db.messages,
+      db.anchors,
+      db.findings,
+      db.detectorRuns,
+      db.projectAssociations,
+      db.investigationAnchors,
+      db.agentInspections,
+      db.investigationCases,
+      db.caseExhibits,
+      db.reviewScopes,
+      db.verdictRevisions,
+      db.investigationFindings,
+    ],
     async () => {
+      const caseIds = await db.investigationCases
+        .where('conversationId')
+        .anyOf(ids)
+        .primaryKeys();
       await db.conversations.bulkDelete(ids);
       await db.messages.where('conversationId').anyOf(ids).delete();
       await db.anchors.where('conversationId').anyOf(ids).delete();
       await db.findings.where('conversationId').anyOf(ids).delete();
       await db.detectorRuns.where('conversationId').anyOf(ids).delete();
+      await db.projectAssociations.where('conversationId').anyOf(ids).delete();
+      await db.investigationAnchors.where('conversationId').anyOf(ids).delete();
+      await db.agentInspections.where('conversationId').anyOf(ids).delete();
+      await db.investigationCases.where('conversationId').anyOf(ids).delete();
+      await db.caseExhibits.where('conversationId').anyOf(ids).delete();
+      await db.reviewScopes.where('conversationId').anyOf(ids).delete();
+      await db.verdictRevisions.where('conversationId').anyOf(ids).delete();
+      if (caseIds.length > 0) {
+        await db.investigationFindings.where('caseId').anyOf(caseIds).delete();
+      }
     }
   );
 }
@@ -117,13 +164,35 @@ export async function deleteConversationsBySource(source: DataSource): Promise<v
 export async function clearConversations(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.conversations, db.messages, db.anchors, db.findings, db.detectorRuns],
+    [
+      db.conversations,
+      db.messages,
+      db.anchors,
+      db.findings,
+      db.detectorRuns,
+      db.projectAssociations,
+      db.investigationAnchors,
+      db.agentInspections,
+      db.investigationCases,
+      db.caseExhibits,
+      db.reviewScopes,
+      db.verdictRevisions,
+      db.investigationFindings,
+    ],
     async () => {
       await db.conversations.clear();
       await db.messages.clear();
       await db.anchors.clear();
       await db.findings.clear();
       await db.detectorRuns.clear();
+      await db.projectAssociations.clear();
+      await db.investigationAnchors.clear();
+      await db.agentInspections.clear();
+      await db.investigationCases.clear();
+      await db.caseExhibits.clear();
+      await db.reviewScopes.clear();
+      await db.verdictRevisions.clear();
+      await db.investigationFindings.clear();
     }
   );
 }

@@ -60,6 +60,9 @@ export function useConversations(
 
   useEffect(() => {
     loadConversations(true);
+    // Offset is managed by loadConversations; adding the callback itself here
+    // would re-fetch after every page append.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.source]);
 
   const loadMore = useCallback(() => {

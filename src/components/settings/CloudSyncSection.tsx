@@ -15,16 +15,20 @@ import {
   login,
   unlock,
   logout,
+  lock as lockDevice,
   recoverWithCode,
+  getStayUnlocked,
+  setStayUnlocked,
 } from '../../lib/auth/session';
 import { isPasskeySupported } from '../../lib/auth/webauthn';
 import { syncEngine } from '../../lib/sync/engine';
-import { lock as lockVault } from '../../lib/crypto';
 
 type Mode = 'idle' | 'signup' | 'login' | 'recover' | 'recovery-shown';
 
 export function CloudSyncSection() {
-  const { status, user, hydrate, setStatus, setUser, syncing, lastSyncAt } = useAuthStore();
+  const { status, user, hydrate, setStatus, setUser, syncing, lastSyncAt, pending, syncError } =
+    useAuthStore();
+  const [stayUnlocked, setStayUnlockedState] = useState(getStayUnlocked);
   const [mode, setMode] = useState<Mode>('idle');
   const [email, setEmail] = useState('');
   const [recoveryInput, setRecoveryInput] = useState('');
@@ -39,11 +43,7 @@ export function CloudSyncSection() {
     hydrate();
   }, [hydrate]);
 
-  useEffect(() => {
-    if (status === 'unlocked') {
-      void syncEngine.start().catch((err) => console.error('[sync] start failed', err));
-    }
-  }, [status]);
+  // Starting/stopping the engine on status changes lives in useSyncLifecycle.
 
   const reset = () => {
     setEmail('');
@@ -103,15 +103,18 @@ export function CloudSyncSection() {
       reset();
     });
 
-  const handleLock = () => {
-    lockVault();
-    syncEngine.stop();
+  const handleLock = async () => {
+    await lockDevice();
     setStatus('locked');
+  };
+
+  const handleStayUnlocked = async (on: boolean) => {
+    setStayUnlockedState(on);
+    await setStayUnlocked(on);
   };
 
   const handleLogout = async () => {
     if (!confirm('Log out and stop syncing? Local data stays on this device.')) return;
-    syncEngine.stop();
     await logout();
     setUser(null);
     setStatus('logged-out');
@@ -281,8 +284,30 @@ export function CloudSyncSection() {
           {lastSyncAt && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Last synced {lastSyncAt.toLocaleTimeString()}
+              {pending > 0 && ` · ${pending} change${pending === 1 ? '' : 's'} waiting to upload`}
             </p>
           )}
+          {syncError && (
+            <p className="flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
+              <AlertCircle size={12} /> Last sync failed: {syncError}
+            </p>
+          )}
+          <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={stayUnlocked}
+              onChange={(e) => void handleStayUnlocked(e.target.checked)}
+            />
+            <span>
+              Stay unlocked on this device
+              <span className="block text-xs text-gray-500 dark:text-gray-400">
+                Sync keeps running after a reload without asking for your passkey. The key is
+                stored in this browser in a form that can't be copied out. Lock or log out to
+                remove it.
+              </span>
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => void syncEngine.tick()}
@@ -298,7 +323,7 @@ export function CloudSyncSection() {
               Re-upload local data
             </button>
             <button
-              onClick={handleLock}
+              onClick={() => void handleLock()}
               className="px-3 py-1.5 text-xs border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg"
             >
               Lock

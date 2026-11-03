@@ -2,7 +2,7 @@
 // Every read/write of user data should go through this module — IndexedDB is
 // the source of truth. Cloud sync (Phase 2) will replicate from here.
 
-export { db, type ChatdexDB, type KnowledgeFolderRow } from './schema';
+export { db, type ChatdexDB, type KnowledgeFolderRow, type SyncLedgerRow } from './schema';
 export * from './conversations';
 export * from './messages';
 export * from './activities';
@@ -17,6 +17,11 @@ export * from './understanding';
 export * from './rawSources';
 export * from './investigationAnchors';
 export * from './investigationCases';
+export * from './preparedChanges';
+export * from './intentTraces';
+export * from './decisionTraces';
+export * from './agentInspections';
+export * from './decisionDiffs';
 
 import { db } from './schema';
 
@@ -45,6 +50,17 @@ export async function clearAllData(): Promise<void> {
       db.caseExhibits,
       db.reviewScopes,
       db.verdictRevisions,
+      db.preparedChanges,
+      db.investigationFindings,
+      db.intentTraces,
+      db.repoFiles,
+      db.inspections,
+      db.decisionTraces,
+      db.agentInspections,
+      db.decisionDiffs,
+      db.researchSources, db.researchSnapshots, db.researchExhibits, db.questionRelations,
+      db.syncLedger,
+      db.landscapeRegions,
     ],
     async () => {
       await db.conversations.clear();
@@ -68,6 +84,20 @@ export async function clearAllData(): Promise<void> {
       await db.caseExhibits.clear();
       await db.reviewScopes.clear();
       await db.verdictRevisions.clear();
+      await db.preparedChanges.clear();
+      await db.investigationFindings.clear();
+      await db.intentTraces.clear();
+      await db.repoFiles.clear();
+      await db.inspections.clear();
+      await db.decisionTraces.clear();
+      await db.agentInspections.clear();
+      await db.decisionDiffs.clear();
+      await db.researchSources.clear();
+      await db.researchSnapshots.clear();
+      await db.researchExhibits.clear();
+      await db.questionRelations.clear();
+      await db.syncLedger.clear();
+      await db.landscapeRegions.clear();
     }
   );
 }

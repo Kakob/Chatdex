@@ -65,7 +65,7 @@ export function KnowledgePage() {
     }
   };
 
-  const handleEdit = (_anchor: ApiAnchor) => {
+  const handleEdit = () => {
     // TODO: open edit modal
   };
 

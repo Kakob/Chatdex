@@ -6,24 +6,41 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 ## Navigation
 
-### For AI Coding Agents (Claude Code / Cursor)
+### For AI coding agents (Claude Code / Cursor)
 
-- **[CLAUDE.md](./CLAUDE.md)** — Primary instructions for AI agents. Read this before working on any part of the codebase. Covers tech stack, commands, project structure, architecture, and coding conventions.
+- **[CLAUDE.md](../CLAUDE.md)** — primary instructions. Read this before working on any part of the codebase: tech stack, commands, structure, architecture invariants, conventions.
 
-### Product Requirements
+### Capabilities and development changes
 
-| Document | What it covers | Status |
-|---|---|---|
-| **[chatdex-prd.md](./chatdex-prd.md)** | Core platform PRD: search, analytics, export, conversation browser, prompt library | Source of truth |
-| **[prd-aipkms.md](./prd-aipkms.md)** | AIPKMS feature PRD: anchoring, threads, resurfacing, synthesis, workspaces | Source of truth |
-| **[PRD activity tracker.md](./PRD%20activity%20tracker.md)** | Activity Tracker PRD: real-time timeline, token usage, artifact capture | Source of truth |
+- **[capabilities/](./capabilities/README.md)** — lasting responsibilities, current contracts, and capability status.
+- **[changes/](./changes/README.md)** — bounded fixes and refinements, active work index, lifecycle rules, and a lightweight plan template.
+- Start with the capability to understand what applies now; open a change plan to understand what is proposed or how a change shipped.
 
-### Vision & Background
+### Understanding Landscape
 
-| Document | What it covers |
+- [Implementation plan, decisions, and verification](./changes/understanding-landscape/PLAN.md) — `/landscape`, acceptance pending.
+- [Code walkthrough](./territories/explore-the-landscape.md) — projection → URL state → scenes → inspector.
+- [Original handoff](./changes/understanding-landscape/START-HERE.md) and [visual reference](./changes/understanding-landscape/visual-guide.html).
+
+### Experience inquiry handoff
+
+- [Original implementation handoff](./changes/experience-inquiry/CODEX_HANDOFF_CHATDEX_INQUIRY.md) — preserved from the supplied bundle.
+- [Research walkthrough and source preparation](./changes/experience-inquiry/WALKTHROUGH.md) — where to open the workflow and load the private registry.
+- [Implementation plan and verification](./changes/experience-inquiry/PLAN.md).
+
+The companion private JSON lives in local, gitignored `research-data/mit/`, not in tracked docs. It lists source leads; it contains no imported primary-source evidence.
+
+### Everything else
+
+| Folder | What lives there |
 |---|---|
-| **[claude-aipkms.md](./claude-aipkms.md)** | Narrative vision for AIPKMS — the "why" and compounding value story |
-| **[Claude activity tracker.md](./Claude%20activity%20tracker.md)** | Technical implementation guide for the Activity Tracker browser extension |
+| **[prds/](./prds/)** | Product-level PRDs spanning capabilities: [core platform](./prds/chatdex-prd.md), [AIPKMS](./prds/prd-aipkms.md), [PatternMirror](./prds/PRD-patternmirror.md), [research contribution](./prds/PRD-research-contribution.md) |
+| **[architecture/](./architecture/)** | [System architecture](./architecture/architecture.md) and [auth architecture](./architecture/auth-architecture.md) |
+| **[territories/](./territories/)** | Territory guides — how one capability works end to end ([index](./territories/README.md)) |
+| **[ownership/](./ownership/)** | The code-ownership loop: exercises, investigations, module notes, audit log ([index](./ownership/README.md)) |
+| **[assessments/](./assessments/)** | Point-in-time repo reconnaissance ([current state](./assessments/chatdex-current-state-reconnaissance.md)), the [invariant register](./assessments/invariant-register.md) (every guarantee → owning spec § → guard test, with unguarded/drift findings), and `recon-screenshots/` |
+| **[vision/](./vision/)** | Narrative vision: [AIPKMS](./vision/claude-aipkms.md), [toolkit → AIPKMS roadmap](./vision/roadmap-toolkit-to-aipkms.md) |
+| **[archive/](./archive/)** | Superseded documents, kept for history — links inside are intentionally not maintained |
 
 ---
 
@@ -85,10 +102,8 @@ npm run dev:extension        # Watches and rebuilds dist-extension/
 
 ---
 
-## Current development phase
+## Current development work
 
-Check the PRDs for phase status. Rough order of priority:
-
-1. Core webapp (search, analytics, export, conversations) — **in progress**
-2. Activity Tracker browser extension — **in progress**
-3. AIPKMS — **planned** (Phase 1: anchor & annotate)
+See the [capability index](./capabilities/README.md) for delivery status and the
+[change index](./changes/README.md) for bounded work. Older PRD phase descriptions
+are historical context, not a second work queue.

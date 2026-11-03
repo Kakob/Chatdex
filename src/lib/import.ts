@@ -1,7 +1,8 @@
-import { parseFiles, type ParsedData } from './parsers';
+import { parseFiles, type ImportWarning, type ParsedData } from './parsers';
 import { bulkPutConversations, bulkPutMessages, storeRawSources, db } from './db/index';
 import { autoAnalyzeConversations } from './detection/autoAnalyze';
 import { deriveAnchorsForConversation } from './investigation/anchors';
+import { deriveAgentInspectionsForConversation } from './investigation/agentInspections';
 import type { DataSource, StoredConversation, StoredMessage } from '../types';
 
 export interface ImportResult {
@@ -12,6 +13,8 @@ export interface ImportResult {
   addedConversationIds: string[];
   /** Raw payloads retained this import (deduped by content hash). */
   rawSourcesAdded: number;
+  /** Source lines a parser skipped. Never empty silently: the UI shows them. */
+  parseWarnings: ImportWarning[];
 }
 
 export interface ImportProgress {
@@ -54,6 +57,12 @@ export async function importFiles(
       await deriveAnchorsForConversation(id);
     } catch (err) {
       console.error('[investigation] anchor derivation failed for', id, err);
+    }
+    // What the agent read (SPEC-decision-recovery §8.1) — same posture.
+    try {
+      await deriveAgentInspectionsForConversation(id);
+    } catch (err) {
+      console.error('[decisions] inspection derivation failed for', id, err);
     }
   }
 
@@ -131,5 +140,6 @@ async function storeData(
     source: data.source,
     addedConversationIds,
     rawSourcesAdded: rawResult.added,
+    parseWarnings: data.warnings,
   };
 }

@@ -1,5 +1,6 @@
-import { Menu, Sun, Moon, RefreshCw } from 'lucide-react';
+import { Menu, Sun, Moon } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { SyncStatusMenu } from './SyncStatusMenu';
 
 export function Header() {
   const { theme, setTheme, toggleSidebar, conversationCount } = useAppStore();
@@ -38,12 +39,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          aria-label="Sync data"
-        >
-          <RefreshCw size={18} className="text-gray-600 dark:text-gray-400" />
-        </button>
+        <SyncStatusMenu />
 
         <button
           onClick={toggleTheme}
@@ -55,10 +51,6 @@ export function Header() {
           ) : (
             <Moon size={18} className="text-gray-600 dark:text-gray-400" />
           )}
-        </button>
-
-        <button className="ml-2 px-3 py-1.5 text-sm font-medium text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-colors">
-          Upgrade to Pro
         </button>
       </div>
     </header>

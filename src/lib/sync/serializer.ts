@@ -22,8 +22,13 @@ import type {
   ReviewScope,
   CaseSearchRecord,
   VerdictRevision,
+  InvestigationFinding,
 } from '../../types/investigation';
 import type { SyncKind } from './syncApi';
+import type { PreparedChange } from '../../types/preparedChange';
+import type { IntentTrace, CommitEvidence } from '../../types/intentTrace';
+import type { DecisionTrace } from '../../types/decision';
+import type { LandscapeRegion } from '../../types/landscape';
 
 export interface SyncEnvelope<TKind extends SyncKind = SyncKind> {
   kind: TKind;
@@ -204,7 +209,7 @@ export function rehydrateDetectorRun(payload: unknown): StoredDetectorRun {
   return { ...p, startedAt: isoToDate(p.startedAt), finishedAt: isoToDate(p.finishedAt) };
 }
 
-// --- shared-understanding entities (PRD-shared-understanding-workspace.md) ---
+// --- shared-understanding entities (docs/capabilities/understanding-workspace/PRD.md) ---
 
 export function envelopeUnderstandingProject(
   p: UnderstandingProject
@@ -218,6 +223,12 @@ export function envelopeUnderstandingProject(
       createdAt: dateToIso(p.createdAt),
       updatedAt: dateToIso(p.updatedAt),
       ...(p.lastReconciledAt ? { lastReconciledAt: dateToIso(p.lastReconciledAt) } : {}),
+      ...(p.lastIntentExtractedAt
+        ? { lastIntentExtractedAt: dateToIso(p.lastIntentExtractedAt) }
+        : {}),
+      ...(p.lastDecisionRecoveredAt
+        ? { lastDecisionRecoveredAt: dateToIso(p.lastDecisionRecoveredAt) }
+        : {}),
     },
   };
 }
@@ -227,12 +238,20 @@ export function rehydrateUnderstandingProject(payload: unknown): UnderstandingPr
     createdAt: string;
     updatedAt: string;
     lastReconciledAt?: string;
+    lastIntentExtractedAt?: string;
+    lastDecisionRecoveredAt?: string;
   };
   return {
     ...p,
     createdAt: isoToDate(p.createdAt),
     updatedAt: isoToDate(p.updatedAt),
     ...(p.lastReconciledAt ? { lastReconciledAt: isoToDate(p.lastReconciledAt) } : {}),
+    ...(p.lastIntentExtractedAt
+      ? { lastIntentExtractedAt: isoToDate(p.lastIntentExtractedAt) }
+      : {}),
+    ...(p.lastDecisionRecoveredAt
+      ? { lastDecisionRecoveredAt: isoToDate(p.lastDecisionRecoveredAt) }
+      : {}),
   };
 }
 
@@ -314,7 +333,8 @@ export function envelopeInvestigationCase(
 ): SyncEnvelope<'investigation_case'> {
   return {
     kind: 'investigation_case',
-    parentId: c.conversationId,
+    // Question and research cases have no primary conversation ('').
+    parentId: c.conversationId || null,
     updatedAt: c.updatedAt,
     payload: {
       ...c,
@@ -400,4 +420,176 @@ export function envelopeVerdictRevision(v: VerdictRevision): SyncEnvelope<'verdi
 export function rehydrateVerdictRevision(payload: unknown): VerdictRevision {
   const p = payload as VerdictRevision & { finalizedAt: string };
   return { ...p, finalizedAt: isoToDate(p.finalizedAt) };
+}
+
+export function envelopeInvestigationFinding(
+  finding: InvestigationFinding
+): SyncEnvelope<'investigation_finding'> {
+  return {
+    kind: 'investigation_finding',
+    parentId: finding.caseId,
+    updatedAt: finding.updatedAt,
+    payload: {
+      ...finding,
+      ...(finding.revisions ? { revisions: finding.revisions.map(r => ({ ...r, revisedAt: dateToIso(r.revisedAt) })) } : {}),
+      createdAt: dateToIso(finding.createdAt),
+      updatedAt: dateToIso(finding.updatedAt),
+      ...(finding.finalizedAt ? { finalizedAt: dateToIso(finding.finalizedAt) } : {}),
+    },
+  };
+}
+
+export function rehydrateInvestigationFinding(payload: unknown): InvestigationFinding {
+  const finding = payload as InvestigationFinding & {
+    createdAt: string;
+    updatedAt: string;
+    finalizedAt?: string;
+  };
+  return {
+    ...finding,
+    ...(finding.revisions ? { revisions: finding.revisions.map(r => ({ ...r, revisedAt: isoToDate(r.revisedAt as unknown as string) })) } : {}),
+    createdAt: isoToDate(finding.createdAt),
+    updatedAt: isoToDate(finding.updatedAt),
+    ...(finding.finalizedAt
+      ? { finalizedAt: isoToDate(finding.finalizedAt) }
+      : {}),
+  };
+}
+
+// --- prepared changes ---
+
+export function envelopePreparedChange(
+  change: PreparedChange
+): SyncEnvelope<'prepared_change'> {
+  return {
+    kind: 'prepared_change',
+    parentId: change.projectId,
+    updatedAt: change.updatedAt,
+    payload: {
+      ...change,
+      createdAt: dateToIso(change.createdAt),
+      updatedAt: dateToIso(change.updatedAt),
+      ...(change.readyAt ? { readyAt: dateToIso(change.readyAt) } : {}),
+      ...(change.implementingAt ? { implementingAt: dateToIso(change.implementingAt) } : {}),
+      ...(change.verifiedAt ? { verifiedAt: dateToIso(change.verifiedAt) } : {}),
+      ...(change.closedAt ? { closedAt: dateToIso(change.closedAt) } : {}),
+    },
+  };
+}
+
+export function rehydratePreparedChange(payload: unknown): PreparedChange {
+  const change = payload as PreparedChange & {
+    createdAt: string;
+    updatedAt: string;
+    readyAt?: string;
+    implementingAt?: string;
+    verifiedAt?: string;
+    closedAt?: string;
+  };
+  // Workspace sections (SPEC-change-workspace §7.1) carry ISO strings inside
+  // (D11) and pass through the spread untouched; only top-level lifecycle
+  // timestamps are revived here.
+  return {
+    ...change,
+    createdAt: isoToDate(change.createdAt),
+    updatedAt: isoToDate(change.updatedAt),
+    ...(change.readyAt ? { readyAt: isoToDate(change.readyAt) } : {}),
+    ...(change.implementingAt ? { implementingAt: isoToDate(change.implementingAt) } : {}),
+    ...(change.verifiedAt ? { verifiedAt: isoToDate(change.verifiedAt) } : {}),
+    ...(change.closedAt ? { closedAt: isoToDate(change.closedAt) } : {}),
+  };
+}
+
+// --- intent traces (SPEC-intent-trace §11.4) ---
+// Append-only: createdAt is the row's only write moment. The cleartext
+// envelope carries only kind / parentId (the intent object) / updatedAt —
+// repoRef, paths, and quotes stay inside the ciphertext (audit S9).
+
+type WireCommitEvidence = Omit<CommitEvidence, 'authoredAt'> & { authoredAt: string };
+
+export function envelopeIntentTrace(t: IntentTrace): SyncEnvelope<'intent_trace'> {
+  return {
+    kind: 'intent_trace',
+    parentId: t.intentObjectId,
+    updatedAt: t.createdAt,
+    payload: {
+      ...t,
+      createdAt: dateToIso(t.createdAt),
+      ...(t.commitEvidence
+        ? {
+            commitEvidence: t.commitEvidence.map((c) => ({
+              ...c,
+              authoredAt: dateToIso(c.authoredAt),
+            })),
+          }
+        : {}),
+    },
+  };
+}
+
+export function rehydrateIntentTrace(payload: unknown): IntentTrace {
+  const { createdAt, commitEvidence, ...rest } = payload as Omit<
+    IntentTrace,
+    'createdAt' | 'commitEvidence'
+  > & {
+    createdAt: string;
+    commitEvidence?: WireCommitEvidence[];
+  };
+  return {
+    ...rest,
+    createdAt: isoToDate(createdAt),
+    ...(commitEvidence
+      ? {
+          commitEvidence: commitEvidence.map((c) => ({
+            ...c,
+            authoredAt: isoToDate(c.authoredAt),
+          })),
+        }
+      : {}),
+  };
+}
+
+// --- Decision traces (SPEC-decision-recovery §7.6) ---------------------------
+// The only Date is createdAt; spans and code evidence carry no timestamps.
+// parentId is the decision object so deleting it cascades to its traces.
+
+export function envelopeDecisionTrace(t: DecisionTrace): SyncEnvelope<'decision_trace'> {
+  return {
+    kind: 'decision_trace',
+    parentId: t.decisionObjectId,
+    updatedAt: t.createdAt,
+    payload: { ...t, createdAt: dateToIso(t.createdAt) },
+  };
+}
+
+export function rehydrateDecisionTrace(payload: unknown): DecisionTrace {
+  const { createdAt, ...rest } = payload as Omit<DecisionTrace, 'createdAt'> & { createdAt: string };
+  return { ...rest, createdAt: isoToDate(createdAt) };
+}
+
+// --- Landscape regions (docs/changes/understanding-landscape) ---------------
+// User organization records. parentId is the project; titles, summaries, and
+// membership stay inside the ciphertext.
+
+export function envelopeLandscapeRegion(r: LandscapeRegion): SyncEnvelope<'landscape_region'> {
+  return {
+    kind: 'landscape_region',
+    parentId: r.projectId,
+    updatedAt: r.updatedAt,
+    payload: { ...r, createdAt: dateToIso(r.createdAt), updatedAt: dateToIso(r.updatedAt) },
+  };
+}
+
+export function rehydrateLandscapeRegion(payload: unknown): LandscapeRegion {
+  const { createdAt, updatedAt, ...rest } = payload as Omit<
+    LandscapeRegion,
+    'createdAt' | 'updatedAt'
+  > & { createdAt: string; updatedAt: string };
+  return {
+    ...rest,
+    memberObjectIds: rest.memberObjectIds ?? [],
+    pinnedObjectIds: rest.pinnedObjectIds ?? [],
+    createdAt: isoToDate(createdAt),
+    updatedAt: isoToDate(updatedAt),
+  };
 }

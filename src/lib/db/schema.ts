@@ -1,6 +1,7 @@
 // Dexie (IndexedDB) schema for Chatdex local-first storage.
 // Source of truth for all user data. Cloud sync (Phase 2) replicates this layer.
 
+import type { ResearchSource, ResearchSnapshot, ResearchExhibit, QuestionRelation } from '../../types/research';
 import Dexie, { type Table } from 'dexie';
 import type {
   StoredConversation,
@@ -26,12 +27,29 @@ import type {
   CaseExhibit,
   ReviewScope,
   VerdictRevision,
+  InvestigationFinding,
 } from '../../types/investigation';
+import type { PreparedChange } from '../../types/preparedChange';
+import type { IntentTrace } from '../../types/intentTrace';
+import type { RepoFileRow, InspectionRow } from '../../types/repo';
+import type { DecisionTrace, AgentInspection, DecisionDiff } from '../../types/decision';
+import type { LandscapeRegion } from '../../types/landscape';
 
 export interface KnowledgeFolderRow {
   id: string;
   name: string;
   createdAt: Date;
+}
+
+/**
+ * One row per record the server is known to hold (pushed by this device or
+ * pulled from it). LOCAL-ONLY: never hooked into the sync engine. Holds only
+ * the record kind and id — no content.
+ */
+export interface SyncLedgerRow {
+  kind: string;
+  id: string;
+  syncedAt: Date;
 }
 
 export class ChatdexDB extends Dexie {
@@ -56,9 +74,24 @@ export class ChatdexDB extends Dexie {
   caseExhibits!: Table<CaseExhibit, string>;
   reviewScopes!: Table<ReviewScope, string>;
   verdictRevisions!: Table<VerdictRevision, string>;
+  preparedChanges!: Table<PreparedChange, string>;
+  investigationFindings!: Table<InvestigationFinding, string>;
+  intentTraces!: Table<IntentTrace, string>;
+  repoFiles!: Table<RepoFileRow, [string, string, string]>;
+  inspections!: Table<InspectionRow, string>;
+  decisionTraces!: Table<DecisionTrace, string>;
+  agentInspections!: Table<AgentInspection, string>;
+  decisionDiffs!: Table<DecisionDiff, string>;
 
-  constructor() {
-    super('chatdex');
+  researchSources!: Table<ResearchSource, string>;
+  researchSnapshots!: Table<ResearchSnapshot, string>;
+  researchExhibits!: Table<ResearchExhibit, string>;
+  questionRelations!: Table<QuestionRelation, string>;
+  syncLedger!: Table<SyncLedgerRow, [string, string]>;
+  landscapeRegions!: Table<LandscapeRegion, string>;
+
+  constructor(name = 'chatdex') {
+    super(name);
     this.version(1).stores({
       conversations: '&id, source, updatedAt, importedAt, [source+updatedAt]',
       messages: '&id, conversationId, [conversationId+createdAt], createdAt',
@@ -72,13 +105,13 @@ export class ChatdexDB extends Dexie {
       dailyStats: '&date',
       metadata: '&key',
     });
-    // v2: agent-observability entities (SPEC-agent-observability.md §3).
+    // v2: agent-observability entities (docs/capabilities/agent-observability/SPEC.md §3).
     this.version(2).stores({
       findings:
         '&id, conversationId, runId, detector, severity, userLabel, createdAt, [conversationId+createdAt]',
       detectorRuns: '&id, &runKey, conversationId, finishedAt',
     });
-    // v3: shared-understanding entities (PRD-shared-understanding-workspace.md §6-§11).
+    // v3: shared-understanding entities (docs/capabilities/understanding-workspace/PRD.md §6-§11).
     this.version(3).stores({
       understandingProjects: '&id, name, reviewState, updatedAt',
       projectAssociations:
@@ -127,6 +160,75 @@ export class ChatdexDB extends Dexie {
     // snapshots, synced encrypted like the other human records.
     this.version(8).stores({
       verdictRevisions: '&id, caseId, conversationId, &[caseId+revisionNumber]',
+    });
+    // v9: project-scoped implementation handoffs. These are human-authored
+    // records; source material remains canonical in conversations/messages.
+    this.version(9).stores({
+      preparedChanges: '&id, projectId, state, updatedAt, [projectId+updatedAt]',
+    });
+    // v10: question-first project investigations and their human findings.
+    // Existing anchor cases remain intact and backfill their discriminator.
+    this.version(10)
+      .stores({
+        investigationCases:
+          '&id, projectId, conversationId, primaryAnchorStableKey, kind, state, updatedAt, [projectId+updatedAt]',
+        investigationFindings: '&id, caseId, projectId, state, updatedAt',
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table('investigationCases')
+          .toCollection()
+          .modify((row: Partial<InvestigationCase>) => {
+            row.kind = row.kind ?? 'anchor';
+          });
+      });
+    // v11: intent traces (SPEC-intent-trace §11.3) — append-only synthesis
+    // output, one row per (intent, commit); synced as ciphertext. The intent
+    // objects themselves are understandingObjects rows (type 'intent') whose
+    // new optional `meta` field needs no schema change (unindexed).
+    this.version(11).stores({
+      intentTraces:
+        '&id, projectId, intentObjectId, createdAt, [projectId+createdAt], [intentObjectId+createdAt]',
+    });
+    // v12: Change Workspace local caches (SPEC-change-workspace §7.2).
+    // BOTH LOCAL-ONLY — never hooked into the sync engine (law §2.5, D3, D9):
+    // `repoFiles` holds whole repository files for client-side search (the
+    // synced workspace keeps only capped quotes); `inspections` is the
+    // human view log behind PRD §17 counts.
+    this.version(12).stores({
+      repoFiles: '&[repoKey+sha+path], repoKey, sha, [repoKey+sha]',
+      inspections: '&id, workspaceId, projectId, [projectId+targetKey], at',
+    });
+    // v13: Decision Recovery (SPEC-decision-recovery §7.5). `decisionTraces`
+    // is append-only synthesis output, one row per (decision, run), synced
+    // as ciphertext (kind 'decision_trace'). `agentInspections` (what the
+    // agent read) and `decisionDiffs` (Semantic Decision Diff) are BOTH
+    // LOCAL-ONLY derived rows — never hooked into the sync engine (law 2.9).
+    this.version(13).stores({
+      decisionTraces:
+        '&id, projectId, decisionObjectId, runId, createdAt, [projectId+createdAt], [decisionObjectId+createdAt], [projectId+runId]',
+      agentInspections: '&id, conversationId, path, [conversationId+stepIndex]',
+      decisionDiffs: '&id, projectId, toRunId, createdAt',
+    });
+    // Additive only. Private source inventory, text and locators never sync.
+    this.version(14).stores({
+      researchSources: '&id, projectId, [projectId+registryId]',
+      researchSnapshots: '&id, sourceId, &[sourceId+contentHash]',
+      researchExhibits: '&id, caseId, sourceId',
+      questionRelations: '&id, projectId',
+    });
+    // v15: sync ledger (docs/changes/reliable-sync). LOCAL-ONLY bookkeeping of
+    // which records have reached the server, so sync can catch up on rows
+    // written while it was off and the UI can say where each record lives.
+    this.version(15).stores({
+      syncLedger: '&[kind+id], kind',
+    });
+    // v16: Understanding Landscape regions (docs/changes/understanding-landscape).
+    // Additive. User organization records — they SYNC (encrypted) as kind
+    // 'landscape_region'. Resume state is NOT here: it reuses the local-only
+    // `inspections` log.
+    this.version(16).stores({
+      landscapeRegions: '&id, projectId, parentRegionId, updatedAt',
     });
   }
 }

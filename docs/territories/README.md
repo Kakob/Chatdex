@@ -34,6 +34,7 @@ Chatdex ingests AI-conversation history (Claude.ai exports, Claude Code JSONL, C
 | **Synthesize understanding** | LLM-extracted projects/objects/events behind a structural evidence requirement and a human review gate; closes the loop into chat. | `lib/understanding/{discovery,reconcile}.ts` | core (newest, U1–U6) | [synthesize-understanding.md](synthesize-understanding.md) |
 | **Relay an LLM call** | Transit-only proxy to the user's own provider accounts — API-key mode or CLI-login subscription bridge; JWT-gated, unlogged, untested. | `lib/providers/relayClient.ts` → `backend/src/routes/llm.ts` | core | [relay-llm-calls.md](relay-llm-calls.md) |
 | **Unlock the vault** | Passkey-PRF key wrapping, recovery codes, never-expiring JWTs; gates only sync, not the app. | `CloudSyncSection.tsx` → `lib/auth/session.ts` | core | [unlock-the-vault.md](unlock-the-vault.md) |
+| **Explore the understanding landscape** | Pure projection of projects/objects/regions into a click-through contour map; URL-driven scenes, bounded rendering, local-only visit log. | `pages/LandscapePage.tsx` → `lib/landscape/projection.ts` | newest (2026-10-29) | [explore-the-landscape.md](explore-the-landscape.md) |
 | **Sync encrypted state** | Dexie-hook dirty queue → per-record AES-GCM → LWW blob store; silent, Settings-gated, with a suspected metadata ping-pong loop. | `lib/sync/engine.ts` | core | [sync-encrypted-state.md](sync-encrypted-state.md) |
 
 ### Supporting territories (documented here, no separate doc)

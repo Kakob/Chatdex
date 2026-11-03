@@ -1,5 +1,6 @@
-// Session-scoped holder for the unwrapped master key. Never persists to disk.
-// lock() drops the reference; closing the tab does the same automatically.
+// Session-scoped holder for the unwrapped master key. This module never
+// persists it; the optional device-remembered copy lives in deviceKey.ts
+// (non-extractable only). lock() drops the in-memory reference.
 //
 // All key material decisions (passkey vs recovery code, server material shape,
 // etc.) live in src/lib/auth/session.ts. This module just guards in-memory

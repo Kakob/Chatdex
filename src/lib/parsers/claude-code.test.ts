@@ -37,6 +37,30 @@ describe('parseClaudeCodeContent', () => {
 
     const result = parseClaudeCodeContent(content, 'mixed.jsonl');
     expect(result.conversations).toHaveLength(1);
+    // The skip is reported, not swallowed (SPEC-decision-investigation §7.1).
+    expect(result.warnings).toEqual([{ line: 1, reason: 'malformed-json' }]);
+  });
+
+  it('numbers malformed-line warnings by source line, counting blank lines', () => {
+    const content = [
+      makeEntry('system', { cwd: '/project' }),
+      '',
+      '{"type": "user", truncated',
+      makeEntry('user', { message: { content: 'ok' } }),
+      'trailing garbage',
+    ].join('\n');
+
+    const result = parseClaudeCodeContent(content, 'gaps.jsonl');
+    expect(result.warnings.map((w) => w.line)).toEqual([3, 5]);
+    expect(result.messages.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('reports no warnings for a clean file', () => {
+    const content = [
+      makeEntry('user', { message: { content: 'a' } }),
+      makeEntry('assistant', { message: { content: 'b' } }),
+    ].join('\n');
+    expect(parseClaudeCodeContent(content, 'clean.jsonl').warnings).toEqual([]);
   });
 
   it('extracts user and assistant messages', () => {

@@ -189,7 +189,7 @@ export async function listDecisionLedger(): Promise<LedgerEntry[]> {
   const entries: LedgerEntry[] = [];
   for (const [caseId, revs] of byCase) {
     const caseRow = await getInvestigationCase(caseId);
-    if (!caseRow) continue;
+    if (!caseRow?.primaryAnchorStableKey) continue;
     revs.sort((a, b) => a.revisionNumber - b.revisionNumber);
     const anchor = await getInvestigationAnchor(caseRow.primaryAnchorStableKey);
     entries.push({
@@ -226,8 +226,10 @@ export interface InvestigationCoverage {
   totals: { totalAnchors: number; uninvestigated: number; open: number; adjudicated: number };
 }
 
-export async function getInvestigationCoverage(): Promise<InvestigationCoverage> {
-  const anchors = await listInvestigationAnchors();
+export async function getInvestigationCoverage(options: {
+  conversationIds?: string[];
+} = {}): Promise<InvestigationCoverage> {
+  const anchors = await listInvestigationAnchors({ conversationIds: options.conversationIds });
   const caseStates = await caseStatesByAnchorKey();
   const lastAdjudicated = await lastAdjudicationByAnchorKey();
 
@@ -298,7 +300,7 @@ async function caseStatesByAnchorKey(): Promise<Map<string, CaseState>> {
   const cases = await listInvestigationCases();
   const map = new Map<string, CaseState>();
   for (const c of cases) {
-    map.set(c.primaryAnchorStableKey, c.state);
+    if (c.primaryAnchorStableKey) map.set(c.primaryAnchorStableKey, c.state);
     for (const linked of c.linkedAnchorStableKeys) {
       if (!map.has(linked)) map.set(linked, c.state);
     }
@@ -317,7 +319,7 @@ async function lastAdjudicationByAnchorKey(): Promise<Map<string, Date>> {
   const map = new Map<string, Date>();
   for (const c of cases) {
     const at = latestByCase.get(c.id);
-    if (at) map.set(c.primaryAnchorStableKey, at);
+    if (at && c.primaryAnchorStableKey) map.set(c.primaryAnchorStableKey, at);
   }
   return map;
 }

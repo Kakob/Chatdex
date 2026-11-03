@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Download, Copy, X, Tag, Search, Radar, Loader2 } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
+import { StorageBadge } from '../common/StorageBadge';
+import { useConversationStorage, useMessageLocations } from '../../hooks/useStorageLocation';
 import { TagBadge } from '../common/TagBadge';
 import { TagInput } from '../common/TagInput';
 import { SourceIcon } from '../common/sourceMeta';
@@ -43,6 +45,9 @@ export function ConversationView({
   const { tagEntity, untagEntity, getEntityTags } = useTagStore();
   const { loadConversationAnchors } = useAnchorStore();
   const addToast = useToastStore((s) => s.addToast);
+  const storageIds = useMemo(() => [conversation.id], [conversation.id]);
+  const storage = useConversationStorage(storageIds)?.get(conversation.id);
+  const messageLocations = useMessageLocations(conversation.id);
 
   const loadFindings = useFindingsStore((s) => s.loadFindings);
   const analyzeConversation = useFindingsStore((s) => s.analyze);
@@ -204,6 +209,8 @@ export function ConversationView({
       <div className="flex items-center gap-4 pb-4 border-b border-gray-200 dark:border-gray-700 mb-4">
         <button
           onClick={onBack}
+          title="Back"
+          aria-label="Back"
           className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         >
           <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
@@ -216,8 +223,13 @@ export function ConversationView({
               {conversation.name}
             </h1>
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {formatDate(conversation.createdAt)} · {conversation.messageCount} messages
+          <p className="flex flex-wrap items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>
+              {formatDate(conversation.createdAt)} · {conversation.messageCount} messages
+            </span>
+            {storage && (
+              <StorageBadge location={storage.location} messages={storage.messages} showCounts />
+            )}
           </p>
 
           {/* Tags */}
@@ -377,6 +389,7 @@ export function ConversationView({
                 conversationId={conversation.id}
                 findings={findingsByMessage.get(message.id)}
                 stepLabel={stepLabels.get(message.id)}
+                storage={messageLocations?.get(message.id)}
               />
             ))}
           </div>

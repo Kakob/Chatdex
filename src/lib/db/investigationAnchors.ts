@@ -31,6 +31,7 @@ export async function getInvestigationAnchor(
 
 export interface ListInvestigationAnchorOptions {
   conversationId?: string;
+  conversationIds?: string[];
   order?: 'asc' | 'desc';
 }
 
@@ -38,13 +39,24 @@ export interface ListInvestigationAnchorOptions {
 export async function listInvestigationAnchors(
   options: ListInvestigationAnchorOptions = {}
 ): Promise<InvestigationAnchor[]> {
-  const { conversationId, order = 'asc' } = options;
-  const rows = conversationId
-    ? await db.investigationAnchors
-        .where('conversationId')
-        .equals(conversationId)
-        .sortBy('occurredAt')
-    : await db.investigationAnchors.orderBy('occurredAt').toArray();
+  const { conversationId, conversationIds, order = 'asc' } = options;
+  let rows: InvestigationAnchor[];
+  if (conversationId) {
+    rows = await db.investigationAnchors
+      .where('conversationId')
+      .equals(conversationId)
+      .sortBy('occurredAt');
+  } else if (conversationIds) {
+    rows =
+      conversationIds.length === 0
+        ? []
+        : await db.investigationAnchors
+            .where('conversationId')
+            .anyOf(conversationIds)
+            .sortBy('occurredAt');
+  } else {
+    rows = await db.investigationAnchors.orderBy('occurredAt').toArray();
+  }
   return order === 'desc' ? rows.reverse() : rows;
 }
 

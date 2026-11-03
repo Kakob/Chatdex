@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type { SessionUser } from '../lib/auth/session';
 import { getCurrentUser, getAuthToken } from '../lib/auth/session';
+import { isUnlocked } from '../lib/crypto';
 
 export type AuthStatus = 'logged-out' | 'locked' | 'unlocked';
 
@@ -13,12 +14,15 @@ interface AuthState {
   syncing: boolean;
   syncError: string | null;
   lastSyncAt: Date | null;
+  /** Local changes waiting to upload. */
+  pending: number;
 
   setStatus: (status: AuthStatus) => void;
   setUser: (user: SessionUser | null) => void;
   setSyncing: (syncing: boolean) => void;
   setSyncError: (err: string | null) => void;
   setLastSyncAt: (d: Date | null) => void;
+  setPending: (pending: number) => void;
   hydrate: () => void;
 }
 
@@ -28,18 +32,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   syncing: false,
   syncError: null,
   lastSyncAt: null,
+  pending: 0,
 
   setStatus: (status) => set({ status }),
   setUser: (user) => set({ user }),
   setSyncing: (syncing) => set({ syncing }),
   setSyncError: (syncError) => set({ syncError }),
   setLastSyncAt: (lastSyncAt) => set({ lastSyncAt }),
+  setPending: (pending) => set({ pending }),
 
   hydrate: () => {
     const token = getAuthToken();
     const user = getCurrentUser();
     if (token && user) {
-      set({ user, status: 'locked' });
+      // A remount (e.g. opening Settings) must not report an unlocked vault
+      // as locked.
+      set({ user, status: isUnlocked() ? 'unlocked' : 'locked' });
     } else {
       set({ user: null, status: 'logged-out' });
     }

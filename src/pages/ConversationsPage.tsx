@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, Filter, CheckSquare } from 'lucide-react';
 import { ConversationList, ConversationView } from '../components/conversations';
 import { BatchTagBar } from '../components/conversations/BatchTagBar';
@@ -7,6 +7,7 @@ import { TagBadge } from '../components/common/TagBadge';
 import { ALL_SOURCES, SOURCE_META } from '../components/common/sourceMeta';
 import { useConversations, useConversation, useConversationTags } from '../hooks';
 import { useFindingSummaries } from '../hooks/useFindingSummaries';
+import { useConversationStorage } from '../hooks/useStorageLocation';
 import { useTagStore } from '../stores/tagStore';
 import type { StoredConversation, DataSource } from '../types';
 
@@ -14,6 +15,7 @@ export function ConversationsPage() {
   const { id: urlId } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [sourceFilter, setSourceFilter] = useState<DataSource | undefined>(undefined);
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
@@ -49,6 +51,7 @@ export function ConversationsPage() {
     [conversations]
   );
   const { tagsMap, refresh: refreshTags } = useConversationTags(conversationIds);
+  const conversationStorage = useConversationStorage(conversationIds);
   const findingSummaries = useFindingSummaries(conversationIds);
 
   // Filter conversations by selected tags
@@ -62,11 +65,14 @@ export function ConversationsPage() {
   }, [conversations, selectedTagIds, tagsMap]);
 
   const handleSelect = (conversation: StoredConversation) => {
-    navigate(`/conversations/${conversation.id}`, { replace: true });
+    navigate(`/conversations/${conversation.id}`);
   };
 
+  // Return to wherever the conversation was opened from (a project, the
+  // landscape, search…); one opened directly falls back to the list.
   const handleBack = () => {
-    navigate('/conversations', { replace: true });
+    if (location.key !== 'default') navigate(-1);
+    else navigate('/conversations', { replace: true });
   };
 
   const toggleTagFilter = (tagId: string) => {
@@ -240,6 +246,7 @@ export function ConversationsPage() {
         selectable={selectionMode}
         selectedIds={selectedIds}
         onToggleSelect={toggleSelect}
+        conversationStorage={conversationStorage}
       />
 
       {/* Batch tag bar */}

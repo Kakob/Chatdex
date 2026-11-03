@@ -1,3 +1,4 @@
+import { FromWorkspaceLine } from '../components/prepare/FromWorkspaceLine';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
@@ -11,6 +12,7 @@ import {
   Lightbulb,
   Loader2,
   MessageCircle,
+  PencilRuler,
   Sparkles,
   Waypoints,
 } from 'lucide-react';
@@ -53,11 +55,17 @@ function ObjectCard({
   showType,
   onReview,
   onOpenHistory,
+  selectable,
+  selected,
+  onToggleSelected,
 }: {
   item: UnderstandingItem;
   showType?: boolean;
   onReview: (objectId: string, state: ReviewState) => void;
   onOpenHistory: (objectId: string) => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelected?: (objectId: string) => void;
 }) {
   const { object } = item;
   return (
@@ -72,6 +80,16 @@ function ObjectCard({
       className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 cursor-pointer hover:border-violet-300 dark:hover:border-violet-800 transition-colors"
     >
       <div className="flex items-start justify-between gap-2">
+        {selectable && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={() => onToggleSelected?.(object.id)}
+            onClick={(event) => event.stopPropagation()}
+            className="mt-1 shrink-0"
+            aria-label={`Select ${object.title} for Prepare Change`}
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {showType && (
@@ -93,6 +111,7 @@ function ObjectCard({
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{object.body}</p>
           )}
           <EvidenceLinks evidence={item.evidence} />
+          <FromWorkspaceLine object={object} />
         </div>
         {object.reviewState === 'pending' && (
           <span onClick={(e) => e.stopPropagation()}>
@@ -111,6 +130,9 @@ function Section({
   showType,
   onReview,
   onOpenHistory,
+  selectable,
+  selectedIds,
+  onToggleSelected,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -118,6 +140,9 @@ function Section({
   showType?: boolean;
   onReview: (objectId: string, state: ReviewState) => void;
   onOpenHistory: (objectId: string) => void;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelected?: (objectId: string) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -134,6 +159,12 @@ function Section({
             showType={showType}
             onReview={onReview}
             onOpenHistory={onOpenHistory}
+            selectable={
+              selectable &&
+              (item.object.reviewState === 'accepted' || item.object.reviewState === 'edited')
+            }
+            selected={selectedIds?.has(item.object.id)}
+            onToggleSelected={onToggleSelected}
           />
         ))}
       </div>
@@ -207,9 +238,14 @@ function RecentChangeRow({ change }: { change: RecentChange }) {
   );
 }
 
-export function ProjectUnderstandingPage() {
+export function ProjectUnderstandingPage({
+  workspaceMode = false,
+}: {
+  workspaceMode?: boolean;
+}) {
   const { id } = useParams<{ id: string }>();
-  const projectId = id === UNASSIGNED_ROUTE_ID ? null : id;
+  // `/projects/unassigned` is its own route with no `:id` param.
+  const projectId = id === undefined || id === UNASSIGNED_ROUTE_ID ? null : id;
   const addToast = useToastStore((s) => s.addToast);
 
   const [data, setData] = useState<ProjectUnderstanding | null | undefined>(undefined);
@@ -225,9 +261,9 @@ export function ProjectUnderstandingPage() {
   } | null>(null);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [historyObjectId, setHistoryObjectId] = useState<string | null>(null);
+  const [selectedPointIds, setSelectedPointIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(() => {
-    if (projectId === undefined) return Promise.resolve();
     return Promise.all([loadProjectUnderstanding(projectId), listReadyProviders()]).then(
       ([loaded, configured]) => {
         setData(loaded);
@@ -244,7 +280,7 @@ export function ProjectUnderstandingPage() {
   // Map data loads lazily on first Map view; `data` in the deps refreshes it
   // after reviews (accept/reject changes chains and statuses).
   useEffect(() => {
-    if (view !== 'map' || projectId === undefined) return;
+    if (view !== 'map') return;
     let cancelled = false;
     void loadProjectMap(projectId).then((loaded) => {
       if (!cancelled) setMap(loaded);
@@ -267,6 +303,15 @@ export function ProjectUnderstandingPage() {
   };
   const onEventReview = (eventId: string, state: 'accepted' | 'rejected') =>
     void handleEventReview(eventId, state);
+
+  const toggleSelectedPoint = (objectId: string) => {
+    setSelectedPointIds((current) => {
+      const next = new Set(current);
+      if (next.has(objectId)) next.delete(objectId);
+      else next.add(objectId);
+      return next;
+    });
+  };
 
   // U6.2 accept-all-low-risk (PRD §11): 'supported' is the one op that
   // changes nothing when accepted — it records reinforcement and evidence,
@@ -367,9 +412,11 @@ export function ProjectUnderstandingPage() {
   }
 
   const { project, understanding } = data;
-  const subtitle = project
-    ? project.description
-    : 'Understanding that discovery could not attribute to a specific project';
+  const subtitle = workspaceMode
+    ? 'The human-governed, source-linked account of what is presently believed. Implementation intent belongs in Prepare Change.'
+    : project
+      ? project.description
+      : 'Understanding that discovery could not attribute to a specific project';
   const isEmpty =
     understanding.direction.length === 0 &&
     understanding.ideasAndDecisions.length === 0 &&
@@ -378,22 +425,35 @@ export function ProjectUnderstandingPage() {
 
   return (
     <div>
-      <Link
-        to="/projects"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 mb-4"
-      >
-        <ArrowLeft size={14} /> Projects
-      </Link>
+      {!workspaceMode && (
+        <Link
+          to="/projects"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-violet-600 dark:hover:text-violet-400 mb-4"
+        >
+          <ArrowLeft size={14} /> Projects
+        </Link>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            {project ? project.name : 'Not tied to a project'}
+            {workspaceMode ? 'Current Understanding' : project ? project.name : 'Not tied to a project'}
           </h1>
           {subtitle && <p className="mt-1 text-gray-600 dark:text-gray-400">{subtitle}</p>}
         </div>
 
         <div className="flex items-center gap-2">
+          {workspaceMode && project && selectedPointIds.size > 0 && (
+            <Link
+              to={`/projects/${project.id}/prepare?understanding=${encodeURIComponent(
+                [...selectedPointIds].join(',')
+              )}`}
+              className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
+            >
+              <PencilRuler size={14} />
+              Prepare change ({selectedPointIds.size})
+            </Link>
+          )}
           <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm">
             {(
               [
@@ -527,6 +587,9 @@ export function ProjectUnderstandingPage() {
             items={understanding.direction}
             onReview={onObjectReview}
             onOpenHistory={setHistoryObjectId}
+            selectable={workspaceMode}
+            selectedIds={selectedPointIds}
+            onToggleSelected={toggleSelectedPoint}
           />
           <Section
             icon={<Lightbulb size={14} />}
@@ -535,6 +598,9 @@ export function ProjectUnderstandingPage() {
             showType
             onReview={onObjectReview}
             onOpenHistory={setHistoryObjectId}
+            selectable={workspaceMode}
+            selectedIds={selectedPointIds}
+            onToggleSelected={toggleSelectedPoint}
           />
           <Section
             icon={<HelpCircle size={14} />}
@@ -542,6 +608,9 @@ export function ProjectUnderstandingPage() {
             items={understanding.openQuestions}
             onReview={onObjectReview}
             onOpenHistory={setHistoryObjectId}
+            selectable={workspaceMode}
+            selectedIds={selectedPointIds}
+            onToggleSelected={toggleSelectedPoint}
           />
           {understanding.recentChanges.length > 0 && (
             <section>

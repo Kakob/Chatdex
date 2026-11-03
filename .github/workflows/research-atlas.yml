@@ -6,11 +6,11 @@ on:
       - 'src/features/researchAtlas/**'
       - 'src/App.tsx'
       - 'src/components/layout/Sidebar.tsx'
-      - 'docs/RESEARCH-ATLAS-MVP.md'
+      - 'docs/changes/research-atlas/PLAN.md'
       - '.github/workflows/research-atlas.yml'
   push:
     branches:
-      - feature/research-atlas-mvp
+      - main
 
 jobs:
   validate:

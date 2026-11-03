@@ -29,7 +29,7 @@ export function Layout() {
       <Header />
       <div className="flex-1 flex overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

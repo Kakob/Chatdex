@@ -4,8 +4,10 @@ import type { ResearchProject } from './types';
 
 afterEach(() => vi.unstubAllGlobals());
 
+type MockResponse = { ok: boolean; status: number; json: () => Promise<unknown> };
+
 function mockResponse(results: unknown[]) {
-  const mock = vi.fn(async (_request: RequestInfo | URL) => ({
+  const mock = vi.fn<(request: RequestInfo | URL) => Promise<MockResponse>>(async () => ({
     ok: true,
     status: 200,
     json: async () => ({ results }),

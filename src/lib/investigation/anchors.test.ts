@@ -208,6 +208,22 @@ describe('deriveAnchorsForConversation — deterministic anchors (SPEC §7.3)', 
     expect(byFile[0].kind).toBe('write');
   });
 
+  it('lists only anchors from an explicit project conversation scope', async () => {
+    const otherId = 'conv-other-project';
+    await bulkPutConversations([conv(otherId)]);
+    await bulkPutMessages([
+      msg('assistant', [editBlock]),
+      msg('assistant', [editBlock], '', otherId),
+    ]);
+    await deriveAnchorsForConversation(CONV_ID);
+    await deriveAnchorsForConversation(otherId);
+
+    const scoped = await listInvestigationAnchors({ conversationIds: [CONV_ID] });
+    expect(scoped).toHaveLength(1);
+    expect(scoped[0].conversationId).toBe(CONV_ID);
+    expect(await listInvestigationAnchors({ conversationIds: [] })).toEqual([]);
+  });
+
   it('backfills all agent sessions but never chat-only sources', async () => {
     const chatConv = { ...conv('conv-chat'), source: 'claude.ai' as const };
     await bulkPutConversations([chatConv]);
