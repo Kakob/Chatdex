@@ -10,7 +10,7 @@ vi.mock('../providers', async (importOriginal) => {
 import { complete } from '../providers';
 import { db } from '../db/schema';
 import { clearAllData } from '../db/index';
-import { createHumanProject, createUnderstandingObject, setEventReviewState, setObjectReviewState } from '../db/understanding';
+import { createHumanProject, createUnderstandingObject, setEventReviewState, setObjectReviewState, reviseUnderstandingObject } from '../db/understanding';
 import { addConceptStatement, createRegion, setMembership } from '../db/landscape';
 import { createChat, appendChatMessage } from '../chat/chats';
 import { loadLandscape } from './load';
@@ -158,5 +158,30 @@ describe('proposals from a concept discussion', () => {
     expect(proposal).toMatchObject({ origin: 'ai', reviewState: 'pending', revision: { previousTitle: 'Dragging a box zooms to the selected area' } });
     await setEventReviewState(proposal.id, 'accepted');
     expect((await db.understandingObjects.get(s.behavior.id))!.title).toBe('Plain drag zooms to the selected area');
+  });
+});
+
+
+describe('proposal request concurrency', () => {
+  it.each(['title', 'body'] as const)('refuses a stale accept after a %s edit during the provider request', async (field) => {
+    const s = await atlas();
+    const chat = await createChat({ provider: 'anthropic', projectId: s.p.id, conceptId: s.drag.id, firstUserMessage: 'Clarify zoom' });
+    completeMock.mockImplementation(async () => {
+      await reviseUnderstandingObject(s.behavior.id, {
+        title: field === 'title' ? 'Use Alt-drag instead' : s.behavior.title,
+        body: field === 'body' ? 'New requirement while AI is thinking' : undefined,
+      });
+      return { model: 'test', text: JSON.stringify({ changes: [{ op: 'revise', objectId: s.behavior.id, title: 'Plain drag zooms', messageIndexes: [0] }] }) };
+    });
+    await proposeConceptUpdates(chat.id, s.p.id, s.drag.id, { provider: 'anthropic' });
+    const beforeReview = await db.understandingObjects.get(s.behavior.id);
+    const proposal = (await db.understandingEvents.where('objectId').equals(s.behavior.id).toArray()).find((e) => e.origin === 'ai' && e.op === 'refined')!;
+    expect(proposal.revision).toMatchObject({ previousTitle: s.behavior.title });
+    expect(proposal.revision?.previousBody).toBeUndefined();
+    await expect(setEventReviewState(proposal.id, 'accepted')).rejects.toThrow(/changed after the proposal/);
+    expect(await db.understandingObjects.get(s.behavior.id)).toEqual(beforeReview);
+    expect((await db.understandingEvents.get(proposal.id))?.reviewState).toBe('pending');
+    await setEventReviewState(proposal.id, 'edited', { title: 'User reconciled wording' });
+    expect((await db.understandingObjects.get(s.behavior.id))?.title).toBe('User reconciled wording');
   });
 });

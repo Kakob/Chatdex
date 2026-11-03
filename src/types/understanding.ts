@@ -168,6 +168,8 @@ export interface UnderstandingEvent {
    * the revision replaces, so history never loses the earlier text.
    */
   revision?: UnderstandingRevision;
+  /** Original proposal, preserved when Edit & accept replaces its wording. */
+  originalRevision?: UnderstandingRevision;
 }
 
 export interface UnderstandingRevision {

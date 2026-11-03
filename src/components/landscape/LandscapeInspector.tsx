@@ -103,6 +103,14 @@ function EventRow({ event, landscape, onChanged }: { event: UnderstandingEvent; 
           {event.revision.body !== event.revision.previousBody ? ' (details changed)' : ''}
         </span>
       )}
+      {event.originalRevision && (
+        <details>
+          <summary>Original proposal before your edits</summary>
+          <p>“{event.originalRevision.previousTitle}” → “{event.originalRevision.title}”</p>
+          {event.originalRevision.previousBody && <p>Previous details: {event.originalRevision.previousBody}</p>}
+          {event.originalRevision.body && <p>Proposed details: {event.originalRevision.body}</p>}
+        </details>
+      )}
       <small>
         {event.origin === 'ai' ? 'AI' : 'You'} · {review} · in source {formatDay(event.occurredAt)} · recorded {formatDay(event.createdAt)}
         {event.evidence.length ? ` · ${event.evidence.length} citation${event.evidence.length === 1 ? '' : 's'}` : ''}

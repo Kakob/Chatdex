@@ -24,7 +24,7 @@ import {
   setRegionKind,
   setRegionParent,
 } from './landscape';
-import { envelopeLandscapeRegion, rehydrateLandscapeRegion } from '../sync/serializer';
+import { envelopeLandscapeRegion, rehydrateLandscapeRegion, envelopeUnderstandingEvent, rehydrateUnderstandingEvent } from '../sync/serializer';
 import { withRevision, REVISION_COALESCE_MS } from '../landscape/organize';
 
 beforeEach(async () => {
@@ -188,6 +188,16 @@ describe('rewording with history', () => {
     await setEventReviewState(proposal.id, 'edited', { title: 'Drag selects a range; release zooms', body: 'v3' });
     expect(await db.understandingObjects.get(object.id)).toMatchObject({ title: 'Drag selects a range; release zooms', body: 'v3' });
     expect(await db.understandingEvents.get(proposal.id)).toMatchObject({ reviewState: 'edited', revision: { previousTitle: 'Drag zooms (mine)' } });
+    const reviewed = (await db.understandingEvents.get(proposal.id))!;
+    expect(reviewed.originalRevision).toEqual(proposal.revision);
+    expect(reviewed.originalRevision?.title).toBe('Drag selects a range, release zooms');
+    expect(reviewed.originalRevision?.previousBody).toBe('v1');
+    expect(reviewed.revision).toMatchObject({ title: 'Drag selects a range; release zooms', body: 'v3', previousTitle: 'Drag zooms (mine)' });
+    expect(reviewed.evidence).toEqual(proposal.evidence);
+    const wire = JSON.parse(JSON.stringify(envelopeUnderstandingEvent(reviewed).payload));
+    expect(rehydrateUnderstandingEvent(wire)).toEqual(reviewed);
+    await expect(setEventReviewState(proposal.id, 'accepted')).rejects.toThrow(/already edited/);
+
   });
 
   it('accepting an untouched AI rewording applies it; rejecting changes nothing', async () => {

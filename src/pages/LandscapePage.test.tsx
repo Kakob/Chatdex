@@ -10,8 +10,9 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { clearAllData } from '../lib/db';
 import { db } from '../lib/db/schema';
-import { createHumanProject, createUnderstandingObject, setObjectReviewState } from '../lib/db/understanding';
+import { createHumanProject, createUnderstandingObject, setObjectReviewState, recordUnderstandingEvent } from '../lib/db/understanding';
 import { loadProjectUnderstanding } from '../lib/understanding/currentUnderstanding';
+import { createRegion, addConceptStatement } from '../lib/db/landscape';
 import { LandscapePage } from './LandscapePage';
 
 beforeAll(() => {
@@ -189,5 +190,41 @@ describe('editable landscape — Atlas Maps walkthrough', () => {
     expect(screen.queryByRole('textbox', { name: 'Add concept' })).toBeNull();
     expect(screen.getByRole('button', { name: '+ Add concept' })).toHaveFocus();
     expect(await db.landscapeRegions.count()).toBe(0);
+  });
+});
+
+
+describe('concept revision review history', () => {
+  it('shows the original AI wording alongside the edited accepted revision after remount', async () => {
+    const p = await createHumanProject({ name: 'Precedent' });
+    const zoom = await createRegion({ projectId: p.id, title: 'Box zoom' });
+    const statement = await addConceptStatement(zoom.id, { type: 'behavior', title: 'Drag zooms', body: 'Original details' });
+    await recordUnderstandingEvent({
+      objectId: statement.id, op: 'refined', origin: 'ai', occurredAt: new Date(),
+      evidence: [{ conversationId: 'discussion', messageIds: ['m1'] }],
+      revision: { title: 'AI zoom wording', body: 'AI proposed details', previousTitle: statement.title, previousBody: statement.body },
+    });
+    renderAt(`/landscape?project=${p.id}&region=${zoom.id}&panel=concept`);
+    const panel = await screen.findByRole('complementary');
+    const u = user();
+    await u.click(within(panel).getByRole('button', { name: 'Edit & accept' }));
+    const title = within(panel).getByRole('textbox', { name: 'Proposed statement' });
+    await u.clear(title);
+    await u.type(title, 'User approved zoom wording');
+    const body = within(panel).getByRole('textbox', { name: 'Proposed details' });
+    await u.clear(body);
+    await u.type(body, 'User approved details');
+    await u.click(within(panel).getByRole('button', { name: 'Accept with edits' }));
+    await within(panel).findByRole('link', { name: 'User approved zoom wording' });
+    cleanup();
+    renderAt(`/landscape?project=${p.id}&region=${zoom.id}&finding=${statement.id}`);
+    const inspector = await screen.findByRole('complementary');
+    await u.click(within(inspector).getByText('Original proposal before your edits'));
+    expect(within(inspector).getByText('“Drag zooms” → “AI zoom wording”')).toBeVisible();
+    expect(within(inspector).getByText('Previous details: Original details')).toBeVisible();
+    expect(within(inspector).getByText('Proposed details: AI proposed details')).toBeVisible();
+    expect(inspector.textContent).toContain('User approved zoom wording');
+    expect(inspector.textContent).toContain('User approved details');
+    expect(within(inspector).getAllByRole('link').some((a) => a.getAttribute('href')?.includes('source=discussion'))).toBe(true);
   });
 });

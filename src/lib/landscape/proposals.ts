@@ -206,8 +206,10 @@ export async function proposeConceptUpdates(
       await setMembership(conceptId, object.id, true);
       result.added += 1;
     } else {
-      const object = await db.understandingObjects.get(change.objectId);
-      if (!object) continue;
+      // Keep the baseline actually sent to the provider. Re-reading it here
+      // would disguise edits made while the request was in flight.
+      const object = editable.find((candidate) => candidate.id === change.objectId);
+      if (!object || !(await db.understandingObjects.get(change.objectId))) continue;
       const body = change.body ?? object.body;
       if (object.title === change.title && (object.body || undefined) === (body || undefined)) continue;
       await recordUnderstandingEvent({

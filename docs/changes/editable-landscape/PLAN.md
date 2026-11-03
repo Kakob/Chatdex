@@ -38,8 +38,12 @@ conversation to point at.
    "AI proposal · awaiting your review", or historical. Evidence is never described as proof.
 4. **Rewording keeps history.** `UnderstandingEvent.revision` {title, body, previousTitle,
    previousBody} on a `refined` event. User edits (`reviseUnderstandingObject`) apply immediately.
-   AI rewordings are pending and apply only on Accept; Accept is refused if the object changed
-   after the proposal (the reviewer must Edit & accept against current wording, or Reject).
+   AI rewordings are pending and apply only on Accept; their baseline is the wording sent
+   to the provider, not a fresh read when the response arrives. Accept is refused if the object changed
+   after the provider request began (the reviewer must Edit & accept against current wording, or Reject).
+   Edit & accept preserves the complete original proposal in `originalRevision`; the finding
+   history exposes its original title/details alongside the applied revision. This optional field
+   uses the existing encrypted event payload and needs no database migration.
    Editing a pending AI object is only possible through review (Edit & accept → `edited`, with the
    AI's wording kept as a user `refined` event). Region `revisions` coalesce free-text saves within
    2 minutes; renames, kind changes, and moves never coalesce.
@@ -130,3 +134,20 @@ stepped the landscape out a level.
   recorded on the prepared change.
 - No code/test linking per concept beyond what Change Workspace already promotes as code
   evidence (Priority 3 left mostly for later).
+
+## Review correctness follow-up (2026-11-03)
+
+- Fixed stale acceptance when a user edits a statement while a concept proposal request is in
+  flight: proposals retain the request-time title/body baseline, and ordinary Accept refuses a
+  mismatch. Edit & accept remains an explicit reconciliation against current wording.
+- Fixed loss of original AI revision wording during Edit & accept: the original revision is
+  preserved separately, including its baseline and proposed details, and is visible in the
+  finding history. Existing event evidence and the applied before/after revision are retained.
+- Regression coverage: both title and body edits during provider completion; rejected stale
+  accepts leave wording/review state intact; explicit edited acceptance; original proposal
+  preservation through sync serialization; UI edit/review/history after remount.
+- Live provider and real-browser acceptance remain pending; this follow-up uses isolated tests.
+- Validation: typecheck, lint, and build passed; 22 focused concept/storage/UI tests and all
+  10 external Precedent acceptance probes passed. The full suite passed 1,111/1,112 tests;
+  the same pre-existing `investigation/constraints.test.ts` invalid-span failure observed on
+  main recurred. Browser/provider acceptance is not claimed by these results.

@@ -415,7 +415,9 @@ export async function setEventReviewState(
     await db.understandingEvents.update(id, {
       reviewState: state,
       updatedAt: now,
-      ...(revision && revision !== event.revision ? { revision } : {}),
+      ...(revision && revision !== event.revision
+        ? { revision, originalRevision: event.originalRevision ?? event.revision }
+        : {}),
     });
     if (state === 'accepted' || state === 'edited') {
       const status = OP_STATUS[event.op];
