@@ -8,7 +8,12 @@ still local-only), sync kinds (new `landscape_region`; CLAUDE.md invariant 1 pre
 
 Code walkthrough: [territories/explore-the-landscape.md](../../territories/explore-the-landscape.md).
 Handoff and visual reference: [START-HERE.md](./START-HERE.md), [VISUAL-CONTRACT.md](./VISUAL-CONTRACT.md),
-[ACCEPTANCE.md](./ACCEPTANCE.md), [visual-guide.html](./visual-guide.html), `reference/`, `screenshots/`.
+[ACCEPTANCE.md](./ACCEPTANCE.md), [reference/lab.html](./reference/lab.html) (synthetic).
+
+The design snapshot (`screenshots/`, `visual-guide.html`, `reference/index.html`,
+`reference/recent.html`, `reference/source/`) captures real Chatdex records, so it is kept
+local-only (listed in `.git/info/exclude`) and is not in the public repository. Links to
+those files in this package resolve only on the machine that holds the snapshot.
 
 ## Problem
 
