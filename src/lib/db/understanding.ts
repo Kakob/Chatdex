@@ -19,6 +19,7 @@ import type {
   EvidenceRef,
   ReviewState,
   UnderstandingOrigin,
+  UnderstandingRevision,
 } from '../../types/understanding';
 
 // --- projects ---
@@ -209,6 +210,28 @@ export async function createUnderstandingObject(
   return object;
 }
 
+/**
+ * Apply new wording plus other fields to an object. `modify`, not `update`:
+ * Dexie's update keeps a key set to undefined, and a cleared body must go.
+ */
+async function applyToObject(
+  id: string,
+  changes: Partial<UnderstandingObject>,
+  wording?: { title: string; body?: string }
+): Promise<void> {
+  await db.understandingObjects
+    .where('id')
+    .equals(id)
+    .modify((o) => {
+      Object.assign(o, changes);
+      if (wording) {
+        o.title = wording.title;
+        if (wording.body) o.body = wording.body;
+        else delete o.body;
+      }
+    });
+}
+
 /** Status implied by each op; ops absent here leave status unchanged. */
 export const OP_STATUS: Partial<Record<UnderstandingOp, UnderstandingObject['status']>> = {
   introduced: 'current',
@@ -225,6 +248,8 @@ export interface RecordUnderstandingEventInput {
   evidence: EvidenceRef[];
   origin: UnderstandingOrigin;
   occurredAt: Date;
+  /** New wording for a 'refined' event; see UnderstandingEvent.revision. */
+  revision?: UnderstandingRevision;
 }
 
 /**
@@ -257,7 +282,11 @@ export async function recordUnderstandingEvent(
     reviewState,
     occurredAt: input.occurredAt,
     createdAt: now,
+    ...(input.revision ? { revision: input.revision } : {}),
   };
+  if (input.revision && input.op !== 'refined') {
+    throw new Error('Only refined events can carry a revision');
+  }
   await db.transaction('rw', [db.understandingObjects, db.understandingEvents], async () => {
     const object = await db.understandingObjects.get(input.objectId);
     if (!object) {
@@ -265,12 +294,85 @@ export async function recordUnderstandingEvent(
     }
     await db.understandingEvents.put(event);
     const status = reviewState === 'accepted' ? OP_STATUS[input.op] : undefined;
-    await db.understandingObjects.update(input.objectId, {
-      ...(status ? { status } : {}),
-      updatedAt: now,
-    });
+    await applyToObject(
+      input.objectId,
+      { ...(status ? { status } : {}), updatedAt: now },
+      reviewState === 'accepted' ? input.revision : undefined
+    );
   });
   return event;
+}
+
+/**
+ * The user rewords an object (editable landscape). Recorded as an accepted
+ * user-origin 'refined' event carrying the previous and new wording, then
+ * applied — the earlier text stays in history. Pending AI proposals cannot
+ * be edited this way: review them (accept / edit & accept / reject) instead,
+ * so an unreviewed AI object never becomes accepted by a side door.
+ */
+export async function reviseUnderstandingObject(
+  id: string,
+  next: { title: string; body?: string },
+  detail?: string
+): Promise<UnderstandingEvent | null> {
+  const object = await db.understandingObjects.get(id);
+  if (!object) throw new Error('Understanding object not found');
+  if (object.reviewState === 'pending' || object.reviewState === 'rejected') {
+    throw new Error(`Review this ${object.reviewState} record before editing it`);
+  }
+  const title = next.title.trim();
+  if (!title) throw new Error('A statement cannot be empty');
+  const body = next.body?.trim() || undefined;
+  if (title === object.title && body === (object.body || undefined)) return null;
+  return recordUnderstandingEvent({
+    objectId: id,
+    op: 'refined',
+    detail: detail ?? 'Edited by you',
+    evidence: [],
+    origin: 'user',
+    occurredAt: new Date(),
+    revision: { title, body, previousTitle: object.title, previousBody: object.body || undefined },
+  });
+}
+
+/**
+ * Review a pending AI object, optionally rewording it first ('edited'). The
+ * AI's original wording is kept as a user 'refined' event so the edit is
+ * visible in history.
+ */
+export async function reviewUnderstandingObject(
+  id: string,
+  state: Exclude<ReviewState, 'pending'>,
+  edit?: { title: string; body?: string }
+): Promise<void> {
+  const object = await db.understandingObjects.get(id);
+  if (!object) throw new Error('Understanding object not found');
+  if (object.reviewState !== 'pending') {
+    throw new Error(`Already ${object.reviewState}; re-review is not supported`);
+  }
+  if (state !== 'edited' || !edit) {
+    await setObjectReviewState(id, state);
+    return;
+  }
+  const title = edit.title.trim();
+  if (!title) throw new Error('A statement cannot be empty');
+  const body = edit.body?.trim() || undefined;
+  const now = new Date();
+  await db.transaction('rw', [db.understandingObjects, db.understandingEvents], async () => {
+    await db.understandingEvents.put({
+      id: generateId(),
+      objectId: id,
+      op: 'refined',
+      detail: 'Edited by you while accepting the AI proposal',
+      evidence: [],
+      origin: 'user',
+      reviewState: 'accepted',
+      occurredAt: now,
+      createdAt: now,
+      revision: { title, body, previousTitle: object.title, previousBody: object.body || undefined },
+    });
+    await applyToObject(id, { reviewState: 'edited', updatedAt: now }, { title, body });
+  });
 }
 
 /**
@@ -281,7 +383,9 @@ export async function recordUnderstandingEvent(
  */
 export async function setEventReviewState(
   id: string,
-  state: Exclude<ReviewState, 'pending'>
+  state: Exclude<ReviewState, 'pending'>,
+  /** For a revision proposal reviewed as 'edited': the wording the user settled on. */
+  editedRevision?: { title: string; body?: string }
 ): Promise<void> {
   const now = new Date();
   await db.transaction('rw', [db.understandingObjects, db.understandingEvents], async () => {
@@ -294,13 +398,28 @@ export async function setEventReviewState(
         `Cannot review event ${id}: already ${event.reviewState} (re-review is not supported)`
       );
     }
-    await db.understandingEvents.update(id, { reviewState: state, updatedAt: now });
+    let revision = event.revision;
+    if (revision && (state === 'accepted' || state === 'edited')) {
+      const object = await db.understandingObjects.get(event.objectId);
+      if (!object) throw new Error(`Cannot review event ${id}: its object is gone`);
+      if (state === 'edited' && editedRevision) {
+        const title = editedRevision.title.trim();
+        if (!title) throw new Error('A statement cannot be empty');
+        revision = { ...revision, title, body: editedRevision.body?.trim() || undefined, previousTitle: object.title, previousBody: object.body || undefined };
+      } else if (object.title !== revision.previousTitle || (object.body || undefined) !== (revision.previousBody || undefined)) {
+        // Accepting as-is would silently overwrite wording written after
+        // the proposal. The reviewer must edit (seeing the current text) or reject.
+        throw new Error('This record changed after the proposal was made — edit the proposal against the current wording, or reject it');
+      }
+    }
+    await db.understandingEvents.update(id, {
+      reviewState: state,
+      updatedAt: now,
+      ...(revision && revision !== event.revision ? { revision } : {}),
+    });
     if (state === 'accepted' || state === 'edited') {
       const status = OP_STATUS[event.op];
-      await db.understandingObjects.update(event.objectId, {
-        ...(status ? { status } : {}),
-        updatedAt: now,
-      });
+      await applyToObject(event.objectId, { ...(status ? { status } : {}), updatedAt: now }, revision);
     }
   });
 }

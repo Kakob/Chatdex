@@ -20,6 +20,8 @@ When I open `/landscape` and click my way down to a source, what is read, what d
 …&source=C                        cited messages with speaker/time; "Back to finding"
 ```
 
+Since 2026-11-03 ([editable landscape](../changes/editable-landscape/PLAN.md)) regions are shown as **concepts**: "+ Add concept" / "+ Add inside X" on the map creates one inline (Enter adds and stays open, Escape cancels); `panel=concept` opens the concept panel (rename, kind, summary, description, statements by section, sub-concepts, link existing records, move, history, delete, Discuss with AI, Prepare Change). [CODE `components/landscape/ConceptPanel.tsx`]
+
 Back steps one level, breadcrumbs jump to ancestors, Escape steps out, browser Back retraces. `lens=recent` ("Where you left off") keeps the same places but highlights what you last opened; clicking an island opens a resume panel instead of entering. `panel=list` and `panel=organize` open the complete list and the region editor. `q` and `filter` drive search and dimming. [CODE]
 
 ## Entry point
@@ -62,11 +64,13 @@ Every link inside the page is produced by `toHref()`, which returns a *relative*
 
 | Thing | Where | Persistence |
 |---|---|---|
-| Region | `LandscapeRegion` in `src/types/landscape.ts` — projectId, parentRegionId, title, summary, order, `memberObjectIds`, `pinnedObjectIds` | Dexie v16 `landscapeRegions`; syncs as ciphertext, kind `landscape_region`, parentId = project |
+| Region (concept) | `LandscapeRegion` in `src/types/landscape.ts` — projectId, parentRegionId, title, summary, optional `body`/`kind`, order, `memberObjectIds`, `pinnedObjectIds`, append-only `revisions` | Dexie v16 `landscapeRegions` (new fields unindexed, no version bump); syncs as ciphertext, kind `landscape_region`, parentId = project |
+| Statement about a concept | ordinary `UnderstandingObject` (`behavior` / `belief` / `question` / `decision`), origin `user`, accepted, evidence optional, placed via membership | existing tables and sync |
+| Rewording | `refined` event with `revision` {title, body, previousTitle, previousBody}; user → applied now, AI → pending until accepted | existing `understandingEvents` |
 | Visit | `inspections` row, `targetKey` `landscape:region:R` / `landscape:finding:R:F` / `landscape:source:R:F:C`, explicit `at` | LOCAL-ONLY (never hooked into sync) |
 | Finding, evidence, history | existing understanding objects/events | read-only here |
 
-Regions are organization, not claims: nothing in `src/lib/db/landscape.ts` reads or writes understanding objects or events except to check a finding's project before placing it. [CODE, TEST `db/landscape.test.ts`]
+Regions are organization, not claims: `src/lib/db/landscape.ts` never edits an existing understanding object or event; its one understanding write, `addConceptStatement`, creates a *new* user-origin object and places it. [CODE, TEST `db/landscape.test.ts`, `db/concepts.test.ts`]
 
 ## Rules the projection enforces
 
@@ -93,13 +97,16 @@ Regions are organization, not claims: nothing in `src/lib/db/landscape.ts` reads
 |---|---|
 | Viewing, navigating, switching lens, searching | one local-only `inspections` row per arrival at a region/finding/source (none in the lab) |
 | Organize panel / membership / pin | `landscapeRegions` row(s) → sync queue |
+| Concept panel edits, "+ Add" | `landscapeRegions` row (+ revision); statements → new `understandingObjects` + `introduced` event |
+| Edit wording / Accept / Edit & accept / Reject | `refined` event (+ object title/body) or review-state change via `db/understanding.ts` |
+| "Discuss with AI" | none here — opens `/chat?project=&concept=`; chat sends `buildConceptContext()` after the disclosure |
 | "Prepare a change" links | none — `?understanding=` only preselects in Prepare Change |
 
-No provider call happens anywhere in this territory. [CODE]
+No provider call happens on the landscape page. Concept chats (`ChatPage`) and "Propose concept updates" (`lib/landscape/proposals.ts`) call the provider only after the existing disclosure modal. [CODE]
 
 ## Tests
 
-`src/lib/landscape/{projection,route,organize,resume,scale}.test.ts`, `src/lib/db/landscape.test.ts` (incl. v15 → v16 migration and serializer round-trip). `scale.test.ts` runs the 25/100/300 synthetic fixtures from `lib/landscape/synthetic.ts`.
+`src/lib/landscape/{projection,route,organize,resume,scale,concept}.test.ts`, `src/lib/db/{landscape,concepts}.test.ts` (incl. v15 → v16 migration and serializer round-trip), `src/pages/LandscapePage.test.tsx` (example hierarchy built through the UI). `scale.test.ts` runs the 25/100/300 synthetic fixtures from `lib/landscape/synthetic.ts`.
 
 ## Fog
 

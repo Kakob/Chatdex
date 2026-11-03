@@ -1,8 +1,8 @@
 // Right-hand inspector of the Understanding Landscape (reference atlas.js
 // findingPanel / sourcePanel / edgePanel, recent.js resume panel), plus the
 // complete-list and organize panels the prototype lacked. The map stays
-// visible beside it. Nothing here changes a finding's review state: review
-// stays in Current Understanding's existing controls.
+// visible beside it. Review and rewording happen only through explicit
+// buttons (editable landscape, ConceptPanel.tsx); viewing changes nothing.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -32,6 +32,7 @@ import { toHref, withLocation, type LandscapeParams, type ResolvedView } from '.
 import type { StoredConversation, StoredMessage } from '../../types';
 import type { UnderstandingEvent } from '../../types/understanding';
 import { edgeLabel, reviewLabel } from './sceneModel';
+import { ProposedEventControls, StatementControls } from './ConceptPanel';
 
 const PAGE = 25;
 
@@ -87,7 +88,7 @@ const OP_LABEL: Record<UnderstandingEvent['op'], string> = {
   resolved: 'Resolved',
 };
 
-function EventRow({ event, landscape }: { event: UnderstandingEvent; landscape: Landscape }) {
+function EventRow({ event, landscape, onChanged }: { event: UnderstandingEvent; landscape: Landscape; onChanged?: () => void }) {
   const replacement = event.supersededByObjectId ? landscape.findings.get(event.supersededByObjectId) : undefined;
   const review = event.reviewState === 'pending' ? 'proposed, awaiting review' : event.reviewState === 'edited' ? 'accepted (edited)' : 'accepted';
   return (
@@ -95,10 +96,18 @@ function EventRow({ event, landscape }: { event: UnderstandingEvent; landscape: 
       <strong>{OP_LABEL[event.op]}</strong>
       {event.detail ? ` — ${event.detail}` : ''}
       {replacement ? ` → “${replacement.object.title}”` : ''}
+      {event.revision && (
+        <span className="revision">
+          {' '}
+          “{event.revision.previousTitle}” → “{event.revision.title}”
+          {event.revision.body !== event.revision.previousBody ? ' (details changed)' : ''}
+        </span>
+      )}
       <small>
         {event.origin === 'ai' ? 'AI' : 'You'} · {review} · in source {formatDay(event.occurredAt)} · recorded {formatDay(event.createdAt)}
         {event.evidence.length ? ` · ${event.evidence.length} citation${event.evidence.length === 1 ? '' : 's'}` : ''}
       </small>
+      {onChanged && event.reviewState === 'pending' && <ProposedEventControls event={event} onChanged={onChanged} />}
     </div>
   );
 }
@@ -116,12 +125,15 @@ export function FindingPanel({
   landscape,
   resume,
   onChanged,
+  editable = true,
 }: {
   finding: LandscapeFinding;
   view: ResolvedView;
   landscape: Landscape;
   resume?: ProjectResume;
   onChanged: () => void;
+  /** False in the read-only synthetic lab. */
+  editable?: boolean;
 }) {
   const project = view.project!;
   const params = view.params;
@@ -143,8 +155,9 @@ export function FindingPanel({
       </div>
       {o.body ? <p>{o.body}</p> : <p className="status-note">No longer description was recorded for this finding.</p>}
       {o.reviewState === 'pending' && (
-        <p className="status-note">AI-proposed and not yet accepted. Review it with the existing controls in Current Understanding; viewing it here changes nothing.</p>
+        <p className="status-note">AI-proposed and not yet accepted. Viewing it changes nothing; accept, edit, or reject it here or in Current Understanding.</p>
       )}
+      {projectId && editable && !project.sample && <StatementControls finding={finding} onChanged={onChanged} />}
       {finding.pendingEventCount > 0 && (
         <p className="status-note">
           {finding.pendingEventCount} proposed change{finding.pendingEventCount === 1 ? '' : 's'} to this finding await review.
@@ -170,7 +183,7 @@ export function FindingPanel({
 
       <div className="section-label">How understanding changed</div>
       {finding.events.length ? (
-        finding.events.map((event) => <EventRow key={event.id} event={event} landscape={landscape} />)
+        finding.events.map((event) => <EventRow key={event.id} event={event} landscape={landscape} onChanged={projectId && editable ? onChanged : undefined} />)
       ) : (
         <p>No events recorded. No replacement or conflict is asserted.</p>
       )}
@@ -232,9 +245,9 @@ function MembershipEditor({ finding, project, onChanged }: { finding: LandscapeF
   };
   return (
     <>
-      <div className="section-label">Where it sits · organization only</div>
+      <div className="section-label">Which concepts it is about · organization only</div>
       {all.length === 0 ? (
-        <p className="note">This project has no regions yet. Use Organize on the project to create some; findings stay in Uncategorized until placed.</p>
+        <p className="note">This project has no concepts yet. Add one on the project landscape; records stay in Uncategorized until placed.</p>
       ) : (
         all.map((node) => {
           const member = node.directIds.includes(finding.object.id);
@@ -250,7 +263,7 @@ function MembershipEditor({ finding, project, onChanged }: { finding: LandscapeF
                 className="mini-button"
                 aria-pressed={pinned}
                 onClick={() => void run(() => setPinned(node.id, finding.object.id, !pinned))}
-                title="Show this statement on the region's terrain"
+                title="Show this statement on the concept's terrain"
               >
                 {pinned ? 'Pinned' : 'Pin as summary'}
               </button>
@@ -259,7 +272,7 @@ function MembershipEditor({ finding, project, onChanged }: { finding: LandscapeF
         })
       )}
       {error && <p className="status-note" role="alert">{error}</p>}
-      <p className="note">Placing or pinning a finding never changes its statement, review state, or evidence.</p>
+      <p className="note">Placing or pinning a record never changes its statement, review state, or evidence. One record can sit in several concepts without being copied.</p>
     </>
   );
 }

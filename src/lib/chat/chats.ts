@@ -21,6 +21,8 @@ export interface ChatProviderMeta {
   model?: string;
   /** Project this chat was started from, if any. */
   projectId?: string;
+  /** Landscape concept (region id) this chat discusses, if started from one. */
+  conceptId?: string;
   /**
    * ISO timestamp of the user accepting the context-injection disclosure for
    * this chat (U5.2). Absent ⇒ the disclosure modal gates the next send that
@@ -62,6 +64,8 @@ export interface CreateChatOptions {
   provider: LLMProviderId;
   /** Associates the chat with a project (user-asserted, pre-accepted). */
   projectId?: string;
+  /** Concept the chat discusses; only kept together with projectId. */
+  conceptId?: string;
   firstUserMessage: string;
 }
 
@@ -74,6 +78,7 @@ export async function createChat(options: CreateChatOptions): Promise<StoredConv
   const meta: ChatProviderMeta = {
     provider: options.provider,
     ...(options.projectId ? { projectId: options.projectId } : {}),
+    ...(options.projectId && options.conceptId ? { conceptId: options.conceptId } : {}),
   };
   const conversation: StoredConversation = {
     id: `chatdex-${crypto.randomUUID()}`,

@@ -62,6 +62,9 @@ Map is a supersession-chain timeline, not a spatial landscape.
    review state, lifecycle, or evidence (tested). Feature/system understanding objects as
    concept identities (living-project-map-exploration) were rejected for this slice for exactly
    that pollution risk.
+   *Extended 2026-11-03 by [editable-landscape](../editable-landscape/PLAN.md):* regions are
+   shown as concepts and gain description, kind, and revision history; statements about a
+   concept are separate user-origin objects, so this decision stands.
 2. **Storage.** Dexie v16 adds `landscapeRegions` (additive). Syncs as ciphertext, kind
    `landscape_region`, parentId = project id; title/summary/membership stay inside the
    ciphertext. Backend kind enum and Drizzle type updated; no SQL migration needed

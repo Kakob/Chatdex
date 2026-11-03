@@ -1,8 +1,10 @@
 // Understanding Landscape (docs/changes/understanding-landscape): a
-// click-through map of projects → regions → findings → evidence, with the
+// click-through map of projects → concepts → findings → evidence, with the
 // reference atlas's visual language. All navigation state is in the URL.
 // Viewing never writes understanding records or calls a provider; the only
-// writes are explicit organization edits and the local-only visit log.
+// writes are explicit edits (docs/changes/editable-landscape: adding and
+// developing concepts and statements, reviewing proposals) and the
+// local-only visit log.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -36,8 +38,9 @@ import {
   ResumePanel,
   SourcePanel,
 } from '../components/landscape/LandscapeInspector';
+import { AddConceptControl, ConceptPanel } from '../components/landscape/ConceptPanel';
 
-const LEVELS = ['Projects', 'Project landscape', 'Region', 'Finding detail', 'Source'];
+const LEVELS = ['Projects', 'Project landscape', 'Concept', 'Finding detail', 'Source'];
 const RESULTS_PAGE = 12;
 
 /**
@@ -240,7 +243,7 @@ function LandscapeView({
         `${project.sourceCount} conversation source${project.sourceCount === 1 ? '' : 's'}`,
         `${project.counts.current} understanding object${project.counts.current === 1 ? '' : 's'}`,
         project.counts.historical ? `${project.counts.historical} superseded or resolved` : '',
-        project.regionCount ? `${project.regionCount} region${project.regionCount === 1 ? '' : 's'}` : 'not organized yet',
+        project.regionCount ? `${project.regionCount} concept${project.regionCount === 1 ? '' : 's'}` : 'no concepts yet',
         project.sample ? 'Synthetic sample supplied by Chatdex' : project.project?.reviewState === 'pending' ? 'Project awaiting review' : '',
       ]
         .filter(Boolean)
@@ -254,9 +257,9 @@ function LandscapeView({
   const sceneHeight = size.height;
   const sceneProps = { landscape, view, lens, matches, filtering, width: sceneWidth, height: sceneHeight };
   const cornerText = view.region
-    ? 'Every mark is a finding or subregion'
+    ? 'Every mark is a statement or sub-concept'
     : project
-      ? 'Click a region to reveal its findings'
+      ? 'Click a concept to enter it'
       : `${landscape.projects.length} place${landscape.projects.length === 1 ? '' : 's'} · ${landscape.connections.length} shared-source connection${landscape.connections.length === 1 ? '' : 's'}`;
 
   const announce = [project?.name ?? 'All projects', ...view.regionTrail.map((r) => r.title), view.finding?.object.title, view.source ? 'Source' : undefined]
@@ -433,6 +436,16 @@ function LandscapeView({
                 : 'Lines show shared sources, not product dependencies.'}
             </div>
             {project && <MiniOverview landscape={landscape} current={project.key} params={params} />}
+            {project?.project && !readOnly && !project.sample && (!view.region || view.region.region) && (
+              <div className="map-toolbar">
+                <AddConceptControl key={view.region?.id ?? 'top'} projectId={project.key} parent={view.region ?? null} onChanged={onChanged} />
+                {view.region?.region && view.panel !== 'concept' && (
+                  <Link className="add-button" to={toHref({ ...withLocation(params, { project: project.key, region: view.region.id }), panel: 'concept' })}>
+                    Develop “{view.region.title}” →
+                  </Link>
+                )}
+              </div>
+            )}
           </div>
           {hasInspector && (
             <aside className="inspector" aria-label={view.source ? 'Source inspection' : view.finding ? 'Finding detail' : view.edge ? 'Connection detail' : view.resume ? 'Where you left off' : 'Details'}>
@@ -443,7 +456,7 @@ function LandscapeView({
 
         <footer className="foot">
           <span>
-            Counts match the Projects page: current findings, counted once even when in two regions. To review means a finding or a change to it is not yet accepted; superseded and resolved findings stay on the map but are not counted. Viewing and navigating never change a record or a review.
+            Counts match the Projects page: current findings, counted once even when in two concepts. To review means a finding or a change to it is not yet accepted; superseded and resolved findings stay on the map but are not counted. Viewing and navigating never change a record or a review.
           </span>
           <button type="button" className="about" onClick={() => setAboutOpen((v) => !v)} aria-expanded={aboutOpen}>
             About this view
@@ -485,12 +498,14 @@ function Inspector({
         landscape={landscape}
         resume={view.project ? loaded.resume.get(view.project.key) : undefined}
         onChanged={readOnly ? () => {} : onChanged}
+        editable={!readOnly}
       />
     );
   }
   if (view.edge) return <ConnectionPanel landscape={landscape} view={view} />;
   if (view.resume) return <ResumePanel landscape={landscape} view={view} resume={loaded.resume.get(view.resume.key)} />;
   if (view.panel === 'organize' && !readOnly) return <OrganizePanel view={view} onChanged={onChanged} />;
+  if (view.panel === 'concept' && !readOnly && view.region?.region) return <ConceptPanel view={view} landscape={landscape} onChanged={onChanged} />;
   return <ListPanel landscape={landscape} view={view} matches={matches} filtering={filtering} />;
 }
 
@@ -554,10 +569,10 @@ function AboutNotice() {
         Projects, findings, review states, sources, and dates are read live from the records on this device. Pending findings are AI proposals you have not accepted; superseded and resolved ones are history, shown hollow. Connections are conversations associated with two projects — shared sources, not dependencies.
       </p>
       <p>
-        Regions are your own organization. When a project has none, its findings sit in Uncategorized. Region statements are ones you pinned, or else the project’s own accepted findings in a fixed order — never generated text. Places keep their positions across filters and lenses.
+        Concepts are your own organization: add them with “+ Add concept”, click one to enter it, and open “Develop” to describe it and record what you intend, believe, decided, and still ask. A concept can be just a name; it never claims the software does something. When a project has none, its findings sit in Uncategorized. Statements on the terrain are ones you pinned, or else the concept’s own accepted records in a fixed order — never generated text. Places keep their positions across filters and lenses.
       </p>
       <p>
-        Back steps out one level; breadcrumbs jump to any ancestor; browser Back retraces your route. “Where you left off” uses visits recorded on this device only. Nothing here calls an AI provider.
+        Back steps out one level; breadcrumbs jump to any ancestor; browser Back retraces your route. “Where you left off” uses visits recorded on this device only. Nothing on this page calls an AI provider; “Discuss with AI” opens native chat, which shows what it will send and asks first.
       </p>
     </section>
   );

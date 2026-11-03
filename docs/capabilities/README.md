@@ -34,7 +34,7 @@ Ordered by build sequence, not by age.
 | Capability | Status | Next action |
 |---|---|---|
 | [agent-observability](./agent-observability/) | Built — Phases 0–8 + browse chips; intervention amendment merged (SPEC §10, I0–I6) | Phase 8b or I0 |
-| [understanding-workspace](./understanding-workspace/) | Built — U0–U6 (U0–U5 live-verified); Understanding Landscape implemented, acceptance pending | Browser pass on U6.1 + U6.2; [landscape open checks](../changes/understanding-landscape/PLAN.md#open-acceptance-checks) |
+| [understanding-workspace](./understanding-workspace/) | Built — U0–U6 (U0–U5 live-verified); Understanding Landscape implemented (now editable), acceptance pending | Browser pass on U6.1 + U6.2; [landscape open checks](../changes/understanding-landscape/PLAN.md#open-acceptance-checks); [editable landscape checks](../changes/editable-landscape/PLAN.md#open-acceptance-checks) |
 | [decision-investigation](./decision-investigation/) | MVP code-complete — DI-0…DI-4 | Jacob's §18 manual acceptance pass, then the §20 deferred list |
 | [intent-trace](./intent-trace/) | Code-complete — IT-0…IT-6 | Jacob's §16 browser pass |
 | [change-workspace](./change-workspace/) | Code-complete — CW-0…CW-8 | Jacob's §18 browser passes |

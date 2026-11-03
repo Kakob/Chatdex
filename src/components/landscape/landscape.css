@@ -138,6 +138,29 @@
 .ldx .list-row small { display: block; color: #8b9886; font-size: 10px; margin-top: 3px; }
 .ldx .list-row:hover { color: #102d1c; }
 
+/* Editable landscape (docs/changes/editable-landscape) */
+.ldx .map-toolbar { position: absolute; top: 10px; right: 14px; display: flex; gap: 8px; align-items: flex-start; z-index: 2; max-width: calc(100% - 28px); flex-wrap: wrap; justify-content: flex-end; }
+.ldx .map-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ldx .add-button { border: 1px solid #326c56; background: #fffef9; color: #326c56; border-radius: 7px; padding: 7px 11px; font-size: 12px; text-decoration: none; cursor: pointer; box-shadow: 0 1px 2px #243c3414; }
+.ldx .add-button:hover, .ldx .add-button:focus-visible { background: #326c56; color: #fffef9; }
+.ldx .inline-add { display: flex; flex-direction: column; gap: 3px; margin: 6px 0; }
+.ldx .map-actions .inline-add { margin: 0; background: #fffef9; border: 1px solid #cbd9c1; border-radius: 8px; padding: 8px; box-shadow: 0 2px 6px #243c341a; width: min(300px, 70vw); }
+.ldx .inline-add input { padding: 7px 9px; border: 1px solid #9eb79c; border-radius: 6px; background: #fffef9; font-size: 13px; color: #243c34; width: 100%; box-sizing: border-box; }
+.ldx .inline-add small, .ldx .edit-row small { color: #8b9886; font-size: 10px; }
+.ldx .inspector textarea, .ldx .statement-edit input[type='text'] { width: 100%; box-sizing: border-box; padding: 8px 9px; border: 1px solid #d3ddd0; border-radius: 6px; background: #fffef9; font: 12px/1.6 inherit; color: #243c34; resize: vertical; margin-bottom: 6px; }
+.ldx .inspector .hint { font-size: 11px; color: #8b9886; margin: 2px 0 8px; line-height: 1.5; }
+.ldx .statement { border-top: 1px solid #e4e9df; padding: 9px 0 9px 9px; border-left: 3px solid #60917c; margin-bottom: 2px; }
+.ldx .statement.unverified { border-left-color: #c8d3c3; }
+.ldx .statement.proposed { border-left-color: #bf984b; background: #fdf8ec; }
+.ldx .statement.historical { border-left-color: #9aa596; opacity: 0.8; }
+.ldx .statement-title { font-size: 13px; color: #2f4f3a; text-decoration: none; display: block; }
+.ldx .statement-title:hover { text-decoration: underline; }
+.ldx .inspector .statement-body { font-size: 12px; margin: 4px 0; line-height: 1.55; white-space: pre-wrap; }
+.ldx .statement > small, .ldx .sub { display: block; color: #8b9886; font-size: 10px; margin-top: 3px; }
+.ldx .statement-actions { margin-top: 6px; }
+.ldx .proposal { margin-top: 6px; padding: 6px 8px; background: #fdf8ec; border-radius: 6px; }
+.ldx .revision { color: #5f7a63; }
+
 .ldx .foot { display: flex; gap: 20px; align-items: center; justify-content: space-between; font-size: 10px; line-height: 1.6; color: #81907c; padding: 12px 3px 0; }
 .ldx .foot a { white-space: nowrap; }
 .ldx .about { border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; font-size: inherit; }
@@ -181,4 +204,6 @@
   .ldx .foot { align-items: flex-start; gap: 10px; flex-wrap: wrap; }
   .ldx .map-corner, .ldx .map-footer { font-size: 8px; }
   .ldx .mini { font-size: 8px; padding: 4px; }
+  .ldx .map-toolbar { top: 6px; right: 6px; }
+  .ldx .add-button { padding: 6px 8px; font-size: 11px; }
 }

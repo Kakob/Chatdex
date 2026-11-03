@@ -161,4 +161,18 @@ export interface UnderstandingEvent {
   createdAt: Date;
   /** Set when review changes the event; sync LWW uses it over createdAt. */
   updatedAt?: Date;
+  /**
+   * New wording carried by a 'refined' event (editable landscape). A user
+   * revision is applied immediately; an AI one is a proposal applied to the
+   * object's title/body only when accepted. previous* snapshot the wording
+   * the revision replaces, so history never loses the earlier text.
+   */
+  revision?: UnderstandingRevision;
+}
+
+export interface UnderstandingRevision {
+  title: string;
+  body?: string;
+  previousTitle: string;
+  previousBody?: string;
 }

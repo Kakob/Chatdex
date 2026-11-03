@@ -446,6 +446,19 @@ nothing and never enter counts, proposals, or agent context. The only edges draw
 shared-source co-associations between projects, labeled as such. The supersession
 History map (§12) remains available unchanged.
 
+**Amended 2026-11-03 — editable landscape** ([change plan](../../changes/editable-landscape/PLAN.md)).
+Regions are presented as *concepts* and can be created, described, nested, moved, and
+developed directly on the landscape with no conversation. A concept still asserts
+nothing: what the user intends, believes, decided, or asks about it is stored as
+ordinary user-origin understanding objects placed in it (membership = "about",
+parent = "contains"), which do count and appear in Current Understanding. One
+narrowing of the rule above: a concept's own title, summary, kind, and description
+are sent to a provider **only** in a concept-scoped chat the user opens with
+"Discuss with AI" (shown in full in the chat, disclosed before the first send). They
+never enter counts, reconciliation proposals, or project-wide chat context.
+Revisions to concepts and to statements are kept as history (region `revisions`,
+`refined` events carrying a `revision`).
+
 ---
 
 ## 14. Living understanding document

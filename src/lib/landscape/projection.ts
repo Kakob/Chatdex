@@ -403,8 +403,8 @@ export function assembleLandscape(input: LandscapeInput): Landscape {
         title: 'Uncategorized',
         summary:
           nodes.length === 0
-            ? 'Every finding in this project. Create a region to start organizing.'
-            : 'Findings not yet placed in a region.',
+            ? 'Everything in this project. Add a concept to start organizing.'
+            : 'Understanding not yet placed in a concept.',
         parentId: null,
         depth: 0,
         children: [],

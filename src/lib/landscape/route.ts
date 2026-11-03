@@ -20,7 +20,8 @@ import {
 import { parseFilter, type LandscapeFilter } from './search';
 
 export type LandscapeLens = 'whole' | 'recent';
-export type LandscapePanel = 'list' | 'organize';
+/** 'concept' opens the current region's concept panel (editable landscape). */
+export type LandscapePanel = 'list' | 'organize' | 'concept';
 
 export interface LandscapeParams {
   project?: string;
@@ -48,7 +49,7 @@ export function parseParams(search: URLSearchParams): LandscapeParams {
     source: get('source'),
     edge: get('edge'),
     resume: get('resume'),
-    panel: panel === 'list' || panel === 'organize' ? panel : undefined,
+    panel: panel === 'list' || panel === 'organize' || panel === 'concept' ? panel : undefined,
     lens: search.get('lens') === 'recent' ? 'recent' : 'whole',
     q: search.get('q') ?? '',
     filter: parseFilter(search.get('filter')),
@@ -147,7 +148,9 @@ export function resolveView(landscape: Landscape, input: LandscapeParams): Resol
         params.source = source.conversationId;
       }
     }
-    if (input.panel === 'list' || (input.panel === 'organize' && project.project)) {
+    // The concept panel needs a real (user-created) region in a real project.
+    const conceptOk = input.panel === 'concept' && project.project && view.region?.region;
+    if (input.panel === 'list' || (input.panel === 'organize' && project.project) || conceptOk) {
       if (!view.finding) {
         view.panel = input.panel;
         params.panel = input.panel;

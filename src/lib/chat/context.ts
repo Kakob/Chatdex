@@ -9,6 +9,8 @@ import { loadProjectUnderstanding, type CurrentUnderstanding } from '../understa
 import { renderLivingDocument } from '../understanding/livingDocument';
 import { estimateTokens } from '../utils/tokens';
 import type { UnderstandingProject } from '../../types/understanding';
+import { buildConceptContext } from '../landscape/concept';
+import { loadLandscape } from '../landscape/load';
 
 export interface ChatContextConfig {
   /**
@@ -128,4 +130,38 @@ export async function loadProjectChatContext(
   const loaded = await loadProjectUnderstanding(projectId);
   if (!loaded || !loaded.project) return null;
   return buildProjectContext(loaded.project, loaded.understanding, config);
+}
+
+/**
+ * Chat context, optionally narrowed to one landscape concept (editable
+ * landscape, "Discuss with AI"). A concept chat sends the bounded concept
+ * packet (lib/landscape/concept.ts) instead of the whole project document.
+ */
+export type ChatContext = ProjectChatContext & {
+  concept?: { id: string; title: string; path: string[]; objectIds: string[] };
+};
+
+/**
+ * Concept context when `conceptId` names a concept of the project; otherwise
+ * (no concept, or it was deleted) the project context.
+ */
+export async function loadChatContext(
+  projectId: string,
+  conceptId?: string | null
+): Promise<ChatContext | null> {
+  if (conceptId) {
+    const { landscape } = await loadLandscape();
+    const ctx = buildConceptContext(landscape, projectId, conceptId);
+    if (ctx) {
+      return {
+        systemPrompt: ctx.systemPrompt,
+        document: ctx.document,
+        truncated: ctx.truncated,
+        estimatedTokens: ctx.estimatedTokens,
+        projectName: ctx.projectName,
+        concept: { id: ctx.conceptId, title: ctx.conceptTitle, path: ctx.path, objectIds: ctx.objectIds },
+      };
+    }
+  }
+  return loadProjectChatContext(projectId);
 }

@@ -8,6 +8,7 @@ import {
   GitMerge,
   Loader2,
   MessageCircle,
+  Map as MapIcon,
   Play,
   Plus,
   RotateCcw,
@@ -25,7 +26,9 @@ import {
   setChatModelOverride,
   type ChatProviderMeta,
 } from '../lib/chat/chats';
-import { loadProjectChatContext, type ProjectChatContext } from '../lib/chat/context';
+import { loadChatContext, type ChatContext } from '../lib/chat/context';
+import { proposeConceptUpdates } from '../lib/landscape/proposals';
+import { landscapeHref } from '../lib/landscape/route';
 import { getUnderstandingProject } from '../lib/db/understanding';
 import { countPendingForProject } from '../lib/understanding/pendingReviews';
 import { getReconcilableConversations, reconcileProject } from '../lib/understanding/reconcile';
@@ -156,7 +159,7 @@ function ModelPicker({
  * What the model was told (U5.2): the injected project context is never
  * invisible — collapsed by default, one click away.
  */
-function ContextPanel({ context }: { context: ProjectChatContext | null }) {
+function ContextPanel({ context }: { context: ChatContext | null }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 text-sm">
@@ -168,7 +171,9 @@ function ContextPanel({ context }: { context: ProjectChatContext | null }) {
         <FileText size={14} />
         {context ? (
           <>
-            Context sent to the model: current understanding of {context.projectName}
+            {context.concept
+              ? `Context sent to the model: concept “${context.concept.title}” (${context.concept.path.join(' › ')})`
+              : `Context sent to the model: current understanding of ${context.projectName}`}
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">
               ~{context.estimatedTokens.toLocaleString()} tokens
               {context.truncated ? ' · truncated to budget' : ''}
@@ -202,13 +207,13 @@ export function ChatPage() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
-  const [context, setContext] = useState<ProjectChatContext | null>(null);
+  const [context, setContext] = useState<ChatContext | null>(null);
   const [pendingDisclosure, setPendingDisclosure] = useState<{
     action: 'send' | 'reply' | 'regenerate';
     text?: string;
     disclosure: DisclosureSummary;
     authMode: AuthMode;
-    context: ProjectChatContext;
+    context: ChatContext;
   } | null>(null);
   const [newChatModel, setNewChatModel] = useState<string | null>(null);
   const [railScope, setRailScope] = useState<'all' | 'project'>('all');
@@ -227,6 +232,18 @@ export function ChatPage() {
   const newChatProjectId = activeId ? null : searchParams.get('project');
   const chatMetaForProject = activeChat?.providerMeta as ChatProviderMeta | undefined;
   const chatProjectId = chatMetaForProject?.projectId ?? newChatProjectId;
+  // ?concept= (from the landscape's "Discuss with AI") narrows the context
+  // to one concept; an open chat carries it in providerMeta.
+  const chatConceptId = activeId
+    ? chatMetaForProject?.conceptId ?? null
+    : newChatProjectId
+      ? searchParams.get('concept')
+      : null;
+  const [proposing, setProposing] = useState(false);
+  const [pendingProposal, setPendingProposal] = useState<{
+    disclosure: DisclosureSummary;
+    authMode: AuthMode;
+  } | null>(null);
 
   const refreshChats = useCallback(async () => {
     setChats(
@@ -278,7 +295,7 @@ export function ChatPage() {
     void getUnderstandingProject(chatProjectId).then((p) => {
       if (!cancelled) setProjectName(p?.name ?? null);
     });
-    void loadProjectChatContext(chatProjectId).then((ctx) => {
+    void loadChatContext(chatProjectId, chatConceptId).then((ctx) => {
       if (!cancelled) setContext(ctx);
     });
     void countPendingForProject(chatProjectId).then((n) => {
@@ -287,7 +304,7 @@ export function ChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [chatProjectId]);
+  }, [chatProjectId, chatConceptId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -313,7 +330,7 @@ export function ChatPage() {
   const streamReply = async (
     conversationId: string,
     history: ChatMessage[],
-    ctx: ProjectChatContext | null,
+    ctx: ChatContext | null,
     modelOverride?: string
   ) => {
     if (!effectiveProvider) return;
@@ -360,7 +377,7 @@ export function ChatPage() {
 
   const performSend = async (
     text: string,
-    ctx: ProjectChatContext | null,
+    ctx: ChatContext | null,
     markDisclosed = false
   ) => {
     if (!effectiveProvider) return;
@@ -373,6 +390,7 @@ export function ChatPage() {
         const conv = await createChat({
           provider: effectiveProvider,
           ...(chatProjectId ? { projectId: chatProjectId } : {}),
+          ...(chatProjectId && chatConceptId ? { conceptId: chatConceptId } : {}),
           firstUserMessage: text,
         });
         conversationId = conv.id;
@@ -408,7 +426,7 @@ export function ChatPage() {
 
   /** Stream a reply from the stored history as-is (continue / regenerate). */
   const performReply = async (
-    ctx: ProjectChatContext | null,
+    ctx: ChatContext | null,
     markDisclosed = false,
     regenerate = false
   ) => {
@@ -437,9 +455,9 @@ export function ChatPage() {
   };
 
   /** Fresh context at action time; the panel mirrors what actually goes out. */
-  const loadFreshContext = async (): Promise<ProjectChatContext | null> => {
+  const loadFreshContext = async (): Promise<ChatContext | null> => {
     if (!chatProjectId) return null;
-    const ctx = await loadProjectChatContext(chatProjectId);
+    const ctx = await loadChatContext(chatProjectId, chatConceptId);
     setContext(ctx);
     return ctx;
   };
@@ -450,7 +468,7 @@ export function ChatPage() {
    * action triggers it. Cancelling sends nothing.
    */
   const gateOnDisclosure = async (
-    ctx: ProjectChatContext | null,
+    ctx: ChatContext | null,
     action: 'send' | 'reply' | 'regenerate',
     text?: string
   ): Promise<boolean> => {
@@ -543,6 +561,45 @@ export function ChatPage() {
       addToast(`Reconciliation failed: ${(err as Error).message}`, 'error');
     } finally {
       setReconciling(false);
+    }
+  };
+
+  /**
+   * Editable landscape: turn this concept discussion into proposed updates
+   * of the concept (pending, reviewed on the landscape). Disclosed first —
+   * the chat transcript and the concept context go to the provider.
+   */
+  const handleProposeClick = async () => {
+    if (!activeChat || !chatProjectId || !chatConceptId || !effectiveProvider || sending || proposing) return;
+    setPendingProposal({
+      disclosure: buildDisclosure([activeChat], effectiveProvider),
+      authMode: await getProviderAuthMode(effectiveProvider),
+    });
+  };
+
+  const handleConfirmProposal = async () => {
+    if (!pendingProposal || !activeId || !chatProjectId || !chatConceptId || !effectiveProvider) return;
+    setPendingProposal(null);
+    setProposing(true);
+    try {
+      const outcome = await proposeConceptUpdates(activeId, chatProjectId, chatConceptId, {
+        provider: effectiveProvider,
+        ...(chatMeta?.modelOverride ? { model: chatMeta.modelOverride } : {}),
+      });
+      const total = outcome.added + outcome.revised;
+      addToast(
+        total
+          ? `${outcome.added} new statement${outcome.added !== 1 ? 's' : ''} and ${outcome.revised} rewording${
+              outcome.revised !== 1 ? 's' : ''
+            } proposed — review them on the concept`
+          : 'No updates proposed from this discussion'
+      );
+      if (outcome.warnings.length > 0) console.warn('Concept proposal warnings:', outcome.warnings);
+      setProjectPendingCount(await countPendingForProject(chatProjectId));
+    } catch (err) {
+      addToast(`Proposing updates failed: ${(err as Error).message}`, 'error');
+    } finally {
+      setProposing(false);
     }
   };
 
@@ -641,6 +698,15 @@ export function ChatPage() {
                 )}
               </Link>
             )}
+            {chatProjectId && context?.concept && (
+              <Link
+                to={landscapeHref({ project: chatProjectId, region: context.concept.id, panel: 'concept' })}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+                title="Open this concept on the landscape"
+              >
+                <MapIcon size={11} /> {context.concept.title}
+              </Link>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -711,6 +777,17 @@ export function ChatPage() {
                       {chatUpToDate ? 'Reconciled' : 'Reconcile chat'}
                     </button>
                   )}
+                  {chatProjectId && context?.concept && providerReady && (
+                    <button
+                      onClick={() => void handleProposeClick()}
+                      disabled={sending || proposing || !messages.some((m) => m.sender === 'assistant')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors disabled:opacity-50"
+                      title={`Propose updates to “${context.concept.title}” from this discussion; you review them before anything changes`}
+                    >
+                      {proposing ? <Loader2 size={14} className="animate-spin" /> : <MapIcon size={14} />}
+                      Propose concept updates
+                    </button>
+                  )}
                 </>
               )
             )}
@@ -725,7 +802,9 @@ export function ChatPage() {
               <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
               <p>
                 {isNewChat
-                  ? 'Start a conversation — it will be saved as a Chatdex source'
+                  ? context?.concept
+                    ? `Discuss “${context.concept.title}”. The model sees only the concept context above — open it to check.`
+                    : 'Start a conversation — it will be saved as a Chatdex source'
                   : 'No messages in this chat'}
               </p>
             </div>
@@ -852,16 +931,35 @@ export function ChatPage() {
           disclosure={pendingDisclosure.disclosure}
           authMode={pendingDisclosure.authMode}
           actionLabel="Project chat"
-          sendsDescription={`Chatdex's synthesized understanding of "${
-            pendingDisclosure.context.projectName
-          }" (derived from ${pendingDisclosure.disclosure.totalConversations} conversation${
-            pendingDisclosure.disclosure.totalConversations !== 1 ? 's' : ''
-          }) along with ${
-            pendingDisclosure.action === 'send' ? 'your message' : 'this chat'
-          }`}
+          sendsDescription={
+            pendingDisclosure.context.concept
+              ? `your recorded understanding of the concept "${pendingDisclosure.context.concept.title}" in "${
+                  pendingDisclosure.context.projectName
+                }" — its description, accepted statements, enclosing concepts, and the titles (not contents) of linked conversations — along with ${
+                  pendingDisclosure.action === 'send' ? 'your message' : 'this chat'
+                }`
+              : `Chatdex's synthesized understanding of "${
+                  pendingDisclosure.context.projectName
+                }" (derived from ${pendingDisclosure.disclosure.totalConversations} conversation${
+                  pendingDisclosure.disclosure.totalConversations !== 1 ? 's' : ''
+                }) along with ${pendingDisclosure.action === 'send' ? 'your message' : 'this chat'}`
+          }
           confirmLabel="Send with context"
           onConfirm={() => void handleConfirmDisclosure()}
           onCancel={() => setPendingDisclosure(null)}
+        />
+      )}
+
+      {pendingProposal && context?.concept && (
+        <DisclosureModal
+          disclosure={pendingProposal.disclosure}
+          authMode={pendingProposal.authMode}
+          actionLabel={`Concept proposals (“${context.concept.title}”)`}
+          sendsDescription={`this chat's messages and the concept context shown above`}
+          title={`Send this concept discussion to ${pendingProposal.disclosure.providerLabel}?`}
+          confirmLabel="Send and propose"
+          onConfirm={() => void handleConfirmProposal()}
+          onCancel={() => setPendingProposal(null)}
         />
       )}
 

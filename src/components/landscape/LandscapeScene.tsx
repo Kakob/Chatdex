@@ -426,7 +426,7 @@ function RegionIsland({ node, place, count, color, landscape, lens, matches, fil
     ...(node.summary ? [node.summary] : []),
     ...node.previews.map((p) => `“${p.title}”`),
   ].slice(0, 2);
-  const sub = node.children.length ? `${node.children.length} subregion${node.children.length === 1 ? '' : 's'}` : undefined;
+  const sub = node.children.length ? `${node.children.length} sub-concept${node.children.length === 1 ? '' : 's'}` : undefined;
   const caption = countsLine(node, sub, true);
   return (
     <Link to={href} className="place" style={{ opacity }} aria-label={`Explore ${node.title}: ${caption}`} data-place={node.id}>
@@ -504,14 +504,14 @@ export function ProjectScene({ landscape, view, lens, matches, filtering, width,
       {overflow && (
         <OverflowPlace
           place={places[places.length - 1]}
-          text={`${regions.length - shown.length} more regions · open the full list`}
+          text={`${regions.length - shown.length} more concepts · open the full list`}
           href={toHref({ ...params, panel: 'list' })}
           color={project.color}
         />
       )}
       {empty ? (
         <>
-          <SvgText x={width / 2} y={height / 2 - 30} size={26} max={50} color={project.color} text="Nothing synthesized here yet" className="land-title" />
+          <SvgText x={width / 2} y={height / 2 - 30} size={26} max={50} color={project.color} text={project.project && !project.sample ? 'Start with a concept' : 'Nothing synthesized here yet'} className="land-title" />
           <SvgText
             x={width / 2}
             y={height / 2 + 8}
@@ -519,9 +519,11 @@ export function ProjectScene({ landscape, view, lens, matches, filtering, width,
             max={70}
             color="#6c7f70"
             text={
-              project.sourceCount
-                ? `${project.sourceCount} linked conversation${project.sourceCount === 1 ? '' : 's'} · no understanding records. No findings have been invented.`
-                : 'No linked conversations or understanding records yet.'
+              project.project && !project.sample
+                ? 'Use “+ Add concept” to name the parts of this project you want to understand — no imported conversation needed. Nothing has been invented.'
+                : project.sourceCount
+                  ? `${project.sourceCount} linked conversation${project.sourceCount === 1 ? '' : 's'} · no understanding records. No findings have been invented.`
+                  : 'No linked conversations or understanding records yet.'
             }
           />
         </>
@@ -532,7 +534,7 @@ export function ProjectScene({ landscape, view, lens, matches, filtering, width,
           size={12}
           max={120}
           color="#89977d"
-          text={project.regionCount ? 'Regions are your organization of this project’s records. Moving a finding never changes it.' : 'Not organized yet — every finding is in Uncategorized. Use Organize to add regions.'}
+          text={project.regionCount ? 'Concepts are your organization of this project. Moving a record between them never changes it.' : 'Not organized yet — every finding is in Uncategorized. Use “+ Add concept” to start.'}
         />
       )}
     </Terrain>
@@ -619,7 +621,13 @@ export function RegionScene({ landscape, view, lens, matches, filtering, width, 
   const rx = width * 0.44;
   const ry = height * 0.4;
   const titleY = cy - ry + 58;
-  const summary = region.summary ?? (region.previews.length ? undefined : 'No findings are placed in this region yet.');
+  const summary =
+    region.summary ??
+    (region.previews.length || region.children.length
+      ? undefined
+      : region.region
+        ? 'Just a name so far. Add a sub-concept, or develop it to describe what you intend and believe.'
+        : 'Nothing is placed here yet.');
   const summaryMax = charsFor(rx * 1.3, 13);
   const summaryH = summary ? linesHeight(summary, summaryMax, 13, 2) : 0;
 
@@ -651,7 +659,7 @@ export function RegionScene({ landscape, view, lens, matches, filtering, width, 
     <Terrain
       width={width}
       height={height}
-      label={`${region.title}: findings and subregions`}
+      label={`${region.title}: statements and sub-concepts`}
       counts={{ places: count, findings: pinIds.length, edges: 0 }}
     >
       <Contours place={{ x: cx, y: cy, rx, ry }} color={project.color} />
@@ -669,7 +677,7 @@ export function RegionScene({ landscape, view, lens, matches, filtering, width, 
           matches={matches}
           filtering={filtering}
           href={toHref(withLocation(params, { project: project.key, region: child.id }))}
-          enterText="Enter subregion →"
+          enterText="Enter →"
         />
       ))}
       {pinIds.map((id, j) => {
@@ -693,7 +701,7 @@ export function RegionScene({ landscape, view, lens, matches, filtering, width, 
       {hidden > 0 && (
         <OverflowPlace
           place={places[places.length - 1]}
-          text={`${hidden} more in this region · open the full list`}
+          text={`${hidden} more in this concept · open the full list`}
           href={toHref({ ...params, finding: undefined, source: undefined, panel: 'list' })}
           color={project.color}
         />

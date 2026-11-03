@@ -576,19 +576,30 @@ export function envelopeLandscapeRegion(r: LandscapeRegion): SyncEnvelope<'lands
     kind: 'landscape_region',
     parentId: r.projectId,
     updatedAt: r.updatedAt,
-    payload: { ...r, createdAt: dateToIso(r.createdAt), updatedAt: dateToIso(r.updatedAt) },
+    payload: {
+      ...r,
+      ...(r.revisions ? { revisions: r.revisions.map((v) => ({ ...v, at: dateToIso(v.at) })) } : {}),
+      createdAt: dateToIso(r.createdAt),
+      updatedAt: dateToIso(r.updatedAt),
+    },
   };
 }
 
 export function rehydrateLandscapeRegion(payload: unknown): LandscapeRegion {
-  const { createdAt, updatedAt, ...rest } = payload as Omit<
+  const { createdAt, updatedAt, revisions, ...rest } = payload as Omit<
     LandscapeRegion,
-    'createdAt' | 'updatedAt'
-  > & { createdAt: string; updatedAt: string };
+    'createdAt' | 'updatedAt' | 'revisions'
+  > & {
+    createdAt: string;
+    updatedAt: string;
+    revisions?: (Omit<NonNullable<LandscapeRegion['revisions']>[number], 'at'> & { at: string })[];
+  };
   return {
     ...rest,
     memberObjectIds: rest.memberObjectIds ?? [],
     pinnedObjectIds: rest.pinnedObjectIds ?? [],
+    // Rows from before the editable landscape have no revisions; keep them absent.
+    ...(revisions ? { revisions: revisions.map((v) => ({ ...v, at: isoToDate(v.at) })) } : {}),
     createdAt: isoToDate(createdAt),
     updatedAt: isoToDate(updatedAt),
   };

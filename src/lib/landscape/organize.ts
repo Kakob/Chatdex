@@ -1,10 +1,64 @@
 // Pure organization rules for landscape regions (docs/changes/understanding-landscape).
 // No Dexie here: db/landscape.ts applies these to stored rows.
 
-import type { LandscapeRegion } from '../../types/landscape';
+import type { LandscapeRegion, LandscapeRegionField } from '../../types/landscape';
 
 /** At most this many pinned statements render on a region's terrain. */
 export const MAX_PINNED_STATEMENTS = 2;
+
+/**
+ * Saves of the same free-text field (description, summary) within this
+ * window merge into one revision (the earliest `from` is kept), so writing a
+ * description in several saves does not bury the history in fragments.
+ * Renames, kind changes, and moves are discrete actions and never merge.
+ */
+export const REVISION_COALESCE_MS = 2 * 60 * 1000;
+const COALESCED_FIELDS: ReadonlySet<LandscapeRegionField> = new Set(['body', 'summary']);
+
+/** Suggested concept kinds; the field is free text, these are just offered. */
+export const CONCEPT_KINDS = ['area', 'feature', 'interaction', 'component', 'workflow', 'data', 'research', 'experiment'] as const;
+
+/**
+ * Record a change of `field` on the region's revision list. A free-text
+ * save merges into the previous revision when it is the same field and
+ * recent; a merge back to the starting text removes that revision. Returns
+ * the region unchanged when from === to.
+ */
+export function withRevision(
+  region: LandscapeRegion,
+  field: Exclude<LandscapeRegionField, 'created'>,
+  from: string | null | undefined,
+  to: string | null | undefined,
+  at: Date
+): LandscapeRegion {
+  const norm = (v: string | null | undefined) => (v === undefined || v === '' ? null : v);
+  if (norm(from) === norm(to)) return region;
+  const revisions = [...(region.revisions ?? [])];
+  const last = revisions[revisions.length - 1];
+  if (last && last.field === field && COALESCED_FIELDS.has(field) && at.getTime() - last.at.getTime() <= REVISION_COALESCE_MS) {
+    revisions.pop();
+    if (norm(last.from) !== norm(to)) revisions.push({ at, field, from: norm(last.from), to: norm(to) });
+  } else {
+    revisions.push({ at, field, from: norm(from), to: norm(to) });
+  }
+  return { ...region, revisions };
+}
+
+/** Ids of every region nested under `regionId` (not including itself). */
+export function descendantIds(regions: LandscapeRegion[], regionId: string): Set<string> {
+  const out = new Set<string>();
+  const queue = [regionId];
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const r of regions) {
+      if (r.parentRegionId === id && !out.has(r.id) && r.id !== regionId) {
+        out.add(r.id);
+        queue.push(r.id);
+      }
+    }
+  }
+  return out;
+}
 
 /**
  * True when making `parentId` the parent of `regionId` would create a cycle

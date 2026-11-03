@@ -75,3 +75,20 @@ describe('resolveView', () => {
     ]);
   });
 });
+
+describe('concept panel (editable landscape)', () => {
+  it('opens only on a real concept of a real project, and Back closes it first', () => {
+    const v = resolve({ project: 'p1', region: 'sub', panel: 'concept' });
+    expect(v.corrected).toBe(false);
+    expect(v.panel).toBe('concept');
+    const up = parentParams(v);
+    expect([up.project, up.region, up.panel]).toEqual(['p1', 'sub', undefined]);
+    // Virtual Uncategorized and project-level views have no concept to develop.
+    expect(resolve({ project: 'p1', region: UNCATEGORIZED_ID, panel: 'concept' }).panel).toBeUndefined();
+    const top = resolve({ project: 'p1', panel: 'concept' });
+    expect([top.corrected, top.panel]).toEqual([true, undefined]);
+    // A foreign concept id is dropped rather than followed into another project.
+    const foreign = resolve({ project: 'p1', region: 'rz', panel: 'concept' });
+    expect([foreign.corrected, foreign.region, foreign.panel]).toEqual([true, undefined, undefined]);
+  });
+});
