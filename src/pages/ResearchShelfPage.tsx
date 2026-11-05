@@ -47,7 +47,7 @@ export function ResearchShelfPage() {
   const metadata = { projectId: id, title, kind, attribution, uri, authored, eventTime, notes, locator };
   return <div className="space-y-5 text-gray-900 dark:text-gray-100 max-w-6xl">
     <Link className="text-violet-600" to={`/projects/${id}/investigate`}>← Investigate History</Link>
-    <header><h1 className="text-2xl font-semibold">Research sources & questions</h1><p className="text-gray-500 mt-2">Private on this device. Register leads, import your exports, and investigate what the sources actually say. No account fetching or AI interpretation.</p><a href="#source-shelf" className="inline-block mt-3 text-violet-600 underline">Read sources · {sources.filter(s => snapshots.some(v => v.sourceId === s.id)).length} imported</a></header>
+    <header><h1 className="text-2xl font-semibold">Research sources & questions</h1><p className="text-gray-500 mt-2">Private on this device. Register leads, import your exports, and investigate what the sources actually say. No account fetching or AI interpretation.</p><a href="#source-shelf" className="inline-block mt-3 text-violet-600 underline">Read {sources.length} source{sources.length === 1 ? '' : 's'} · {sources.filter(s => snapshots.some(v => v.sourceId === s.id)).length} with imported text</a></header>
     {notice && <p role="status" className="text-green-700 dark:text-green-300">{notice}</p>}
     {error && <p role="alert" className="text-red-600">{error}</p>}
     <fieldset disabled={busy} className="space-y-5">

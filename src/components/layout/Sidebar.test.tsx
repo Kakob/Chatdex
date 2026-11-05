@@ -25,7 +25,6 @@ describe('Sidebar', () => {
       ['Landscape', '/landscape'],
       ['Sources', '/conversations'],
       ['Global search', '/search'],
-      ['Research Atlas', '/research'],
       ['Import', '/import'],
     ]);
     expect(screen.getByRole('link', { name: 'Settings' }).getAttribute('href')).toBe('/settings');

@@ -15,14 +15,6 @@ async function projectExists(id: string) {
   const p = await db.understandingProjects.get(id);
   if (!p || !['accepted', 'edited'].includes(p.reviewState)) throw new Error('An accepted project is required');
 }
-export async function ensureMITProject() {
-  const existing = await db.understandingProjects.where('name').equals('MIT Investigations').first();
-  if (existing) { await projectExists(existing.id); return existing; }
-  const now = new Date();
-  const p = { id: generateId(), name: 'MIT Investigations', origin: 'user' as const, reviewState: 'accepted' as const, createdAt: now, updatedAt: now };
-  await db.understandingProjects.add(p);
-  return p;
-}
 export async function registerSource(input: Omit<ResearchSource, 'id' | 'registeredAt' | 'access' | 'privacy'>) {
   await projectExists(input.projectId);
   if (!input.title.trim()) throw new Error('Source title is required');

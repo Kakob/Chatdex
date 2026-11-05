@@ -5,7 +5,6 @@ import {
   MessageSquare,
   FolderKanban,
   Map as MapIcon,
-  Microscope,
   Upload,
   Settings,
 } from 'lucide-react';
@@ -17,7 +16,6 @@ const navItems = [
   { to: '/landscape', icon: MapIcon, label: 'Landscape' },
   { to: '/conversations', icon: MessageSquare, label: 'Sources' },
   { to: '/search', icon: Search, label: 'Global search' },
-  { to: '/research', icon: Microscope, label: 'Research Atlas' },
   { to: '/import', icon: Upload, label: 'Import' },
 ];
 

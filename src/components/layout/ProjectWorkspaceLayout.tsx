@@ -4,6 +4,7 @@ import { FolderKanban, GitCompare, History, Lightbulb, PencilRuler, Scale } from
 import { getUnderstandingProject, getAssociationsForProject } from '../../lib/db/understanding';
 import { countPendingForProject } from '../../lib/understanding/pendingReviews';
 import { landscapeHref } from '../../lib/landscape/route';
+import { db } from '../../lib/db/schema';
 import type { UnderstandingProject } from '../../types/understanding';
 
 const WORKFLOW_TABS = [
@@ -20,6 +21,7 @@ export function ProjectWorkspaceLayout() {
   const [project, setProject] = useState<UnderstandingProject | null | undefined>(undefined);
   const [sourceCount, setSourceCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [researchCount, setResearchCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,13 +30,15 @@ export function ProjectWorkspaceLayout() {
       getUnderstandingProject(id),
       getAssociationsForProject(id),
       countPendingForProject(id),
-    ]).then(([loadedProject, associations, pending]) => {
+      db.researchSources.where('projectId').equals(id).count(),
+    ]).then(([loadedProject, associations, pending, research]) => {
       if (cancelled) return;
       setProject(loadedProject ?? null);
       setSourceCount(
         associations.filter((association) => association.reviewState !== 'rejected').length
       );
       setPendingCount(pending);
+      setResearchCount(research);
     });
     return () => {
       cancelled = true;
@@ -95,7 +99,7 @@ export function ProjectWorkspaceLayout() {
             to={`/projects/${id}/investigate/research`}
             className="text-sm font-medium text-violet-600 dark:text-violet-400 hover:underline"
           >
-            Research sources & questions
+            Research sources & questions · {researchCount}
           </Link>
           {pendingCount > 0 && (
             <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">

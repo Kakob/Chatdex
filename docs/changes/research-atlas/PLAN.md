@@ -14,9 +14,11 @@ Built October 23, 2026; merged to `main` 2026-10-30 as PR #2 (`0162a66`). Route 
 - [ ] Browser pass: seed loads on first visit; search, detail panels and cross-links work;
       an OpenAlex import and a grant-linked paper lookup return records; investigation
       status/notes persist across reload; JSON export downloads.
-- [ ] Decide whether Research Atlas keeps a top-level sidebar entry in the slimmed nav, and
-      whether its name needs separating from the project-scoped Research shelf
-      (`/projects/:id/investigate/research`).
+- [x] Sidebar decision (2026-11-04): no top-level entry. The catalog was copied into an
+      ordinary "Research Atlas" project as reference-only research sources
+      (`src/features/researchAtlas/toProject.ts`, idempotent via `atlas:<id>` registry ids);
+      the sidebar link was removed. `/research` still resolves by URL and its database is
+      left untouched.
 
 ## Purpose
 
@@ -57,7 +59,7 @@ Some strands are subprojects of listed institutes, not independent federal grant
 
 ## Workflow
 
-1. Open Research Atlas in the Chatdex sidebar.
+1. Open `/research` directly (no sidebar entry since 2026-11-04), or use the Research Atlas project's research sources.
 2. Browse Projects, Researchers, Papers, and My investigations.
 3. Search instantly across the saved catalog. Press Import from OpenAlex to retrieve the first 25 U.S.-affiliated grant, author or recent open-access publication records matching the query.
 4. In a grant detail, Find grant-linked papers queries OpenAlex for works associated with that grant identifier (first 25 matches).
