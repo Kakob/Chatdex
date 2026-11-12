@@ -28,7 +28,7 @@ export function GenericEngineeringExplorerPage({ projectId, projectName }: { pro
   const name = node?.title ?? 'No modeled components';
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-5.5rem)] min-h-[440px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100 sm:h-[calc(100dvh-6.5rem)]">
+    <div className="mx-auto flex min-h-[calc(100dvh-5.5rem)] max-w-7xl flex-col gap-3 text-gray-900 dark:text-gray-100 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[440px] lg:overflow-hidden">
       <header className="flex shrink-0 items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><BookOpen size={17} className="shrink-0 text-violet-600" />
@@ -82,7 +82,7 @@ export function GenericEngineeringExplorerPage({ projectId, projectName }: { pro
           </section>
         </div>
 
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900" aria-label="Generic engineering inspector">
+        <section className="flex min-h-[60dvh] flex-1 flex-col overflow-hidden lg:min-h-0 rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900" aria-label="Generic engineering inspector">
           <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
             <div className="min-w-0"><p className={'text-[10px] uppercase tracking-wide ' + muted}>Selected engineering entity</p><h2 className="truncate font-semibold">{name}</h2></div>
             <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-700 lg:hidden" aria-label={readerExpanded ? 'Show structure' : 'Expand inspector'}
