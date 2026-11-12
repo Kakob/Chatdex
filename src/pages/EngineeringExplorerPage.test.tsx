@@ -145,15 +145,15 @@ describe('EngineeringExplorerPage: visual system model', () => {
     const inspector = screen.getByRole('region', { name: 'Inspector' });
 
     await user.click(within(inspector).getByRole('button', { name: 'Expand inspector' }));
-    expect(diagram.parentElement).toHaveClass('hidden');
+    expect(diagram.parentElement?.parentElement).toHaveClass('hidden');
     expect(within(inspector).getByRole('button', { name: 'Show diagram' })).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(within(inspector).getByRole('button', { name: 'Show diagram' }));
-    expect(diagram.parentElement).not.toHaveClass('hidden');
+    expect(diagram.parentElement?.parentElement).not.toHaveClass('hidden');
 
     await user.click(within(inspector).getByRole('button', { name: /Inspect implementation/ }));
     expect(within(inspector).getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true');
-    expect(diagram.parentElement).toHaveClass('hidden');
+    expect(diagram.parentElement?.parentElement).toHaveClass('hidden');
   });
 
   it('executes the real queue and highlights worker failure → lease expiry → retry → ack', async () => {
