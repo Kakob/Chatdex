@@ -92,7 +92,7 @@ export function GenericEngineeringExplorerPage({ projectId, projectName }: { pro
           </div>
           <div role="tablist" aria-label="Generic inspection modes" className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
             {(['understand', 'code', 'tests'] as const).map((item) => (
-              <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}
+              <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => { setTab(item); if (item !== 'understand') setReaderExpanded(true); }}
                 className={'min-h-11 flex-1 border-b-2 text-sm ' + (tab === item ? 'border-violet-600 font-semibold text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500')}>
                 {item.charAt(0).toUpperCase() + item.slice(1)}
               </button>
@@ -112,7 +112,7 @@ export function GenericEngineeringExplorerPage({ projectId, projectName }: { pro
                 </nav>
               </div>
             )}
-            {activeId && tab === 'code' && <BoundSourceInspector model={model} targetId={activeId} role="implementation" title={name} />}
+            {activeId && tab === 'code' && <BoundSourceInspector model={model} targetId={activeId} role="implementation" title={name} onModelRefresh={refresh} />}
             {activeId && tab === 'tests' && <BoundSourceInspector model={model} targetId={activeId} role="test" title={name} />}
           </div>
         </section>
