@@ -163,7 +163,7 @@ describe('existing source code through the SAME analyzer', () => {
     expect(find(graph, 'enqueue', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
     expect(find(graph, 'claim', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
     expect(find(graph, 'reapExpired', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
-    expect(find(graph, 'workOnce').kind).toBe('function');
+    expect(find(graph, 'workOnce', 'examples/event-queue/src/worker.ts').kind).toBe('function');
     expect(find(graph, 'todoTransition').kind).toBe('function');
     expect(find(graph, 'TodoState').kind).toBe('interface');
     expect(graph.entities.length).toBeGreaterThan(25);
