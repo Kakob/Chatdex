@@ -160,9 +160,9 @@ describe('existing source code through the SAME analyzer', () => {
       { path: 'src/lib/engineering/todoModel.ts', text: fromRepo('src/lib/engineering/todoModel.ts') },
     ] });
     expect(find(graph, 'EventQueue').kind).toBe('class');
-    expect(find(graph, 'enqueue').parentId).toBe(find(graph, 'EventQueue').id);
-    expect(find(graph, 'claim').parentId).toBe(find(graph, 'EventQueue').id);
-    expect(find(graph, 'reapExpired').parentId).toBe(find(graph, 'EventQueue').id);
+    expect(find(graph, 'enqueue', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
+    expect(find(graph, 'claim', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
+    expect(find(graph, 'reapExpired', 'examples/event-queue/src/queue.ts').parentId).toBe(find(graph, 'EventQueue').id);
     expect(find(graph, 'workOnce').kind).toBe('function');
     expect(find(graph, 'todoTransition').kind).toBe('function');
     expect(find(graph, 'TodoState').kind).toBe('interface');
