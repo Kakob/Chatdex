@@ -287,7 +287,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
                 aria-selected={tab === item.id}
                 aria-controls="explorer-inspector-content"
                 className={'min-h-11 flex-1 border-b-2 px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-violet-600 ' + (tab === item.id ? 'border-violet-600 text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400')}
-                onClick={() => setTab(item.id)}
+                onClick={() => { setTab(item.id); if (item.id !== 'understand') setInspectorFocused(true); }}
               >
                 {item.label}
               </button>
@@ -328,7 +328,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
             {tab === 'code' && (
               <div className="space-y-2">
                 <p className={'text-xs ' + muted}>Real checked-in TypeScript, bundled with this app build. Read-only; not revision-pinned evidence.</p>
-                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="implementation" title={part.title} exampleFallback={{ kind: "event-queue", projectId: projectId ?? EVENT_QUEUE_PROJECT_ID }} />
+                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="implementation" title={part.title} onModelRefresh={refreshModel} exampleFallback={{ kind: "event-queue", projectId: projectId ?? EVENT_QUEUE_PROJECT_ID }} />
               </div>
             )}
             {tab === 'tests' && (
