@@ -3,7 +3,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { clearAllData, db } from '../lib/db';
-import { createEngineeringExampleProjects, EVENT_QUEUE_PROJECT_ID, TODO_LIST_PROJECT_ID } from '../lib/engineering/demoProjects';
+import { createEngineeringExampleProjects, EVENT_QUEUE_PROJECT_ID, TODO_LIST_PROJECT_ID, exampleConceptId } from '../lib/engineering/demoProjects';
 import { engineeringModelDb, installExampleTransitions } from '../lib/engineering/modelStore';
 import { EngineeringExplorerPage } from './EngineeringExplorerPage';
 import { TodoExplorerPage } from './TodoExplorerPage';
@@ -41,7 +41,7 @@ describe('model projections on running examples', () => {
     const live = screen.getByRole('region', { name: 'Live queue controls' });
     await user.click(within(live).getByRole('button', { name: '+ Job' }));
     await waitFor(() => expect(live).toHaveTextContent('Pending: 1'));
-    expect(within(model).getByText('Queue')).toBeInTheDocument(); // current canonical title retained
+    expect((await db.landscapeRegions.get(exampleConceptId('event-queue', 'queue')))?.title).toBe('Queue'); // canonical model remains unchanged
   });
 
   it('shows a todo design proposal while the actual reducer still creates and completes tasks', async () => {
