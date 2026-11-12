@@ -32,6 +32,7 @@ import {
 } from '../lib/understanding/overview';
 import { OP_LABEL } from '../lib/understanding/livingDocument';
 import { createEngineeringExampleProjects } from '../lib/engineering/demoProjects';
+import { installExampleTransitions } from '../lib/engineering/modelStore';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { ProjectReviewCard, type AssociationRow } from '../components/understanding/ProjectReviewCard';
 import { useToastStore } from '../stores/toastStore';
@@ -238,6 +239,10 @@ export function ProjectsPage() {
     setLoadingEngineering(true);
     try {
       const result = await createEngineeringExampleProjects();
+      // Installation is opt-in. Repair missing local-only relationship records
+      // even when native project and concept records already existed.
+      await installExampleTransitions(result.queueProjectId);
+      await installExampleTransitions(result.todoProjectId);
       addToast(result.created ? 'Event Queue and Todo List example projects added' : 'Engineering example projects are ready');
       await load();
       navigate('/projects/' + result.queueProjectId + '/engineering');
