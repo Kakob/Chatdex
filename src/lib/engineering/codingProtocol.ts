@@ -27,6 +27,18 @@ export interface SourceEditProposal {
   createdAt: Date;
 }
 
+/** A successful explicit writer operation, NOT verification of program behavior. */
+export interface SourceWriteReceipt {
+  id: string;
+  projectId: string;
+  revisionId: string;
+  writerId: string;
+  path: string;
+  baselineHash: string;
+  writtenHash: string;
+  at: Date;
+}
+
 export interface EngineeringCodingContext {
   projectId: string;
   targetId: string;
