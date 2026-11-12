@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createEngineeringExampleProjects, EVENT_QUEUE_PROJECT_ID, TODO_LIST_PROJECT_ID } from '../../lib/engineering/demoProjects';
 import { clearAllData } from '../../lib/db';
 import { engineeringModelDb, installExampleTransitions } from '../../lib/engineering/modelStore';
-import { ModelInspector, useExampleEngineeringModel } from './ModelInspector';
+import { ModelInspector } from './ModelInspector';
+import { useExampleEngineeringModel } from '../../lib/engineering/useEngineeringModel';
 
 function Editor({ projectId, kind, nodeId }: {
   projectId: string;
