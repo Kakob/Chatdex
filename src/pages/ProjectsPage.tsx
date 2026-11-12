@@ -31,6 +31,7 @@ import {
   type OverviewQuestion,
 } from '../lib/understanding/overview';
 import { OP_LABEL } from '../lib/understanding/livingDocument';
+import { createEngineeringExampleProjects } from '../lib/engineering/demoProjects';
 import { DisclosureModal } from '../components/understanding/DisclosureModal';
 import { ProjectReviewCard, type AssociationRow } from '../components/understanding/ProjectReviewCard';
 import { useToastStore } from '../stores/toastStore';
@@ -116,6 +117,7 @@ export function ProjectsPage() {
   const [projectDescription, setProjectDescription] = useState('');
   const [sampleLoaded, setSampleLoaded] = useState(false);
   const [loadingSample, setLoadingSample] = useState(false);
+  const [loadingEngineering, setLoadingEngineering] = useState(false);
 
   const load = useCallback(async () => {
     const [loadedOverview, associations, configured, hasSample] = await Promise.all([
@@ -232,6 +234,20 @@ export function ProjectsPage() {
     }
   };
 
+  const handleEngineeringExamples = async () => {
+    setLoadingEngineering(true);
+    try {
+      const result = await createEngineeringExampleProjects();
+      addToast(result.created ? 'Event Queue and Todo List example projects added' : 'Engineering example projects are ready');
+      await load();
+      navigate('/projects/' + result.queueProjectId + '/engineering');
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setLoadingEngineering(false);
+    }
+  };
+
   const projects = overview?.projects ?? [];
   const pending = projects.filter((s) => s.project.reviewState === 'pending');
   const reviewed = projects.filter((s) => s.project.reviewState !== 'pending');
@@ -274,6 +290,16 @@ export function ProjectsPage() {
               <FlaskConical size={14} />
             )}
             {sampleLoaded ? 'Open sample' : 'Load sample workspace'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleEngineeringExamples()}
+            disabled={loadingEngineering}
+            className="flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm text-emerald-800 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-950"
+            title="Creates two clearly labeled example projects with authored concepts. Does not import personal data."
+          >
+            {loadingEngineering ? <Loader2 size={14} className="animate-spin" /> : <FlaskConical size={14} />}
+            {loadingEngineering ? 'Creating examples…' : 'Add engineering examples'}
           </button>
           <button
             type="button"
