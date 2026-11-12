@@ -1,283 +1,330 @@
 /**
- * Experimental, read-only exploration surface for the engineering prototype.
+ * Engineering Explorer, iteration 1.5: one compact diagram and one inspector.
  *
- * This is an AUTHORED guided tour of the checked-in example queue, not a
- * generated program model, debugger, code editor, or live execution engine.
- * Bundled ?raw source comes from the current app build and is not evidence
- * pinned to one of the imported test manifests.
+ * The system/step descriptions and source entry points are authored. Scenario
+ * highlighting is illustrative, not a recording of program execution. Source
+ * is bundled from this build, not loaded at the SHA of an evidence manifest.
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, BookOpen, Code2, GitBranch, RotateCcw, StepForward } from 'lucide-react';
-import { Badge, button, muted, panel, primaryButton } from '../components/engineering/ui';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, ExternalLink } from 'lucide-react';
+import { Badge, button, muted } from '../components/engineering/ui';
+import {
+  SystemDiagram,
+  type DiagramEdgeId,
+  type DiagramNodeId,
+} from '../components/engineering/SystemDiagram';
 import queueSource from '../../examples/event-queue/src/queue.ts?raw';
 import workerSource from '../../examples/event-queue/src/worker.ts?raw';
 import deliveryTests from '../../examples/event-queue/test/delivery.test.ts?raw';
 
-type ConceptId = 'overview' | 'producer' | 'storage' | 'lifecycle' | 'worker' | 'recovery' | 'verification';
-type SourceId = 'queue' | 'worker' | 'delivery-tests';
+type SourceId = 'queue' | 'worker' | 'tests';
+type InspectorTab = 'understand' | 'code' | 'tests';
 type ScenarioId = 'success' | 'failure';
 
-interface TourConcept {
-  id: ConceptId;
+interface Part {
   title: string;
-  short: string;
-  description: string;
-  question: string;
+  role: string;
+  summary: string;
+  detail: string;
   source: SourceId;
   needle: string;
+  criterion: string;
+  testDescription: string;
 }
 
-const concepts: TourConcept[] = [
-  {
-    id: 'overview', title: 'Event Queue', short: 'The system',
-    description: 'A producer adds jobs; the queue holds them until workers process them. If a worker fails, unfinished work can be offered again.',
-    question: 'How can work finish without being silently lost?',
-    source: 'queue', needle: 'export class EventQueue',
+const PARTS: Record<DiagramNodeId, Part> = {
+  producer: {
+    title: 'Producer',
+    role: 'Entry point',
+    summary: 'A producer adds work and receives a job ID.',
+    detail: 'enqueue() stores a new job as pending in process memory before returning the ID. It does not wait for a worker to finish.',
+    source: 'queue', needle: 'async enqueue(payload', criterion: 'EQ-C0',
+    testDescription: 'Jobs first reach workers in the order they were enqueued.',
   },
-  {
-    id: 'producer', title: 'Producer', short: 'Creates work',
-    description: 'A producer asks the queue to accept a job. enqueue() gives the job an ID and marks it pending in memory.',
-    question: 'What happens between submitting a job and receiving its ID?',
-    source: 'queue', needle: 'async enqueue(payload',
+  queue: {
+    title: 'Queue',
+    role: 'System core',
+    summary: 'The queue keeps track of jobs between submission and completion.',
+    detail: 'EventQueue stores jobs in an insertion-ordered Map. Because that Map lives only in this process, a queue process restart loses the jobs.',
+    source: 'queue', needle: 'export class EventQueue', criterion: 'EQ-C5',
+    testDescription: 'A job survives a worker failure as long as the queue process stays alive.',
   },
-  {
-    id: 'storage', title: 'Queue & storage', short: 'Remembers work',
-    description: 'The queue stores jobs in an in-memory Map. This is enough to outlive a worker failure while the queue process stays alive, but not a process restart.',
-    question: 'Where does a job live while nobody is processing it?',
-    source: 'queue', needle: 'private readonly jobs = new Map',
+  worker: {
+    title: 'Worker',
+    role: 'Execution',
+    summary: 'A worker claims one job, runs a handler, then acknowledges success.',
+    detail: 'workOnce() does not acknowledge a job when its handler throws. An unacknowledged job stays leased until expiry, when it can be retried.',
+    source: 'worker', needle: 'export async function workOnce', criterion: 'EQ-C5',
+    testDescription: 'A failed worker must not cause its job to disappear.',
   },
-  {
-    id: 'lifecycle', title: 'Job lifecycle', short: 'Tracks states',
-    description: 'A job is pending, becomes leased when claimed, and is removed only after a successful acknowledgment. Failed attempts can return it to pending or leave it dead-lettered.',
-    question: 'Why is receiving a job different from finishing it?',
-    source: 'queue', needle: "export type JobState",
+  pending: {
+    title: 'Pending',
+    role: 'Job state',
+    summary: 'The job is stored, waiting for a worker to claim it.',
+    detail: 'Pending is a real JobState. enqueue() creates it; lease expiry can return an unfinished job here. This is a state of the job, not a separate service.',
+    source: 'queue', needle: 'export type JobState', criterion: 'EQ-C2',
+    testDescription: 'An unacknowledged leased job becomes claimable again after expiry.',
   },
-  {
-    id: 'worker', title: 'Worker', short: 'Does the work',
-    description: 'The worker claims a job for a limited time, runs the handler, and acknowledges only if processing succeeds. A thrown error leaves the job unacknowledged.',
-    question: 'What happens if the worker crashes between receiving and finishing a job?',
-    source: 'worker', needle: 'export async function workOnce',
+  leased: {
+    title: 'Leased',
+    role: 'Job state',
+    summary: 'A worker is processing the job, but the queue still owns it.',
+    detail: 'claim() gives a worker a temporary lease token without removing the job. A stale token cannot acknowledge a later claim.',
+    source: 'queue', needle: 'async claim(workerId', criterion: 'EQ-C3',
+    testDescription: 'A worker cannot acknowledge another worker’s newer claim.',
   },
-  {
-    id: 'recovery', title: 'Failure recovery', short: 'Retries unfinished work',
-    description: 'When a lease expires, the queue returns the unacknowledged job to pending. After too many attempts, the job becomes dead-lettered instead of disappearing silently.',
-    question: 'How can the queue recover work when its worker never responds?',
-    source: 'queue', needle: 'async reapExpired',
+  acked: {
+    title: 'Completed',
+    role: 'Terminal transition',
+    summary: 'Successful acknowledgment removes the finished job.',
+    detail: 'Completed is drawn as an outcome, not a stored JobState. ack() validates the current lease token and deletes the job. It cannot be claimed again.',
+    source: 'queue', needle: 'async ack(jobId', criterion: 'EQ-C1',
+    testDescription: 'An acknowledged job is not dispatched again.',
   },
-  {
-    id: 'verification', title: 'Tests', short: 'Checks behavior',
-    description: 'Tests exercise the queue through its public API. The worker-failure test proves a specific scenario at the revision where it was run; it does not prove durable restart recovery.',
-    question: 'Which observed results support these explanations?',
-    source: 'delivery-tests', needle: "it('[EQ-C5]",
+  tests: {
+    title: 'Tests',
+    role: 'Evidence',
+    summary: 'Tests exercise observable queue behavior through its public interface.',
+    detail: 'The worker-failure test enqueues a job, fails a worker, advances the manual clock, and checks that another worker can process the same job. Tests here are source, not browser-run results.',
+    source: 'tests', needle: "it('[EQ-C5]", criterion: 'EQ-C5',
+    testDescription: 'Worker failure does not silently lose accepted work.',
   },
-];
-
-const sourceFiles: Record<SourceId, { path: string; content: string; label: string }> = {
-  queue: { path: 'src/queue.ts', content: queueSource, label: 'Queue implementation' },
-  worker: { path: 'src/worker.ts', content: workerSource, label: 'Worker implementation' },
-  'delivery-tests': { path: 'test/delivery.test.ts', content: deliveryTests, label: 'Delivery tests' },
+  retry: {
+    title: 'Retry',
+    role: 'Recovery mechanism',
+    summary: 'When a lease expires, unfinished work can become pending again.',
+    detail: 'reapExpired() examines leased jobs and either releases them for another attempt or dead-letters them if the configured attempt limit is exhausted.',
+    source: 'queue', needle: 'async reapExpired', criterion: 'EQ-C2',
+    testDescription: 'A job can be reclaimed after its lease expires.',
+  },
+  'dead-letter': {
+    title: 'Dead letter',
+    role: 'Job state',
+    summary: 'A job that exhausted its allowed attempts remains inspectable.',
+    detail: 'Instead of silently dropping a repeatedly failing job, the queue marks it dead_lettered. It no longer counts as active work and deadLetters() can list it.',
+    source: 'queue', needle: 'deadLetters():', criterion: 'EQ-C7',
+    testDescription: 'Exhausted jobs become dead letters rather than disappearing.',
+  },
 };
 
-interface TourStep {
-  text: string;
+const SOURCES: Record<SourceId, { path: string; text: string }> = {
+  queue: { path: 'src/queue.ts', text: queueSource },
+  worker: { path: 'src/worker.ts', text: workerSource },
+  tests: { path: 'test/delivery.test.ts', text: deliveryTests },
+};
+
+interface ScenarioStep {
+  label: string;
   explanation: string;
-  concept: ConceptId;
+  focus: DiagramNodeId;
+  highlights: DiagramNodeId[];
+  edge?: DiagramEdgeId;
 }
 
-const scenarios: Record<ScenarioId, TourStep[]> = {
+const SCENARIOS: Record<ScenarioId, ScenarioStep[]> = {
   success: [
-    { text: 'Job submitted', explanation: 'A producer calls enqueue(). The new job has an ID.', concept: 'producer' },
-    { text: 'Job pending', explanation: 'The queue still owns the job while no worker has claimed it.', concept: 'storage' },
-    { text: 'Worker claims', explanation: 'The queue gives the worker a temporary lease; the job stays tracked.', concept: 'worker' },
-    { text: 'Handler succeeds', explanation: 'The worker finishes the task and can now acknowledge the job.', concept: 'worker' },
-    { text: 'Job acknowledged', explanation: 'ack() removes the completed job. It will not be dispatched again.', concept: 'lifecycle' },
+    { label: 'Job submitted', explanation: 'The producer calls enqueue(). A job ID is returned.', focus: 'producer', highlights: ['producer', 'queue'], edge: 'enqueue' },
+    { label: 'Waiting in queue', explanation: 'The real queue records the new job as pending.', focus: 'pending', highlights: ['queue', 'pending'], edge: 'store' },
+    { label: 'Claimed', explanation: 'A worker temporarily leases the job; the queue still tracks it.', focus: 'leased', highlights: ['worker', 'leased'], edge: 'claim' },
+    { label: 'Processing succeeds', explanation: 'The worker finishes the handler and can acknowledge the job.', focus: 'worker', highlights: ['worker', 'leased'], edge: 'dispatch' },
+    { label: 'Acknowledged', explanation: 'ack() removes the completed job. It cannot be claimed again.', focus: 'acked', highlights: ['leased', 'acked'], edge: 'ack' },
   ],
   failure: [
-    { text: 'Job submitted', explanation: 'The producer adds a job. It is waiting in queue memory.', concept: 'producer' },
-    { text: 'Worker claims', explanation: 'A worker receives the job, but the queue keeps it in the leased state.', concept: 'worker' },
-    { text: 'Worker fails', explanation: 'The worker fails before acknowledging. The queue has NOT forgotten the job.', concept: 'worker' },
-    { text: 'Lease expires', explanation: 'A time limit prevents the failed worker from owning the job forever.', concept: 'recovery' },
-    { text: 'Job becomes pending', explanation: 'reapExpired() makes unfinished work claimable again.', concept: 'recovery' },
-    { text: 'Another attempt', explanation: 'Another worker claims and finishes the work. Processing can occur more than once.', concept: 'worker' },
-    { text: 'Acknowledged', explanation: 'A successful acknowledgment finally removes the job.', concept: 'lifecycle' },
+    { label: 'Job submitted', explanation: 'A new job enters the queue and gets an ID.', focus: 'producer', highlights: ['producer', 'queue'], edge: 'enqueue' },
+    { label: 'Claimed', explanation: 'The worker receives a lease; the queue still holds the job.', focus: 'leased', highlights: ['worker', 'leased'], edge: 'claim' },
+    { label: 'Worker fails', explanation: 'The handler fails before acknowledgment. The job is still leased, not lost.', focus: 'worker', highlights: ['worker', 'leased'] },
+    { label: 'Lease expires', explanation: 'The lease time runs out, so the queue can recover unfinished work.', focus: 'retry', highlights: ['leased', 'retry'], edge: 'expire' },
+    { label: 'Pending again', explanation: 'The expired job returns to pending; it can now be claimed again.', focus: 'pending', highlights: ['retry', 'pending'], edge: 'requeue' },
+    { label: 'Another attempt', explanation: 'A worker reclaims the job. Duplicate processing is possible.', focus: 'leased', highlights: ['pending', 'leased'], edge: 'to-lease' },
+    { label: 'Acknowledged', explanation: 'A successful second attempt ends with an acknowledgment.', focus: 'acked', highlights: ['leased', 'acked'], edge: 'ack' },
   ],
 };
 
-function SourcePreview({ concept }: { concept: TourConcept }) {
+function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: string; title: string }) {
   const [full, setFull] = useState(false);
-  const file = sourceFiles[concept.source];
-  const lines = file.content.split('\n');
-  const located = lines.findIndex((line) => line.includes(concept.needle));
-  const start = full ? 0 : Math.max(0, located - 4);
-  const end = full ? lines.length : Math.min(lines.length, (located >= 0 ? located : 0) + 17);
-  const excerpt = lines.slice(start, end);
-  const github = 'https://github.com/Kakob/Chatdex/blob/feature/engineering-explorer-iteration-1/examples/event-queue/' + file.path;
+  const file = SOURCES[fileId];
+  const lines = file.text.split('\n');
+  const match = lines.findIndex((line) => line.includes(needle));
+  const from = full ? 0 : Math.max(0, match - 4);
+  const to = full ? lines.length : Math.min(lines.length, Math.max(0, match) + 22);
+  const githubUrl = 'https://github.com/Kakob/Chatdex/blob/feature/engineering-explorer-iteration-1/examples/event-queue/' + file.path +
+    (match >= 0 ? '#L' + (match + 1) : '');
 
   return (
-    <section className={panel + ' min-w-0'} aria-label="Source code">
+    <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2"><Code2 size={16} /> <h2 className="font-semibold">Actual source code</h2></div>
-          <p className={'mt-1 text-xs ' + muted}>{file.label}</p>
-        </div>
-        <a href={github} target="_blank" rel="noreferrer" className="text-xs text-violet-700 underline dark:text-violet-300">
-          Open on GitHub
+        <p className={'min-w-0 break-all text-xs ' + muted}>{title} · {file.path}</p>
+        <a className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 underline dark:text-violet-300" href={githubUrl} target="_blank" rel="noreferrer">
+          GitHub <ExternalLink size={12} />
         </a>
       </div>
-      <p className={'mt-2 text-xs ' + muted}>
-        Source bundled with this app build, not a live editor or revision-pinned evidence. The highlighted line is an authored entry point.
-      </p>
-      <div className="mt-3 overflow-auto rounded-lg border border-gray-200 bg-gray-950 text-gray-100 dark:border-gray-700">
-        <div className="sticky left-0 border-b border-gray-700 px-3 py-2 font-mono text-xs text-gray-400">{file.path}</div>
-        <pre className="p-3 text-xs leading-5">
+      <div className="max-w-full overflow-auto rounded-lg border border-gray-700 bg-gray-950 text-gray-100" aria-label={title + ' excerpt'}>
+        <pre className="w-max min-w-full p-3 font-mono text-[11px] leading-5">
           <code>
-            {excerpt.map((line, i) => {
-              const number = start + i + 1;
+            {lines.slice(from, to).map((line, i) => {
+              const n = from + i + 1;
               return (
-                <span key={number} className={'block whitespace-pre ' + (number === located + 1 ? 'bg-violet-900/60 text-white' : '')}>
-                  <span className="mr-4 inline-block w-7 select-none text-right text-gray-500">{number}</span>{line || ' '}
-                  {'\n'}
+                <span key={n} className={'block whitespace-pre pr-2 ' + (n === match + 1 ? 'bg-violet-900/70' : '')}>
+                  <span className="mr-3 inline-block w-7 select-none text-right text-gray-500">{n}</span>{line || ' '}{'\n'}
                 </span>
               );
             })}
           </code>
         </pre>
       </div>
-      {located < 0 && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">The expected entry point was not found in this build.</p>}
-      <button type="button" className={button + ' mt-3'} onClick={() => setFull((previous) => !previous)}>
+      {match < 0 && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">This authored entry point was not found in the bundled source.</p>}
+      <button type="button" className={button} onClick={() => setFull(!full)}>
         {full ? 'Show relevant excerpt' : 'View full file'}
       </button>
-    </section>
+    </div>
   );
 }
 
 export function EngineeringExplorerPage() {
-  const [selected, setSelected] = useState<ConceptId>('overview');
+  const [selected, setSelected] = useState<DiagramNodeId>('queue');
+  const [tab, setTab] = useState<InspectorTab>('understand');
   const [scenario, setScenario] = useState<ScenarioId>('failure');
-  const [step, setStep] = useState(0);
-  const concept = concepts.find((entry) => entry.id === selected) ?? concepts[0];
-  const journey = scenarios[scenario];
-  const current = journey[step];
+  const [stepIndex, setStepIndex] = useState(0);
+  const part = PARTS[selected];
+  const currentSteps = SCENARIOS[scenario];
+  const currentStep = currentSteps[stepIndex];
 
-  const chooseScenario = (choice: ScenarioId) => {
-    setScenario(choice);
-    setStep(0);
-    setSelected(scenarios[choice][0].concept);
+  const goToStep = (next: number) => {
+    const index = Math.max(0, Math.min(currentSteps.length - 1, next));
+    setStepIndex(index);
+    setSelected(currentSteps[index].focus);
   };
-
-  const nextStep = () => {
-    const index = Math.min(step + 1, journey.length - 1);
-    setStep(index);
-    setSelected(journey[index].concept);
+  const changeScenario = (next: ScenarioId) => {
+    setScenario(next);
+    setStepIndex(0);
+    setSelected(SCENARIOS[next][0].focus);
   };
+  const tabs: { id: InspectorTab; label: string }[] = [
+    { id: 'understand', label: 'Understand' },
+    { id: 'code', label: 'Code' },
+    { id: 'tests', label: 'Tests' },
+  ];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4 text-gray-900 dark:text-gray-100 sm:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <BookOpen size={19} className="text-violet-600 dark:text-violet-300" />
-            <h1 className="text-xl font-semibold">Explore: Event Queue</h1>
-            <Badge tone="violet">Iteration 1</Badge>
+    <div
+      className="mx-auto flex min-h-[470px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100"
+      style={{ height: 'calc(100dvh - 7.5rem)' }}
+    >
+      <header className="flex shrink-0 items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <BookOpen size={18} className="shrink-0 text-violet-600 dark:text-violet-300" />
+            <h1 className="truncate text-base font-semibold sm:text-xl">Event Queue Explorer</h1>
+            <Badge tone="violet">1.5</Badge>
           </div>
-          <p className={'mt-1 max-w-2xl text-sm ' + muted}>
-            Discover how this program works. Select a subsystem, follow a job, and inspect the source behind each explanation.
-          </p>
+          <p className={'truncate text-[11px] ' + muted}>Tap the system · inspect its behavior and code</p>
         </div>
-        <Link to="/engineering" className={button}><GitBranch size={15} /> Original change workbench</Link>
+        <Link to="/engineering" className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-2 text-xs dark:border-gray-700" aria-label="Original engineering workbench">
+          <ArrowLeft size={14} /> Workbench
+        </Link>
       </header>
 
-      <section className={panel} aria-label="System flow">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold">How a job moves through the system</h2>
-          <span className={'text-xs ' + muted}>Authored model of the checked-in example</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {(['producer', 'storage', 'worker'] as const).map((id, index) => {
-            const entry = concepts.find((item) => item.id === id)!;
-            return (
-              <div key={id} className="flex items-center gap-2">
-                {index > 0 && <ArrowRight size={16} className="text-gray-400" />}
-                <button type="button"
-                  className={'rounded-lg border px-4 py-3 text-left transition ' + (selected === id ? 'border-violet-500 bg-violet-50 dark:bg-violet-950/40' : 'border-gray-200 hover:border-violet-300 dark:border-gray-700')}
-                  onClick={() => setSelected(id)}>
-                  <span className="block text-sm font-semibold">{entry.title}</span>
-                  <span className={'block text-xs ' + muted}>{entry.short}</span>
-                </button>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(370px,.95fr)]">
+        <div className="flex min-h-0 shrink-0 flex-col gap-2 lg:min-h-0 lg:shrink">
+          <div className="flex shrink-0 items-center justify-between gap-2" role="group" aria-label="Scenario choice">
+            <span className={'text-xs font-medium ' + muted}>Illustrated path</span>
+            <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+              <button type="button" aria-pressed={scenario === 'success'} className={'rounded-md px-3 py-1.5 text-xs font-medium ' + (scenario === 'success' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-700 dark:text-violet-200' : muted)} onClick={() => changeScenario('success')}>
+                Successful job
+              </button>
+              <button type="button" aria-pressed={scenario === 'failure'} className={'rounded-md px-3 py-1.5 text-xs font-medium ' + (scenario === 'failure' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-700 dark:text-violet-200' : muted)} onClick={() => changeScenario('failure')}>
+                Worker crashes
+              </button>
+            </div>
+          </div>
+
+          <div className="min-h-[210px] shrink-0 lg:min-h-0" style={{ height: 'clamp(210px, 36dvh, 360px)' }}>
+            <SystemDiagram selected={selected} highlighted={currentStep.highlights} highlightedEdge={currentStep.edge} onSelect={setSelected} />
+          </div>
+
+          <section className="shrink-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900" aria-label="Scenario walkthrough">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-semibold">{currentStep.label}</span>
+                  <span className={muted}>Step {stepIndex + 1} / {currentSteps.length}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs leading-4 text-gray-600 dark:text-gray-300">{currentStep.explanation}</p>
               </div>
-            );
-          })}
-          <button type="button" className={button} onClick={() => setSelected('recovery')}>If worker fails → Recovery</button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 disabled:opacity-30 dark:border-gray-600" aria-label="Previous step" disabled={stepIndex === 0} onClick={() => goToStep(stepIndex - 1)}><ChevronLeft size={17} /></button>
+                <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 text-white disabled:opacity-30" aria-label="Next step" disabled={stepIndex === currentSteps.length - 1} onClick={() => goToStep(stepIndex + 1)}><ChevronRight size={17} /></button>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
 
-      <section className={panel} aria-label="Guided behavior">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="font-semibold">Observe a scenario</h2>
-            <p className={'text-xs ' + muted}>Illustrated walkthrough, not code execution or measured runtime evidence.</p>
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 lg:rounded-xl" aria-label="Inspector">
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-300 dark:bg-gray-600 lg:hidden" aria-hidden="true" />
+          <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-2">
+            <div className="min-w-0">
+              <p className={'text-[10px] font-semibold uppercase tracking-wide ' + muted}>Selected system part · {part.role}</p>
+              <h2 className="truncate text-base font-semibold">{part.title}</h2>
+            </div>
+            <span className="shrink-0 rounded-full bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-200">Authored model</span>
           </div>
-          <div className="flex gap-2">
-            <button type="button" aria-pressed={scenario === 'success'} className={scenario === 'success' ? primaryButton : button} onClick={() => chooseScenario('success')}>Successful job</button>
-            <button type="button" aria-pressed={scenario === 'failure'} className={scenario === 'failure' ? primaryButton : button} onClick={() => chooseScenario('failure')}>Worker crashes</button>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {journey.map((stage, index) => (
-            <button type="button" key={index} aria-current={index === step ? 'step' : undefined}
-              className={'rounded-full border px-3 py-1.5 text-xs ' + (index === step ? 'border-violet-500 bg-violet-100 font-medium text-violet-900 dark:bg-violet-950 dark:text-violet-100' : 'border-gray-300 dark:border-gray-700')}
-              onClick={() => { setStep(index); setSelected(stage.concept); }}>
-              {(index + 1) + '. ' + stage.text}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-          <div>
-            <p className="text-sm font-semibold">{current.text}</p>
-            <p className="mt-1 text-sm">{current.explanation}</p>
-          </div>
-          <div className="flex gap-2">
-            <button type="button" className={button} onClick={() => { setStep(0); setSelected(journey[0].concept); }}><RotateCcw size={14} /> Reset</button>
-            <button type="button" className={primaryButton} disabled={step === journey.length - 1} onClick={nextStep}><StepForward size={14} /> Next step</button>
-          </div>
-        </div>
-      </section>
 
-      <div className="grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)]">
-        <nav className={panel + ' self-start'} aria-label="System components">
-          <h2 className="mb-2 text-sm font-semibold">Explore components</h2>
-          <div className="space-y-1">
-            {concepts.map((entry) => (
-              <button type="button" key={entry.id} aria-current={selected === entry.id ? 'page' : undefined}
-                onClick={() => setSelected(entry.id)}
-                className={'w-full rounded-md px-3 py-2 text-left text-sm ' + (selected === entry.id ? 'bg-violet-100 font-semibold text-violet-900 dark:bg-violet-900/40 dark:text-violet-100' : 'hover:bg-gray-100 dark:hover:bg-gray-800')}>
-                <span className="block">{entry.title}</span>
-                <span className={'block text-xs font-normal ' + (selected === entry.id ? 'text-violet-700 dark:text-violet-200' : muted)}>{entry.short}</span>
+          <div role="tablist" aria-label="Inspect selected system part" className="flex shrink-0 gap-1 border-b border-gray-200 px-3 dark:border-gray-700">
+            {tabs.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={'explorer-tab-' + item.id}
+                aria-selected={tab === item.id}
+                aria-controls="explorer-inspector-content"
+                className={'min-h-11 flex-1 border-b-2 px-2 text-sm font-medium focus-visible:outline-2 focus-visible:outline-violet-600 ' + (tab === item.id ? 'border-violet-600 text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400')}
+                onClick={() => setTab(item.id)}
+              >
+                {item.label}
               </button>
             ))}
           </div>
-        </nav>
-        <main className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
-          <section className={panel} aria-label="Component understanding">
-            <Badge tone="violet">System model · authored</Badge>
-            <h2 className="mt-3 text-lg font-semibold">{concept.title}</h2>
-            <p className="mt-3 text-sm leading-6">{concept.description}</p>
-            <div className="mt-4 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800">
-              <p className="mb-1 font-medium">Question to investigate</p>
-              <p>{concept.question}</p>
-            </div>
-            <p className={'mt-3 text-xs ' + muted}>This concept and the entry point on the right are manually linked for the first iteration. They are not inferred from source.</p>
-            <button type="button" className={button + ' mt-4'} onClick={() => setSelected('verification')}>
-              See supporting tests <ArrowRight size={14} />
-            </button>
-          </section>
-          <SourcePreview key={concept.id} concept={concept} />
-        </main>
+
+          <div
+            id="explorer-inspector-content"
+            role="tabpanel"
+            aria-labelledby={'explorer-tab-' + tab}
+            className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-3"
+            key={selected + ':' + tab}
+          >
+            {tab === 'understand' && (
+              <div className="space-y-3 text-sm leading-6">
+                <p className="font-medium">{part.summary}</p>
+                <p className="text-gray-600 dark:text-gray-300">{part.detail}</p>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className={button} onClick={() => setTab('code')}><Code2 size={14} /> Inspect implementation <ArrowRight size={13} /></button>
+                  <button type="button" className={button} onClick={() => setTab('tests')}>See test {part.criterion} <ArrowRight size={13} /></button>
+                </div>
+                <p className={'text-xs leading-5 ' + muted}>The diagram and connections are manually authored. The colored route is a walkthrough, not observed execution.</p>
+              </div>
+            )}
+            {tab === 'code' && (
+              <div className="space-y-2">
+                <p className={'text-xs ' + muted}>Real checked-in TypeScript, bundled with this app build. Read-only; not revision-pinned evidence.</p>
+                <SourceExcerpt key={selected + ':code'} fileId={part.source} needle={part.needle} title={part.title} />
+              </div>
+            )}
+            {tab === 'tests' && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="violet">{part.criterion}</Badge>
+                  <p className="text-sm">{part.testDescription}</p>
+                </div>
+                <p className={'text-xs ' + muted}>This is a real test definition; no tests are executed by this explorer. Verification manifests live in the original workbench.</p>
+                <SourceExcerpt key={selected + ':tests'} fileId="tests" needle={"it('[" + part.criterion + "]"} title="Relevant test" />
+              </div>
+            )}
+          </div>
+        </section>
       </div>
-      <p className={'text-xs ' + muted}>
-        This exploratory route is intentionally separate from the existing local-only engineering workbench. It does not modify project data, run code, or edit files.
-      </p>
+      <span className="sr-only">Select a diagram node to change the inspector; scenario controls illustrate the flow without executing the queue.</span>
     </div>
   );
 }
