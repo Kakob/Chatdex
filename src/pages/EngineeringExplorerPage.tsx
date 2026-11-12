@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge, button, muted } from '../components/engineering/ui';
 import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
+import { ModelInspector, useExampleEngineeringModel } from '../components/engineering/ModelInspector';
 import { QueueLiveLab, type QueueAction } from '../components/engineering/QueueLiveLab';
 import { LiveQueueSession, type LiveQueueSnapshot } from '../lib/engineering/liveQueue';
 import { exampleConceptId } from '../lib/engineering/demoProjects';
@@ -154,6 +155,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
   const [live, setLive] = useState<LiveQueueSnapshot>(() => session.snapshot());
   const [liveBusy, setLiveBusy] = useState(false);
   const [liveError, setLiveError] = useState<string | null>(null);
+  const { model: engineeringModel, refresh: refreshModel, error: modelError } = useExampleEngineeringModel(projectId);
   const [tab, setTab] = useState<InspectorTab>('understand');
   const [inspectorFocused, setInspectorFocused] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>('failure');
@@ -165,9 +167,14 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
   const highlighted: DiagramNodeId[] = mode === 'live' ? (latestEvent?.highlighted ?? ['queue']) : currentStep.highlights;
   const highlightedEdge = mode === 'live' ? latestEvent?.edge : currentStep.edge;
   const titles: Partial<Record<DiagramNodeId, string>> = {};
+  const proposedTitles: Partial<Record<DiagramNodeId, string>> = {};
   if (projectId) for (const node of Object.keys(PARTS) as DiagramNodeId[]) {
     const concept = concepts.find((item) => item.id === exampleConceptId('event-queue', node));
     if (concept) titles[node] = concept.title;
+  }
+  if (projectId && engineeringModel) for (const node of Object.keys(PARTS) as DiagramNodeId[]) {
+    const proposal = engineeringModel.elements[exampleConceptId('event-queue', node)]?.proposed;
+    if (proposal) proposedTitles[node] = proposal.title;
   }
   const runLive = (action: QueueAction) => {
     setLiveError(null);
@@ -248,7 +255,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
           )}
 
           <div className="h-[clamp(185px,30dvh,280px)] shrink-0 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
-            <SystemDiagram selected={selected} highlighted={highlighted} highlightedEdge={highlightedEdge} onSelect={setSelected} titles={titles} counts={mode === 'live' ? { pending: live.pendingCount, leased: live.leasedCount, acked: live.completedIds.length, 'dead-letter': live.deadLetterCount } : undefined} />
+            <SystemDiagram selected={selected} highlighted={highlighted} highlightedEdge={highlightedEdge} onSelect={setSelected} titles={titles} proposedTitles={proposedTitles} counts={mode === 'live' ? { pending: live.pendingCount, leased: live.leasedCount, acked: live.completedIds.length, 'dead-letter': live.deadLetterCount } : undefined} />
           </div>
 
           {mode === 'live' ? (
@@ -278,7 +285,8 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
           <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-2">
             <div className="min-w-0">
               <p className={'text-[10px] font-semibold uppercase tracking-wide ' + muted}>Selected system part · {part.role}</p>
-              <h2 className="truncate text-base font-semibold">{titles[selected] ?? part.title}</h2>
+              <h2 className="truncate text-base font-semibold">{proposedTitles[selected] ?? titles[selected] ?? part.title}</h2>
+              {proposedTitles[selected] && <p className="text-[10px] font-semibold text-amber-700 dark:text-amber-300">Proposed only · running program unchanged</p>}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="hidden rounded-full bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-200 sm:inline-flex">Authored model</span>
@@ -316,6 +324,10 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
               <div className="space-y-3 text-sm leading-6">
                 <p className="font-medium">{part.summary}</p>
                 <p className="text-gray-600 dark:text-gray-300">{part.detail}</p>
+                {projectId && (
+                  <ModelInspector key={selected} kind="event-queue" nodeId={selected} projectId={projectId} model={engineeringModel} onRefresh={refreshModel} />
+                )}
+                {modelError && <p role="alert" className="text-xs text-red-700">{modelError}</p>}
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className={button} onClick={() => { setTab('code'); setInspectorFocused(true); }}><Code2 size={14} /> Inspect implementation <ArrowRight size={13} /></button>
                   <button type="button" className={button} onClick={() => setTab('tests')}>See test {part.criterion} <ArrowRight size={13} /></button>
