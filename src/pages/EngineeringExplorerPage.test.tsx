@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -107,6 +107,7 @@ describe('EngineeringExplorerPage: visual system model', () => {
 
     const diagram = screen.getByRole('group', { name: 'Event queue system diagram' });
     const inspector = screen.getByRole('region', { name: 'Inspector' });
+    await user.click(screen.getByRole('button', { name: 'Guided explanation' }));
     const walkthrough = screen.getByRole('region', { name: 'Scenario walkthrough' });
 
     // Default is illustrative worker failure; the first step highlights enqueue.
@@ -155,9 +156,37 @@ describe('EngineeringExplorerPage: visual system model', () => {
     expect(diagram.parentElement).toHaveClass('hidden');
   });
 
+  it('executes the real queue and highlights worker failure → lease expiry → retry → ack', async () => {
+    const user = userEvent.setup();
+    renderExplorer();
+    const live = screen.getByRole('region', { name: 'Live queue controls' });
+    const diagram = screen.getByRole('group', { name: 'Event queue system diagram' });
+    expect(within(live).getByText(/Running actual EventQueue/)).toBeInTheDocument();
+    await user.click(within(live).getByRole('button', { name: '+ Job' }));
+    await waitFor(() => expect(live).toHaveTextContent('Pending: 1'));
+    expect(diagram.querySelector('[data-edge="enqueue"]')).toHaveAttribute('data-highlighted', 'true');
+
+    await user.click(within(live).getByRole('button', { name: 'Claim' }));
+    await waitFor(() => expect(live).toHaveTextContent('Leased: 1'));
+    await user.click(within(live).getByRole('button', { name: 'Fail worker' }));
+    await waitFor(() => expect(live).toHaveTextContent('remains leased'));
+    expect(live).toHaveTextContent('Leased: 1');
+
+    await user.click(within(live).getByRole('button', { name: 'Advance clock' }));
+    await waitFor(() => expect(live).toHaveTextContent('Pending: 1'));
+    expect(diagram.querySelector('[data-edge="requeue"]')).toHaveAttribute('data-highlighted', 'true');
+
+    await user.click(within(live).getByRole('button', { name: 'Claim' }));
+    await waitFor(() => expect(live).toHaveTextContent('Leased: 1'));
+    await user.click(within(live).getByRole('button', { name: 'Complete' }));
+    await waitFor(() => expect(live).toHaveTextContent('Done: 1'));
+    expect(diagram.querySelector('[data-edge="ack"]')).toHaveAttribute('data-highlighted', 'true');
+  });
+
   it('supports switching scenarios, previous/next navigation, and explicit non-execution labeling', async () => {
     const user = userEvent.setup();
     renderExplorer();
+    await user.click(screen.getByRole('button', { name: 'Guided explanation' }));
     const walkthrough = screen.getByRole('region', { name: 'Scenario walkthrough' });
     const inspector = screen.getByRole('region', { name: 'Inspector' });
 
