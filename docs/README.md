@@ -32,7 +32,8 @@ The companion private JSON lives in local, gitignored `research-data/mit/`, not 
 
 ### Engineering abstraction prototype handoff
 
-- [Original prototype handoff](./changes/engineering-abstraction-prototype/CHATDEX_ENGINEERING_ABSTRACTION_PROTOTYPE_HANDOFF.md) — "refactor a guarantee, not a function"; proposed, not started. Checkpoint 0 adds `PLAN.md` beside it.
+- [Plan, verification, demo script](./changes/engineering-abstraction-prototype/PLAN.md) — experimental `/engineering`, acceptance pending.
+- [Original prototype handoff](./changes/engineering-abstraction-prototype/CHATDEX_ENGINEERING_ABSTRACTION_PROTOTYPE_HANDOFF.md) — "refactor a guarantee, not a function".
 
 ### Everything else
 

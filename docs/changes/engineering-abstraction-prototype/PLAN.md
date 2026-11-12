@@ -1,6 +1,6 @@
 # Engineering abstraction prototype — "Refactor a guarantee, not a function"
 
-Status: In progress (Checkpoint 0 done; Checkpoint 1 vertical slice in progress)
+Status: Implemented — acceptance pending (Checkpoints 0–2 done; Checkpoint 3 partial, see Open acceptance checks)
 Primary capability: [Understanding Workspace](../../capabilities/understanding-workspace/PRD.md)
 Related: [Change Workspace](../../capabilities/change-workspace/SPEC.md) (handoff/verification
 vocabulary, unchanged), [Repository Integration](../../capabilities/repository-integration/SPEC.md)
@@ -112,6 +112,66 @@ criterion tests (`test:EQ-C5`).
 - **Checkpoint 3 — trust.** Stale/missing binding, dirty and mismatched manifests, no automatic
   promotion, failure scopes kept apart, durable stage (EQ-C6) or explicitly out of scope; demo script.
 
+## What shipped
+
+Experimental route **`/engineering`** (not in the sidebar; open the URL directly).
+
+| Piece | Files |
+|---|---|
+| Types (reuse `LandscapeRegion` / `UnderstandingObject` / `UnderstandingEvent`) | `src/types/engineering.ts` |
+| Contract vocabulary, criteria, rule pack `queue-delivery@1` | `src/lib/engineering/rules.ts` |
+| Authored Event Queue model (11 concepts, 6 statements, 8 relationships, 11 bindings) | `src/lib/engineering/fixture.ts` |
+| Pure impact derivation (propagation, unknown impact, model gaps) | `src/lib/engineering/impact.ts` |
+| Binding status (unobserved / missing / observed / current / stale) | `src/lib/engineering/bindings.ts` |
+| Manifest parse + import refusals; per-criterion verification; handoff `.md`/`.json` | `src/lib/engineering/io/` |
+| Local-only DB `chatdex-engineering-prototype`; draft → approve → import → confirm → accept | `src/lib/engineering/storage.ts` |
+| Workbench UI | `src/pages/EngineeringPrototypePage.tsx`, `src/components/engineering/` |
+| Real queue, harness, criterion tests, evidence capture script, two real manifests | `examples/event-queue/` |
+
+The real loop ran once, end to end, in this session:
+
+1. Baseline queue committed at `f354cf7` (remove on dispatch). Pinned evidence captured from a clean
+   tree: EQ-C0/C1 pass, **EQ-C5 fails** ("job was lost: removed on dispatch before the worker completed").
+2. In Chatdex: contract edited to ack-after-processing / worker failure → 16 obligations, Producer /
+   enqueue flagged *impact unknown*; approved against base `f354cf7`; handoff exported.
+3. **Outside Chatdex**: a separate coding agent got only the exported handoff, worked in an isolated
+   worktree from `f354cf7`, and committed `8f03376` (claim/ack/lease tokens/reapExpired/bounded
+   attempts with dead letters; `dequeue()` removed; README documents duplicates and in-memory limits).
+   It decided the producer unknown needs no code change and recorded that as an agent-reported note.
+   Merged with `--no-ff` (`a59dbef`) so the evidenced sha stays in history.
+4. Its pinned manifest (`base f354cf7`, 24 passed / 0 failed) imported as implementation evidence:
+   EQ-C5 failed → passed → **supported**; EQ-C6 not required, not run, **unverified**.
+5. Accepted explicitly: contract v2 current, v1 superseded, job-loss limitation resolved (because
+   EQ-C5 is supported at `8f03376`), reload reconstructs everything.
+
+### Guarantees at `8f03376` (from imported evidence only)
+
+| Guarantee | Status | Evidence |
+|---|---|---|
+| Acked job is not dispatched again (EQ-C1) | Supported | test passed at `8f03376` |
+| Unacked job reclaimable after lease expiry (EQ-C2) | Supported | test passed |
+| Stale lease token cannot ack a newer claim (EQ-C3) | Supported | test passed |
+| Duplicates possible after lease expiry (EQ-C4) | Supported (demonstrated, documented) | test passed |
+| Job survives worker failure, queue process alive (EQ-C5) | Supported | failed at `f354cf7`, passed at `8f03376` |
+| Bounded retries, dead-lettered not dropped (EQ-C7) | Supported | test passed |
+| First-delivery order (EQ-C0); no FIFO across retries | Supported (first delivery only) | test passed |
+| Job survives queue process restart (EQ-C6) | **Not verified — out of scope** | no durable stage built, no test |
+| Exactly-once execution | **Not promised** | EQ-C4 shows duplicates |
+
+### Demo script (repeatable)
+
+```
+git switch --detach f354cf7 && npm run queue:test   # 6 passed, 1 failed (EQ-C5): the legacy loss
+git switch feature/engineering-abstraction-prototype && npm run queue:test   # 24 passed: ack after processing
+npm run dev   # open http://localhost:4000/engineering
+```
+In the page: Import evidence manifest → `examples/event-queue/evidence/f354cf78ffad.json` → pick Ack
+after processing + Worker failure → read obligations / Why / Impact unknown → Save as draft → Approve
+change → Handoff .md (this is what an agent or a hand-coder implements) → Import as "Implementation of
+the approved change" → `examples/event-queue/evidence/8f03376bb9d1.json` → read the before/after
+table → Accept new understanding → reload. "Reset prototype" starts over. To produce new evidence,
+commit on a branch from the base and run `npm run queue:evidence -- --base <base sha>`.
+
 ## Exclusions
 
 No changes to sync, crypto, detection, investigation, Change Workspace, GitHub integration, or the
@@ -126,12 +186,41 @@ Queue baseline `f354cf7`: `npm run queue:test` → 6 passed, 1 failed (EQ-C5, by
 "job was lost: removed on dispatch before the worker completed"). Pinned evidence
 `examples/event-queue/evidence/f354cf78ffad.json` captured from a clean tree.
 
+Implementation `8f03376` (external implementer): `npm run queue:test` 24 passed / 0 failed,
+re-run independently after hand-back; EQ-C0/C1/C5 test bodies byte-identical to base; implementer's
+mutation check (ack before handler → EQ-C5 fails) reported, not re-run here.
+
+Branch after merge (2026-11-12): `npm run typecheck` clean, `npm run lint` clean, `npm run build`
+succeeds, `npm test` 142 files / 1142 tests passed (baseline 138 / 1111), `npm run queue:test`
+24 passed. New tests: `impact.test.ts` (derivation, paths,
+unknown, scopes, incremental, model gap, determinism), `io/io.test.ts` (manifest refusals,
+verification, binding states), `storage.test.ts` (isolation from main DB, approval gate, handoff
+determinism, wrong-base/duplicate refusal, acceptance, reload), `EngineeringPrototypePage.test.tsx`
+(steps 1–10 through the UI using both real manifests).
+
+Browser (Chrome, dev server on `localhost:4001`, prototype DB only): steps 1–10 walked with the two
+real manifests; found and fixed one bug jsdom could not show — relationship and concept titles
+rendered black on the dark panel (panel base had no text color).
+
 ## Open acceptance checks
 
-- [ ] Browser walkthrough of handoff §5 steps 1–10 on an isolated origin.
-- [ ] Before → proposed → implemented → verified table from two real manifests.
-- [ ] Reload reconstructs proposal, evidence, and accepted contract version.
+- [x] Before → proposed → implemented → verified table from two real manifests.
+- [x] Reload reconstructs proposal, evidence, and accepted contract version.
+- [x] Browser walkthrough of handoff §5 steps 1–10 (dark theme, desktop width).
+- [ ] Your own walkthrough and judgment: does it feel like engineering at the level of meaning?
+- [ ] Phone-width layout and light theme.
+- [ ] Durable stage (EQ-C6) — or keep it explicitly out of scope.
 
 ## Limitations
 
-Recorded as the slice lands.
+- The model, rules, and bindings are authored for one synthetic project; nothing is inferred from
+  code, and there is no UI for editing relationships, rules, or bindings (only the contract).
+- One contract (delivery) and one rule pack. `ContractDefinition` is generic; the UI assumes delivery.
+- Standalone route and own DB: not linked to a real project, a real Change Workspace, or the
+  landscape. Promotion into the main DB is follow-up work.
+- Bindings resolve symbols only through the capture script's TypeScript AST pass; Chatdex itself
+  never reads the repository for this feature.
+- Implementation runs are matched to criteria by test-name prefix `[EQ-Cn]`; a renamed test drops
+  out of verification (shown as unmapped, never as passing).
+- Resolving a limitation on acceptance relies on its authored `refutedBy` criterion.
+- Approval freezes impact; later model edits do not re-derive an approved change.
