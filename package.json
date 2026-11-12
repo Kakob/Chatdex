@@ -22,7 +22,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:all": "vitest run && cd backend && vitest run"
+    "test:all": "vitest run && cd backend && vitest run",
+    "queue:test": "vitest run --config examples/event-queue/vitest.config.ts",
+    "queue:evidence": "node examples/event-queue/scripts/capture-evidence.mjs"
   },
   "dependencies": {
     "@simplewebauthn/browser": "^13.3.0",
