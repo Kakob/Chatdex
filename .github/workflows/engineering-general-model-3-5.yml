@@ -1,0 +1,31 @@
+name: General Engineering Model 3.5
+
+on:
+  push:
+    branches:
+      - feature/engineering-general-model-3-5
+  pull_request:
+    paths:
+      - 'src/lib/engineering/**'
+      - 'src/components/engineering/**'
+      - 'src/pages/Engineering*'
+      - 'src/pages/TodoExplorerPage*'
+      - 'src/pages/ProjectsPage.tsx'
+      - '.github/workflows/engineering-general-model-3-5.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- src/lib/engineering/modelStore.test.ts src/lib/engineering/sourceCatalog.test.ts src/lib/engineering/modelGraph.test.ts src/lib/engineering/generalModel.test.ts src/components/engineering/ModelInspector.test.tsx src/pages/EngineeringModelIntegration.test.tsx src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx src/pages/EngineeringProjectPage.test.tsx
+      - run: npm run queue:test
+      - run: npm run build
