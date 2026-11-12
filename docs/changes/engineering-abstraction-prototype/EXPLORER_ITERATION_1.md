@@ -1,5 +1,10 @@
 # Engineering explorer — iteration 1: explore before changing
 
+## Superseded by visual iteration
+
+See [Explorer iteration 1.5](./EXPLORER_ITERATION_1_5.md) for the current diagram-first mobile experience, updated walkthrough, source inspector, and acceptance checks. The original long-page layout described below is retained as historical context.
+
+
 Branch: feature/engineering-explorer-iteration-1 (based on feature/engineering-abstraction-prototype).
 Route: /engineering/explore, linked from the original /engineering workbench.
 Status: first browser-review candidate; automated and browser checks pending.
