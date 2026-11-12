@@ -4,7 +4,7 @@
 // obligations, hands off, and reconciles imported test evidence.
 
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FlaskConical, RotateCcw } from 'lucide-react';
 import { ChangePanel } from '../components/engineering/ChangePanel';
 import { ConceptTree, ConceptView } from '../components/engineering/ConceptView';
@@ -77,6 +77,7 @@ export function EngineeringPrototypePage() {
             <FlaskConical size={20} className="text-violet-600" />
             <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Engineering — {snapshot.project.name}</h1>
             <Badge tone="amber">Experimental</Badge>
+            <Link to="/engineering/explore" className={`${button} ml-2`}>Explore the system →</Link>
           </div>
           <p className={`mt-1 max-w-3xl text-sm ${muted}`}>
             Change what the system guarantees, see what follows, hand the work off, and reconcile real test evidence. Synthetic project stored only
