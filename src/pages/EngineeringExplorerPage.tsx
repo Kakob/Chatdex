@@ -208,8 +208,7 @@ export function EngineeringExplorerPage() {
 
   return (
     <div
-      className="mx-auto flex min-h-[470px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100"
-      style={{ height: 'calc(100dvh - 7.5rem)' }}
+      className="mx-auto flex h-[calc(100dvh-5.5rem)] min-h-[440px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100 sm:h-[calc(100dvh-6.5rem)]"
     >
       <header className="flex shrink-0 items-center justify-between gap-2">
         <div className="min-w-0">
@@ -239,7 +238,7 @@ export function EngineeringExplorerPage() {
             </div>
           </div>
 
-          <div className="min-h-[210px] shrink-0 lg:min-h-0" style={{ height: 'clamp(210px, 36dvh, 360px)' }}>
+          <div className="h-[clamp(185px,30dvh,280px)] shrink-0 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
             <SystemDiagram selected={selected} highlighted={currentStep.highlights} highlightedEdge={currentStep.edge} onSelect={setSelected} />
           </div>
 
