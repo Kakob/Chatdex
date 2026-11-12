@@ -30,6 +30,10 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 The companion private JSON lives in local, gitignored `research-data/mit/`, not in tracked docs. It lists source leads; it contains no imported primary-source evidence.
 
+### Model-native engineering — current proposed direction
+
+- **[Vision, architecture, capability inventory, and next five tasks](./changes/model-native-engineering/PLAN.md)** — proposed phone-to-laptop engineering loop: portable source analyzer, secure local bridge, source-derived model, guarded edits/reconciliation, concept scopes and local Git controls. This is **not yet implemented**.
+
 ### Engineering abstraction prototype handoff
 
 - [Plan, verification, demo script](./changes/engineering-abstraction-prototype/PLAN.md) — experimental `/engineering`, acceptance pending.
