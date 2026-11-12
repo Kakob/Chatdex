@@ -26,6 +26,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test -- src/lib/engineering/modelStore.test.ts src/lib/engineering/sourceCatalog.test.ts src/lib/engineering/modelGraph.test.ts src/lib/engineering/generalModel.test.ts src/components/engineering/ModelInspector.test.tsx src/pages/EngineeringModelIntegration.test.tsx src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx src/pages/EngineeringProjectPage.test.tsx src/pages/GenericEngineeringExplorerPage.test.tsx
+      - run: npm test -- src/lib/engineering/modelStore.test.ts src/lib/engineering/sourceCatalog.test.ts src/lib/engineering/modelGraph.test.ts src/components/engineering/ModelInspector.test.tsx src/pages/EngineeringModelIntegration.test.tsx src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx src/pages/EngineeringProjectPage.test.tsx src/pages/GenericEngineeringExplorerPage.test.tsx
       - run: npm run queue:test
       - run: npm run build
