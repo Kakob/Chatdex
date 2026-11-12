@@ -34,6 +34,7 @@ The companion private JSON lives in local, gitignored `research-data/mit/`, not 
 
 - [Plan, verification, demo script](./changes/engineering-abstraction-prototype/PLAN.md) — experimental `/engineering`, acceptance pending.
 - [Original prototype handoff](./changes/engineering-abstraction-prototype/CHATDEX_ENGINEERING_ABSTRACTION_PROTOTYPE_HANDOFF.md) — "refactor a guarantee, not a function".
+- [Generic engineering model and repo-backed impact (iteration 3.5)](./changes/engineering-abstraction-prototype/EXPLORER_ITERATION_3_5.md) — shared graph/inspector, code bindings over existing indexer, and generic project view.
 - [Shared engineering model and revision proposals (iteration 3)](./changes/engineering-abstraction-prototype/EXPLORER_ITERATION_3.md) — persistent local proposal history on both demo project models; runtime unchanged.
 - [Live engineering Explorers + two native example projects (iteration 2)](./changes/engineering-abstraction-prototype/EXPLORER_ITERATION_2.md) — real queue execution, Todo List reducer, and opt-in project installation.
 - [Visual Explorer iteration 1.5: mobile diagram and inspector](./changes/engineering-abstraction-prototype/EXPLORER_ITERATION_1_5.md) — experimental `/engineering/explore`, clickable diagram, code/test tabs and illustrative scenario paths; mobile review pending.
