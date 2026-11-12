@@ -144,7 +144,8 @@ export function SourceBuildWorkspace({
               <p className={'text-xs leading-5 ' + muted}>
                 For now, ChatGPT is the coding agent via a copied handoff. It is not running inside
                 this browser. Return a complete changed file, then paste it below. Future agents
-                can supply the same revision shape through a provider adapter.
+                can supply the same revision shape through a provider adapter. The copied handoff
+                includes the complete source text; review it before sending private code to a provider.
               </p>
               <button type="button" className={button} onClick={() => setHandoffVisible((v) => !v)}>
                 {handoffVisible ? 'Hide agent handoff' : 'Show agent handoff'}
