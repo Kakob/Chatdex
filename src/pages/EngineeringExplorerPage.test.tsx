@@ -109,6 +109,24 @@ describe('EngineeringExplorerPage: visual system model', () => {
     expect(within(walkthrough).getByText('Pending again')).toBeInTheDocument();
   });
 
+  it('lets a small-screen user focus the inspector and return to the full diagram', async () => {
+    const user = userEvent.setup();
+    renderExplorer();
+    const diagram = screen.getByRole('group', { name: 'Event queue system diagram' });
+    const inspector = screen.getByRole('region', { name: 'Inspector' });
+
+    await user.click(within(inspector).getByRole('button', { name: 'Expand inspector' }));
+    expect(diagram.parentElement).toHaveClass('hidden');
+    expect(within(inspector).getByRole('button', { name: 'Show diagram' })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(within(inspector).getByRole('button', { name: 'Show diagram' }));
+    expect(diagram.parentElement).not.toHaveClass('hidden');
+
+    await user.click(within(inspector).getByRole('button', { name: /Inspect implementation/ }));
+    expect(within(inspector).getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true');
+    expect(diagram.parentElement).toHaveClass('hidden');
+  });
+
   it('supports switching scenarios, previous/next navigation, and explicit non-execution labeling', async () => {
     const user = userEvent.setup();
     renderExplorer();
