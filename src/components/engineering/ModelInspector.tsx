@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowLeft, GitBranch, Pencil, RotateCcw } from 'lucide-r
 import type { EngineeringExampleKind } from '../../lib/engineering/demoProjects';
 import { exampleConceptId } from '../../lib/engineering/demoProjects';
 import { ModelImpactPreview } from './ModelImpactPreview';
+import { sourceRevisionLabel } from '../../lib/engineering/codingStore';
 import {
   proposeModelEdit,
   relationForNode,
@@ -155,6 +156,8 @@ export function ModelInspector({
   const targetId = transitionId ?? conceptId;
   const element = model.elements[targetId];
   const relations = relationForNode(model, conceptId);
+  const linkedCode = model.codeRevisions.filter((revision) => revision.targetId === targetId)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
     <section className="space-y-2" aria-label="Persistent engineering model">
@@ -197,6 +200,22 @@ export function ModelInspector({
         </details>
       )}
       {element && <ModelImpactPreview model={model} targetId={targetId} />}
+      <details aria-label="Linked source work" className="rounded-lg border border-gray-200 p-2 text-xs dark:border-gray-700">
+        <summary className="cursor-pointer font-semibold">Linked code revisions ({linkedCode.length})</summary>
+        {linkedCode.length === 0 ? (
+          <p className={'mt-2 ' + muted}>No staged code changes for this model entity. Use Code → Build through this model to create one.</p>
+        ) : (
+          <ol className="mt-2 space-y-2">
+            {linkedCode.slice(0, 8).map((revision) => (
+              <li key={revision.id} className="border-l-2 border-violet-300 pl-2 dark:border-violet-700">
+                <p className="font-medium">{revision.actor === 'agent' ? 'Agent-supplied' : 'Human'} · {sourceRevisionLabel(revision, model.codeWrites).replaceAll('-', ' ')}</p>
+                <p className={muted}>{revision.path} · {revision.intent}</p>
+                <p className={muted}>Model source code change is not automatically verified by tests.</p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </details>
       <p className={'text-[11px] leading-4 ' + muted}>
         Only design proposals are stored here. Live code, tests and queue/task behavior remain unchanged. Proposals are local to this browser.
       </p>
