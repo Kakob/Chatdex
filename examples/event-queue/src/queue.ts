@@ -20,6 +20,9 @@
  * - Ordering. First delivery follows enqueue order. A job returning from an
  *   expired lease is claimable again in its original position, so there is
  *   no strict FIFO guarantee across retries.
+ * - Configurable retry delay. With retryBackoffMs > 0, each failed claim
+ *   schedules its next eligible claim using bounded exponential backoff.
+ *   The default 0ms retains immediate retry eligibility.
  * - Memory only. All state, including leases, lives in this process. Jobs
  *   survive a worker failure only while the queue process keeps running; a
  *   queue process restart loses every job.
@@ -162,7 +165,7 @@ export class EventQueue {
   }
 
   /**
-   * Lease the oldest pending job to `workerId` for `leaseMs`.
+   * Lease the oldest eligible pending job to `workerId` for `leaseMs`.
    *
    * The job stays in the queue (state `leased`) until it is acked with the
    * returned `leaseToken`. Expired leases are reaped first, so a job whose
@@ -222,7 +225,8 @@ export class EventQueue {
 
   /**
    * End every lease that has expired at `now`. Each such job returns to
-   * `pending`, or moves to `dead_lettered` if it has used all `maxAttempts`.
+   * `pending` (possibly scheduled for a later eligible claim), or moves to
+   * `dead_lettered` after using all configured attempts.
    * Resolves with the number of expired leases handled.
    */
   async reapExpired(now: number = this.clock.now()): Promise<number> {
