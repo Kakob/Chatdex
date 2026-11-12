@@ -30,6 +30,10 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 The companion private JSON lives in local, gitignored `research-data/mit/`, not in tracked docs. It lists source leads; it contains no imported primary-source evidence.
 
+### Engineering abstraction prototype handoff
+
+- [Original prototype handoff](./changes/engineering-abstraction-prototype/CHATDEX_ENGINEERING_ABSTRACTION_PROTOTYPE_HANDOFF.md) — "refactor a guarantee, not a function"; proposed, not started. Checkpoint 0 adds `PLAN.md` beside it.
+
 ### Everything else
 
 | Folder | What lives there |
