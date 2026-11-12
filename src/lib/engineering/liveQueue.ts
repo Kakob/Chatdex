@@ -29,16 +29,20 @@ export interface LiveQueueSnapshot {
   currentClaimId: string | null;
   leaseMs: number;
   maxAttempts: number;
+  retryBackoffMs: number;
   pendingCount: number;
+  readyCount: number;
+  scheduledCount: number;
   leasedCount: number;
   deadLetterCount: number;
 }
 
 const LEASE_MS = 5_000;
 const MAX_ATTEMPTS = 3;
+const RETRY_BACKOFF_MS = 1_000;
 
 export class LiveQueueSession {
-  private readonly harness = createHarness({ leaseMs: LEASE_MS, maxAttempts: MAX_ATTEMPTS });
+  private readonly harness = createHarness({ leaseMs: LEASE_MS, maxAttempts: MAX_ATTEMPTS, retryBackoffMs: RETRY_BACKOFF_MS });
   private readonly jobIds: string[] = [];
   private readonly completedIds: string[] = [];
   private readonly trace: QueueTraceEvent[] = [];
@@ -60,7 +64,10 @@ export class LiveQueueSession {
       currentClaimId: this.active?.id ?? null,
       leaseMs: LEASE_MS,
       maxAttempts: MAX_ATTEMPTS,
+      retryBackoffMs: RETRY_BACKOFF_MS,
       pendingCount: jobs.filter((job) => job.state === 'pending').length,
+      readyCount: jobs.filter((job) => job.state === 'pending' && (job.availableAt ?? 0) <= this.harness.clock.now()).length,
+      scheduledCount: jobs.filter((job) => job.state === 'pending' && (job.availableAt ?? 0) > this.harness.clock.now()).length,
       leasedCount: jobs.filter((job) => job.state === 'leased').length,
       deadLetterCount: jobs.filter((job) => job.state === 'dead_lettered').length,
     };
@@ -122,14 +129,23 @@ export class LiveQueueSession {
   async expireLeases(): Promise<LiveQueueSnapshot> {
     if (this.active) throw new Error('Finish or fail the active worker before advancing past its lease.');
     const before = this.snapshot();
-    await this.harness.advance(LEASE_MS + 1);
+    const scheduled = before.jobs.filter((job) => job.state === 'pending' && (job.availableAt ?? 0) > before.atMs);
+    const advanceMs = before.leasedCount > 0 ? LEASE_MS + 1 :
+      scheduled.length > 0 ? Math.min(...scheduled.map((job) => job.availableAt! - before.atMs)) + 1 : LEASE_MS + 1;
+    await this.harness.advance(advanceMs);
     const after = this.snapshot();
     const newlyDead = after.jobs.filter((j) => j.state === 'dead_lettered' && before.jobs.some((b) => b.id === j.id && b.state !== 'dead_lettered'));
     const newlyPending = after.jobs.filter((j) => j.state === 'pending' && before.jobs.some((b) => b.id === j.id && b.state === 'leased'));
     if (newlyDead.length) {
       this.record('Attempts exhausted', newlyDead.map((j) => j.id).join(', ') + ' moved into the real dead-letter state.', 'dead-letter', ['retry', 'dead-letter'], 'dead-letter');
     } else if (newlyPending.length) {
-      this.record('Lease expired → pending', newlyPending.map((j) => j.id).join(', ') + ' became claimable again.', 'pending', ['leased', 'retry', 'pending'], 'requeue');
+      const waiting = newlyPending.filter((job) => (job.availableAt ?? 0) > after.atMs);
+      this.record(waiting.length ? 'Lease expired → scheduled retry' : 'Lease expired → pending',
+        waiting.length ? waiting.map((job) => job.id + ' eligible at t=' + job.availableAt).join(', ') + 'ms.':
+          newlyPending.map((job) => job.id).join(', ') + ' became claimable again.',
+        'pending', ['leased', 'retry', 'pending'], 'requeue');
+    } else if (scheduled.length && after.readyCount > before.readyCount) {
+      this.record('Retry delay elapsed', 'A scheduled job is now eligible to be claimed.', 'pending', ['retry', 'pending'], 'requeue');
     } else {
       this.record('Clock advanced', 'No leased job needed recovery at this time.', 'retry', ['retry']);
     }
