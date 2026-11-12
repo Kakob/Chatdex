@@ -88,7 +88,7 @@ const PARTS: Record<DiagramNodeId, Part> = {
     title: 'Retry',
     role: 'Recovery mechanism',
     summary: 'When a lease expires, unfinished work can become pending again.',
-    detail: 'reapExpired() examines leased jobs and either releases them for another attempt or dead-letters them if the configured attempt limit is exhausted.', criterion: 'EQ-C2',
+    detail: 'reapExpired() examines expired leases, dead-letters exhausted jobs, or schedules eligible retry time for pending jobs. With the new retryBackoffMs option, the live queue uses 1s, then 2s exponential wait rather than immediate redelivery.', criterion: 'EQ-C2',
     testDescription: 'A job can be reclaimed after its lease expires.',
   },
   'dead-letter': {
