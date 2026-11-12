@@ -84,6 +84,12 @@ export function projectGraph(model: ProjectEngineeringModel): EngineeringGraph {
     .map((edge) => edge.id);
   const edges = model.transitions.filter((edge) =>
     ids.has(edge.fromConceptId) && ids.has(edge.toConceptId)
+  ).sort((a, b) =>
+    a.fromConceptId.localeCompare(b.fromConceptId) ||
+    a.toConceptId.localeCompare(b.toConceptId) ||
+    a.kind.localeCompare(b.kind) ||
+    a.title.localeCompare(b.title) ||
+    a.id.localeCompare(b.id)
   ).map((edge) => ({
     id: edge.id,
     fromId: edge.fromConceptId,
