@@ -142,6 +142,48 @@ describe('EventQueue', () => {
     expect(() => new EventQueue({ maxAttempts: 0 })).toThrow(/maxAttempts/);
     expect(() => new EventQueue({ maxAttempts: 1.5 })).toThrow(/maxAttempts/);
   });
+
+  it('delays retries exponentially without changing job identity or ack semantics', async () => {
+    const clock = new ManualClock();
+    const queue = new EventQueue({ clock, maxAttempts: 4, retryBackoffMs: 1_000 });
+    const id = await queue.enqueue({ task: 'image' });
+    const first = await queue.claim('worker-a', 100);
+    expect(first?.attempt).toBe(1);
+    clock.advance(100);
+    expect(await queue.reapExpired()).toBe(1);
+    expect(queue.inspect(id)).toMatchObject({ id, state: 'pending', attempts: 1, availableAt: 1_100 });
+    expect(await queue.claim('worker-b', 100)).toBeNull();
+    clock.advance(999);
+    expect(await queue.claim('worker-b', 100)).toBeNull();
+    clock.advance(1);
+    const second = await queue.claim('worker-b', 100);
+    expect(second).toMatchObject({ id, attempt: 2 });
+    clock.advance(100);
+    await queue.reapExpired();
+    expect(queue.inspect(id)).toMatchObject({ state: 'pending', attempts: 2, availableAt: 3_200 });
+    clock.advance(1_999);
+    expect(await queue.claim('worker-c', 100)).toBeNull();
+    clock.advance(1);
+    const third = await queue.claim('worker-c', 100);
+    expect(third?.attempt).toBe(3);
+    if (third) await queue.ack(third.id, third.leaseToken);
+    expect(queue.inspect(id)).toBeNull();
+  });
+
+  it('preserves immediate retry by default and rejects invalid backoff values', async () => {
+    const clock = new ManualClock();
+    const queue = new EventQueue({ clock });
+    const id = await queue.enqueue('legacy');
+    expect(await queue.claim('a', 100)).not.toBeNull();
+    clock.advance(100);
+    await queue.reapExpired();
+    const next = await queue.claim('b', 100);
+    expect(next).toMatchObject({ id, attempt: 2 });
+    for (const invalid of [-1, 0.5, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() => new EventQueue({ retryBackoffMs: invalid })).toThrow(/retryBackoffMs/);
+    }
+  });
+
 });
 
 describe('workOnce', () => {
