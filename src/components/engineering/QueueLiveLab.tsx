@@ -12,9 +12,9 @@ interface Props {
 
 export function QueueLiveLab({ state, busy, error, onAction }: Props) {
   const last = state.events.at(-1);
-  const canClaim = state.pendingCount > 0 && !state.currentClaimId;
+  const canClaim = state.readyCount > 0 && !state.currentClaimId;
   const canFinish = Boolean(state.currentClaimId);
-  const canExpire = !canFinish && state.leasedCount > 0;
+  const canExpire = !canFinish && (state.leasedCount > 0 || state.scheduledCount > 0);
   const commands: { action: QueueAction; label: string; disabled?: boolean }[] = [
     { action: 'enqueue', label: '+ Job' },
     { action: 'claim', label: 'Claim', disabled: !canClaim },
@@ -27,7 +27,7 @@ export function QueueLiveLab({ state, busy, error, onAction }: Props) {
     <section className="shrink-0 rounded-xl border border-emerald-200 bg-emerald-50/50 p-2.5 text-gray-900 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-gray-100" aria-label="Live queue controls">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
         <p className="text-xs font-semibold"><span className="mr-1 text-emerald-700 dark:text-emerald-400">●</span> Running actual EventQueue</p>
-        <span className={'text-[10px] tabular-nums ' + muted}>t={state.atMs}ms · lease {state.leaseMs}ms</span>
+        <span className={'text-[10px] tabular-nums ' + muted}>t={state.atMs}ms · lease {state.leaseMs}ms · backoff {state.retryBackoffMs}ms</span>
       </div>
       <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="Queue commands">
         {commands.map(({ action, label, disabled }) => (
@@ -42,6 +42,8 @@ export function QueueLiveLab({ state, busy, error, onAction }: Props) {
       </div>
       <div aria-label="Observed queue state" className="flex flex-wrap items-center gap-1.5 text-[11px]">
         <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Pending: <b>{state.pendingCount}</b></span>
+        <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Ready: <b>{state.readyCount}</b></span>
+        <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Waiting: <b>{state.scheduledCount}</b></span>
         <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Leased: <b>{state.leasedCount}</b></span>
         <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Done: <b>{state.completedIds.length}</b></span>
         <span className="rounded-md bg-white px-2 py-1 dark:bg-gray-800">Dead: <b>{state.deadLetterCount}</b></span>
@@ -50,7 +52,7 @@ export function QueueLiveLab({ state, busy, error, onAction }: Props) {
         <div aria-label="Job observations" className="mt-1.5 flex max-h-16 flex-wrap gap-1.5 overflow-y-auto">
           {state.jobs.map((job) => (
             <span key={job.id} className="rounded bg-white px-2 py-0.5 font-mono text-[10px] dark:bg-gray-800">
-              {job.id}: {job.state} · try {job.attempts}
+              {job.id}: {job.state} · try {job.attempts}{job.state === 'pending' && (job.availableAt ?? 0) > state.atMs ? ' · next t=' + job.availableAt + 'ms' : ''}
             </span>
           ))}
         </div>
@@ -65,7 +67,7 @@ export function QueueLiveLab({ state, busy, error, onAction }: Props) {
         </details>
       </div>
       {error && <p role="alert" className="mt-1 text-xs text-red-700 dark:text-red-300">{error}</p>}
-      <p className={'mt-1 text-[10px] ' + muted}>Real queue methods and inspected state; only the worker crash is simulated by abandoning its lease. Nothing is written to your projects.</p>
+      <p className={'mt-1 text-[10px] ' + muted}>Real queue methods, exponential backoff and inspected state; worker loss is simulated by abandoning its lease. No user projects are written.</p>
     </section>
   );
 }
