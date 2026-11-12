@@ -305,6 +305,14 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
               <div className="space-y-3 text-sm leading-6">
                 <p className="font-medium">{part.summary}</p>
                 <p className="text-gray-600 dark:text-gray-300">{part.detail}</p>
+                {mode === 'live' && selected === 'retry' && (
+                  <section aria-label="Observed retry implementation" className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-xs leading-5 dark:border-emerald-900 dark:bg-emerald-950/20">
+                    <p className="font-semibold">Observed from the running EventQueue</p>
+                    <p>Initial retry backoff: <b>{live.retryBackoffMs}ms</b> · maximum attempts: <b>{live.maxAttempts}</b></p>
+                    <p>Pending jobs: <b>{live.pendingCount}</b> · ready: <b>{live.readyCount}</b> · waiting: <b>{live.scheduledCount}</b></p>
+                    <p className={muted}>Live harness and inspected job state, not a claim that every repository file is reconciled.</p>
+                  </section>
+                )}
                 {projectId && (
                   <ModelInspector key={selected} kind="event-queue" nodeId={selected} projectId={projectId} model={engineeringModel} onRefresh={refreshModel} />
                 )}
