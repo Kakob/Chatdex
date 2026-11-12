@@ -131,7 +131,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
           <div role="tablist" aria-label="Todo inspector views" className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
             {(['understand', 'code', 'tests'] as const).map((name) => (
               <button key={name} type="button" role="tab" aria-selected={name === tab} onClick={() => setTab(name)}
-                className={'min-h-11 flex-1 border-b-2 text-sm capitalize ' + (name === tab ? 'border-violet-600 font-semibold text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500')}>{name}</button>
+                className={'min-h-11 flex-1 border-b-2 text-sm capitalize ' + (name === tab ? 'border-violet-600 font-semibold text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500')}>{name.charAt(0).toUpperCase() + name.slice(1)}</button>
             ))}
           </div>
           <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3" role="tabpanel" key={selected + tab}>
