@@ -269,5 +269,6 @@ function snapshot(job: StoredJob): JobSnapshot {
     attempts: job.attempts,
   };
   if (job.lease) view.lease = { workerId: job.lease.workerId, expiresAt: job.lease.expiresAt };
+  if (job.state === 'pending' && job.availableAt > job.enqueuedAt) view.availableAt = job.availableAt;
   return view;
 }
