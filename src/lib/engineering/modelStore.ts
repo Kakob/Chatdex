@@ -29,6 +29,7 @@ export interface ModelProposalEvent {
   targetId: string;
   targetKind: ModelTargetKind;
   action: ModelProposalAction;
+  sequence: number;
   /** Original project/model content at the first proposal, not last preview. */
   baseline: ModelWording;
   proposed: ModelWording;
@@ -82,7 +83,7 @@ function same(a: ModelWording, b: ModelWording): boolean {
 function summarize(
   id: string, kind: ModelTargetKind, current: ModelWording, events: ModelProposalEvent[],
 ): ModelElement {
-  const revisions = [...events].sort((a, b) => a.at.getTime() - b.at.getTime() || a.id.localeCompare(b.id));
+  const revisions = [...events].sort((a, b) => a.sequence - b.sequence || a.id.localeCompare(b.id));
   const latest = revisions.at(-1);
   const active = latest?.action === 'propose' ? latest : null;
   return {
@@ -172,7 +173,7 @@ export async function proposeModelEdit(projectId: string, targetId: string, next
   const baseline = active?.action === 'propose' ? active.baseline : target.wording;
   const event: ModelProposalEvent = {
     id: generateId(), projectId, targetId, targetKind: target.kind,
-    action: 'propose', baseline, proposed, at: new Date(),
+    action: 'propose', sequence: history.length + 1, baseline, proposed, at: new Date(),
   };
   await engineeringModelDb.proposals.add(event);
   return event;
@@ -186,7 +187,7 @@ export async function withdrawModelEdit(projectId: string, targetId: string): Pr
   const active = current.revisions.at(-1)!;
   const event: ModelProposalEvent = {
     id: generateId(), projectId, targetId, targetKind: target.kind, action: 'withdraw',
-    baseline: active.baseline, proposed: active.proposed, at: new Date(),
+    sequence: history.length + 1, baseline: active.baseline, proposed: active.proposed, at: new Date(),
   };
   await engineeringModelDb.proposals.add(event);
   return event;
