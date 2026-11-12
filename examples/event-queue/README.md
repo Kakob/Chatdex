@@ -42,6 +42,19 @@ expires, or `dead_lettered` once every allowed attempt has expired.
   from an expired lease is claimable again from its original position, so delivery order
   across retries is not a global FIFO.
 
+### Optional exponential retry backoff
+
+The queue now supports `retryBackoffMs` (default `0`, preserving immediate legacy retries).
+When positive, the first expired claim schedules a retry after the base delay, and each
+later expired claim doubles the wait (capped at 24 hours). Jobs stay in `pending`
+but are not claimable until their `availableAt` time. `inspect()` can surface the
+next eligible time, allowing an engineering UI to distinguish **ready** work
+from **waiting** work. Acknowledgment and dead-letter behavior are unchanged.
+
+The Chatdex live-queue example configures a **1,000ms initial backoff** with
+three allowed claims and a manual test clock; advance the clock a second
+time after an expired lease to make its scheduled retry eligible.
+
 ## Layout
 
 | Path | Contents |
