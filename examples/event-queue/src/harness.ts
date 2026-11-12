@@ -33,6 +33,8 @@ export interface HarnessOptions {
   leaseMs?: number;
   /** Claims allowed per job before it is dead-lettered. Default: the queue's default. */
   maxAttempts?: number;
+  /** Optional exponential retry delay, default 0ms. */
+  retryBackoffMs?: number;
 }
 
 export interface Harness {
@@ -52,7 +54,7 @@ export interface Harness {
 
 export function createHarness(opts: HarnessOptions = {}): Harness {
   const clock = new ManualClock(0);
-  const queue = new EventQueue({ clock, maxAttempts: opts.maxAttempts });
+  const queue = new EventQueue({ clock, maxAttempts: opts.maxAttempts, retryBackoffMs: opts.retryBackoffMs });
   const leaseMs = opts.leaseMs ?? DEFAULT_LEASE_MS;
 
   return {
