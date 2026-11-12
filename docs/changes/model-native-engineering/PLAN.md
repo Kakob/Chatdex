@@ -1,6 +1,6 @@
 # Model-native engineering platform — vision, architecture, and first five tasks
 
-**Status:** Proposed — not implemented  
+**Status:** In progress — Task 1 implemented and CI-validated; Tasks 2–5 not implemented  
 **Date:** 2026-11-12  
 **Working branch at time of assessment:** `feature/engineering-shared-code-workspace`  
 **Primary purpose:** Make Chatdex a practical environment for creating, understanding, modifying, verifying, and maintaining *real* software through a persistent model, initially from a phone connected privately to the user's laptop.  
@@ -251,6 +251,45 @@ Each task is a useful tested deliverable, not a separate UI demo. Finish with a 
 - Existing data untouched outside the explicitly approved project. No LLM required.
 
 **Implementation sequencing note:** Task 5 combines concept semantics and Git/verification to reach the *complete* dogfoodable loop in five tasks, but it may be internally split into smaller commits. The model-scoped edit + reconciliation in Task 4 is the first critical engineering milestone. Task 2 can begin with a trivial two-file repo while Task 1's analyzer is under development.
+
+## 7A. Task 1 outcome — portable deterministic TypeScript analyzer (2026-11-12)
+
+**Implemented:** Source-to-structural-graph analysis only. **Not implemented:** phone/laptop connection, code writing, model-to-code transforms, persistent source-entity identity through renames, concept resolution/reconciliation, model-directed change checks, or Explorer UI integration.
+
+**Branch:** [`feature/engineering-core-analyzer-1`](https://github.com/Kakob/Chatdex/tree/feature/engineering-core-analyzer-1), based on `feature/engineering-shared-code-workspace`. Existing product data and `main` were not modified.
+
+**New files:**
+- `src/lib/engineering/core/contracts.ts`: portable `SourceSnapshot`, `SourceEntity`, `SourceRelation`, `DerivedGraph`, diagnostics, source ranges and noncryptographic fingerprints; sorted bounded inputs, no absolute/traversal paths.
+- `src/lib/engineering/core/analyzeTypeScript.ts`: TypeScript compiler-backed in-memory analyzer. Handles `.ts`, `.tsx`, `.mts` and `.cts` inputs, including local relative imports (with JS-extension mapping), declarations, containment, local exports, and checker-resolvable cross-file calls and references. Does not access Node filesystems, GitHub, browser storage or LLMs.
+- `src/lib/engineering/core/index.ts`: API re-exports for later browser and CLI consumers.
+- `src/lib/engineering/core/analyzeTypeScript.test.ts`: generic input/ordering, type and class members, cross-file relationships, deterministic body changes, syntax/unresolved import diagnostics, TSX, invalid paths/limits, and actual Event Queue/Todo source read by the test harness.
+- `.github/workflows/engineering-core-analyzer.yml`: branch validation.
+
+**Validation:** [Engineering-core CI run](https://github.com/Kakob/Chatdex/actions/runs/43328647951) passed typecheck, lint, 14 focused analyzer/legacy-graph/source-binding tests, actual Event Queue tests and production build. Lint reports one pre-existing nonblocking React-hook warning in the existing `BoundSourceInspector`, outside Task 1 scope. CI validates that the module compiles and the test harness can execute it; a real mobile-browser visualization is reserved for Task 3.
+
+**Usage example (in code; no UI yet):**
+
+```typescript
+import { analyzeTypeScript } from './src/lib/engineering/core';
+
+const graph = analyzeTypeScript({
+  revision: 'optional caller-supplied revision',
+  files: [
+    { path: 'src/math.ts', text: 'export function add(a: number, b: number) { return a + b; }' },
+  ],
+});
+console.log(graph.entities, graph.relations, graph.diagnostics);
+```
+
+**Honest limitations:**
+- Source facts are derived at a particular snapshot; no automatic reparse after external edits yet.
+- Snapshot and declaration fingerprints are **noncryptographic** change indicators; do not use them as secure integrity or Git write guards.
+- Source-entity IDs are deterministic for stable path/qualified name, but renames/moves and overload position shifts may change IDs. Cross-revision entity matching is not implemented.
+- Unavailable external packages and inferred library types are not modeled. Only compiler syntactic diagnostics and explicit missing relative imports are emitted; this is **not a TypeScript typecheck**, and call/reference edges are limited to resolved local symbols.
+- Source graphs are not software concepts: no purpose, state/action specification, or behavior verification is inferred.
+- The current Explorer still shows its authored model. Task 3 will wire the new derived graph to UI; Task 4 will use it to reconcile real source writes.
+
+**Next authorized task remains Task 2**, the secure read-only laptop workspace bridge; it was not implemented as part of Task 1.
 
 ## 8. Exclusions and decision register
 
