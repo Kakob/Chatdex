@@ -13,6 +13,10 @@ import { EngineeringPrototypePage } from './EngineeringPrototypePage';
 const BASELINE_FILE = 'f354cf78ffad.json';
 const BASELINE_SHA = 'f354cf78ffad2603f0860833fc724bf0199b104c';
 const baselineText = readFileSync(resolve(__dirname, '../../examples/event-queue/evidence', BASELINE_FILE), 'utf8');
+// Implemented outside Chatdex from the exported handoff (merge a59dbef).
+const IMPLEMENTATION_FILE = '8f03376bb9d1.json';
+const IMPLEMENTATION_SHA = '8f03376bb9d1fcdb6aa6ec30dffe403388977a8c';
+const implementationText = readFileSync(resolve(__dirname, '../../examples/event-queue/evidence', IMPLEMENTATION_FILE), 'utf8');
 
 function renderPage(url = '/engineering') {
   return render(
@@ -93,6 +97,60 @@ describe('EngineeringPrototypePage', () => {
     expect(screen.getByText('approved')).toBeInTheDocument();
     expect(within(screen.getByTestId('binding-bind-retry-reap')).getByText('Not present at this revision')).toBeInTheDocument();
     expect(screen.getByTestId('handoff-preview').textContent).toContain(BASELINE_SHA);
+  });
+
+  it('reconciles the real implementation evidence (8f03376): before/after, stale bindings, explicit acceptance, reload', async () => {
+    const user = userEvent.setup();
+    renderPage('/engineering?concept=eq-worker');
+    await screen.findByRole('heading', { name: 'Worker / claim / process / ack', level: 1 });
+
+    await user.upload(screen.getByLabelText('Evidence manifest file'), new File([baselineText], BASELINE_FILE));
+    await screen.findByTestId(`run-${BASELINE_SHA.slice(0, 12)}`);
+    // Pin workOnce to its baseline observation.
+    await user.click(within(screen.getByTestId('binding-bind-worker-workonce')).getByRole('button', { name: /Confirm at f354cf78ffad/ }));
+    expect(await within(screen.getByTestId('binding-bind-worker-workonce')).findByText('Confirmed at this revision')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: /Ack after processing/ }));
+    await user.click(screen.getByRole('radio', { name: /Worker failure/ }));
+    await user.click(screen.getByRole('button', { name: 'Save as draft change' }));
+    await user.click(await screen.findByRole('button', { name: 'Approve change' }));
+    await screen.findByText('approved');
+
+    // A manifest built on another base is refused for the approved change.
+    await user.selectOptions(screen.getByLabelText('Import as'), 'implementation');
+    const wrongBase = JSON.stringify({ ...JSON.parse(implementationText), revision: { ...JSON.parse(implementationText).revision, baseSha: 'c'.repeat(40) } });
+    await user.upload(screen.getByLabelText('Evidence manifest file'), new File([wrongBase], 'wrong.json'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('approved change starts from f354cf78ffad');
+
+    await user.upload(screen.getByLabelText('Evidence manifest file'), new File([implementationText], IMPLEMENTATION_FILE));
+    const run = await screen.findByTestId(`run-${IMPLEMENTATION_SHA.slice(0, 12)}`);
+    expect(within(run).getByText(/24 passed · 0 failed/)).toBeInTheDocument();
+    expect(within(run).getAllByText('agent-reported').length).toBeGreaterThan(0);
+
+    // Before → proposed → implemented → verified, from two real manifests.
+    const c5 = screen.getByTestId('criterion-EQ-C5');
+    expect(within(c5).getByText('failed')).toBeInTheDocument();
+    expect(within(c5).getByText('passed')).toBeInTheDocument();
+    expect(within(c5).getByText('supported')).toBeInTheDocument();
+    const c6 = screen.getByTestId('criterion-EQ-C6');
+    expect(within(c6).getByText('not required')).toBeInTheDocument();
+    expect(within(c6).getByText('unverified')).toBeInTheDocument();
+
+    // Bindings move to the new revision without silently becoming current.
+    expect(within(screen.getByTestId('binding-bind-worker-workonce')).getByText(/Stale — confirmed at an older revision · text changed/)).toBeInTheDocument();
+    expect(within(screen.getByTestId('binding-bind-worker-claim')).getByText('Observed, not yet confirmed')).toBeInTheDocument();
+
+    // Explicit acceptance creates contract v2 and resolves the refuted limitation.
+    await user.click(screen.getByRole('button', { name: /Accept new understanding at 8f03376bb9d1/ }));
+    cleanup();
+    renderPage('/engineering?concept=eq-delivery');
+    expect(await screen.findByRole('heading', { name: 'Delivery guarantee', level: 1 })).toBeInTheDocument();
+    expect(screen.getByText('v2')).toBeInTheDocument();
+    expect(screen.getAllByText(/survive worker failure while the queue process runs/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/all required criteria supported/)).toBeInTheDocument();
+    expect(screen.getByText('Jobs are removed when dispatched; no failure after dispatch is survived')).toHaveClass('line-through');
+    expect(screen.getByText('A job is lost if its worker fails after receiving it and before completing')).toHaveClass('line-through');
+    expect(within(screen.getByTestId('binding-bind-delivery-dequeue')).getByText('Not present at this revision')).toBeInTheDocument();
   });
 
   it('refuses re-importing the same evidence file and shows why', async () => {

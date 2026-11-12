@@ -1,0 +1,592 @@
+{
+  "schema": "chatdex.engineering.evidence/v1",
+  "repository": {
+    "remote": "https://github.com/Kakob/Chatdex",
+    "root": "examples/event-queue"
+  },
+  "revision": {
+    "sha": "8f03376bb9d1fcdb6aa6ec30dffe403388977a8c",
+    "dirty": false,
+    "dirtyScope": "examples/event-queue",
+    "branch": "eq/ack-after-processing",
+    "baseSha": "f354cf78ffad2603f0860833fc724bf0199b104c"
+  },
+  "changedPaths": [
+    "examples/event-queue/README.md",
+    "examples/event-queue/src/harness.ts",
+    "examples/event-queue/src/queue.ts",
+    "examples/event-queue/src/worker.ts",
+    "examples/event-queue/test/delivery.test.ts",
+    "examples/event-queue/test/queue.test.ts"
+  ],
+  "uncommittedPaths": [],
+  "command": "npx vitest run --config examples/event-queue/vitest.config.ts --reporter=json",
+  "environment": {
+    "node": "v22.16.0",
+    "platform": "darwin",
+    "vitest": "4.1.1"
+  },
+  "capturedAt": "2026-11-12T08:38:48.970Z",
+  "tests": [
+    {
+      "id": "EQ-C0",
+      "name": "[EQ-C0] dispatches jobs in enqueue order on first delivery",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 1.433
+    },
+    {
+      "id": "EQ-C1",
+      "name": "[EQ-C1] does not dispatch a completed job again",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.283
+    },
+    {
+      "id": "EQ-C2",
+      "name": "[EQ-C2] a claimed but unacknowledged job can be reclaimed after its lease expires",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.688
+    },
+    {
+      "id": "EQ-C3",
+      "name": "[EQ-C3] a stale lease token cannot acknowledge a newer claim",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.624
+    },
+    {
+      "id": "EQ-C4",
+      "name": "[EQ-C4] lease expiry can cause duplicate processing (documented, demonstrated)",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.188
+    },
+    {
+      "id": "EQ-C5",
+      "name": "[EQ-C5] an accepted job survives a worker failure before completion",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.247
+    },
+    {
+      "id": "EQ-C7",
+      "name": "[EQ-C7] retries are bounded; exhausted jobs are dead-lettered, not silently dropped",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.344
+    },
+    {
+      "id": null,
+      "name": "a redelivered job keeps its original position (no strict FIFO across retries)",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.141
+    },
+    {
+      "id": null,
+      "name": "ack rejects an expired lease even before it is reaped",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.24
+    },
+    {
+      "id": null,
+      "name": "ack rejects unknown, pending, and already-acked jobs",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.602
+    },
+    {
+      "id": null,
+      "name": "ack with the current token removes the job",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.175
+    },
+    {
+      "id": null,
+      "name": "acks on success",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.215
+    },
+    {
+      "id": null,
+      "name": "claim leases the job instead of removing it",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.266
+    },
+    {
+      "id": null,
+      "name": "claim on an empty queue returns null",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.073
+    },
+    {
+      "id": null,
+      "name": "claim reaps expired leases itself, without a separate reaper",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.122
+    },
+    {
+      "id": null,
+      "name": "claim rejects an empty worker id or a non-positive lease",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.821
+    },
+    {
+      "id": null,
+      "name": "dead-letters a job when its last allowed lease expires",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.303
+    },
+    {
+      "id": null,
+      "name": "does not ack when the handler throws",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.107
+    },
+    {
+      "id": null,
+      "name": "enqueue returns a deterministic job id",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.938
+    },
+    {
+      "id": null,
+      "name": "passes worker id and lease length to claim",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.075
+    },
+    {
+      "id": null,
+      "name": "reapExpired returns expired leases to pending and counts them",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.423
+    },
+    {
+      "id": null,
+      "name": "rejects an invalid maxAttempts",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 1.046
+    },
+    {
+      "id": null,
+      "name": "returns idle on an empty queue",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.052
+    },
+    {
+      "id": null,
+      "name": "uses the supplied id factory, lease token factory, and clock",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.494
+    }
+  ],
+  "symbols": [
+    {
+      "path": "src/harness.ts",
+      "symbol": "Harness",
+      "startLine": 38,
+      "endLine": 51,
+      "sha256": "4b03083dfa352dc16627b009b9bdaa98973470cba8964b2df3babd4e2da97f2d"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "HarnessOptions",
+      "startLine": 31,
+      "endLine": 36,
+      "sha256": "4c0a6e0b4b754874b78e1aea59aefb4e47fc40323cfbe5c7b8e465a9232e0ef6"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock",
+      "startLine": 14,
+      "endLine": 29,
+      "sha256": "1251005772a655dd1ad52d305b6759f6ba24dfdf3a2ff181c38ed97e99967ee8"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.advance",
+      "startLine": 25,
+      "endLine": 28,
+      "sha256": "d1e7cb4240e5653aeebae056471b4dac7e0bc5590b3bb79af3074dd85e2e9881"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.constructor",
+      "startLine": 17,
+      "endLine": 19,
+      "sha256": "8e1a9e8beb130dc05307477d3394cce93a2a6753ddf0c151cef89e8952834ffd"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.current",
+      "startLine": 15,
+      "endLine": 15,
+      "sha256": "e88ebae75d409d7172783688c6cd6073a964cff3df7c77830e253c138a4375ce"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.now",
+      "startLine": 21,
+      "endLine": 23,
+      "sha256": "aee403ac145ba15119ee2cc966600c6697f68e2b60ce0fe72a22e8e98ed18cb8"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "createHarness",
+      "startLine": 53,
+      "endLine": 71,
+      "sha256": "8e968e90ca85858bffbe8211b8f58f850b41c7178d4cfe6e62ae7a1e726c5bf4"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "AckRejectedError",
+      "startLine": 76,
+      "endLine": 86,
+      "sha256": "d83b9d875ccb1e01a061490dc7a2b831c3098bfdda1d3207394a017c5289ab7a"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "AckRejectedError.constructor",
+      "startLine": 80,
+      "endLine": 85,
+      "sha256": "1b7ca3e74b2ec17460da3d626618a68b784a69e398ad3eaca3df94fddd7d6cdc"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "AckRejectedError.jobId",
+      "startLine": 78,
+      "endLine": 78,
+      "sha256": "811c261e530ac7cc7266234a6810f8fe21d10111bdfe3d64b4dc5a7895e11032"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "AckRejectedError.reason",
+      "startLine": 77,
+      "endLine": 77,
+      "sha256": "e817f8b29194bb600b76540f559dfde53c83eaf58ff6b34c2c09b3ab8a5eefac"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "AckRejection",
+      "startLine": 73,
+      "endLine": 73,
+      "sha256": "6b3be9988f142276d4546a9ecd5ce4a490e7799277d948cb982f19f5a1722c49"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "ClaimedJob",
+      "startLine": 41,
+      "endLine": 49,
+      "sha256": "2cf7e0bf650bd1e507c36267c18c6b217e395ad2e50b8ea99377c5a8596e4533"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "Clock",
+      "startLine": 29,
+      "endLine": 31,
+      "sha256": "53db82fbd89f26b6dc65fbbfef8500caa8814bfa11bc74ed7ae3ee0feb8ca03c"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "DEFAULT_MAX_ATTEMPTS",
+      "startLine": 88,
+      "endLine": 88,
+      "sha256": "88102ae5e86cb32507111fa99e5a9c9ebab6e05873d875d867e6041446cb9943"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue",
+      "startLine": 121,
+      "endLine": 243,
+      "sha256": "2cbfca2b0e2833ae4e804121dd0c17a1632e99a895cb2e44fa5e7c39d8a7109f"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.ack",
+      "startLine": 193,
+      "endLine": 208,
+      "sha256": "35c9c633aab6db14a586f42408a9ac8e532f9cda5e4d007f8ce542007067911e"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.claim",
+      "startLine": 159,
+      "endLine": 183,
+      "sha256": "d28a6993fc5f0353c65425d4e09a708e4d3bf27bd89c91f7c1360f11fb65a4ea"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.clock",
+      "startLine": 122,
+      "endLine": 122,
+      "sha256": "2d38e1ef8b85a73e79f7aa712bcfcba2f236b8507105b227b794c1a572315a53"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.constructor",
+      "startLine": 129,
+      "endLine": 138,
+      "sha256": "b516541f2c057eb705ba83f3ffe80fb3f062f5f5837e7105c31967c084a82a45"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.deadLetters",
+      "startLine": 233,
+      "endLine": 235,
+      "sha256": "52340c4e1689caa436532160405b0b7e9932480660e6706f42d567392549e893"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.enqueue",
+      "startLine": 145,
+      "endLine": 149,
+      "sha256": "fcf9df43b75f62eb2412a7ba03697591911cc53cee40a801b7095e1557adba5d"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.inspect",
+      "startLine": 227,
+      "endLine": 230,
+      "sha256": "17b77f140432f7573fc90f78a83f4dfdd7246aad7d25080548bd6e2de0ba68f8"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.jobs",
+      "startLine": 127,
+      "endLine": 127,
+      "sha256": "a7277c5c53098ee1ec710ee055b2d2af46e16657686d097693ff8497c5377c15"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.maxAttempts",
+      "startLine": 125,
+      "endLine": 125,
+      "sha256": "d9f3c579c6c198b34a1c5fa54a4c35b01a96fb31d8891e6b1112c703d56a9e6a"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.nextId",
+      "startLine": 123,
+      "endLine": 123,
+      "sha256": "08a2be454f7be36751e5097484632b81c1523e3887254ee7d9485bd3c7e8f2de"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.nextLeaseToken",
+      "startLine": 124,
+      "endLine": 124,
+      "sha256": "1d1b4d53ebad3b9c7e60f97e84a8fa43f3e7fbff4dfe72d1023abc07744d7307"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.reapExpired",
+      "startLine": 215,
+      "endLine": 224,
+      "sha256": "a344a2d566ac3d449ce3b9b806b031377ade7181f3997f72f9c19efc863e6ad3"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.size",
+      "startLine": 238,
+      "endLine": 242,
+      "sha256": "9bae84a1ae8fd05ee232f46337b8cfb1b07969bd738bebf538b2d6edbf2165de"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueueOptions",
+      "startLine": 90,
+      "endLine": 97,
+      "sha256": "a392b98824dc7902ea61f8fad6f1a8e7b419507b74224cb89ce0504cf0324c17"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "Job",
+      "startLine": 34,
+      "endLine": 38,
+      "sha256": "4b4b40a01b27ad3c615fc3068597c42041ac4b8ed47a74fea233ad20ce6ff8cc"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "JobSnapshot",
+      "startLine": 65,
+      "endLine": 71,
+      "sha256": "68ae3ab2fdfb8e2672ebe8cfc0966dfcf5ec8a05bef2c6c87527bb9ce0a3b550"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "JobState",
+      "startLine": 62,
+      "endLine": 62,
+      "sha256": "67b7f411239a8abe6f9beb498c5888ae37403e040e55aec8596210db7677ba1f"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "Lease",
+      "startLine": 109,
+      "endLine": 113,
+      "sha256": "bb6193e5c8a51d0d642928f211e96fe8ade1325bdcf09a36f2904c7d9bbb706f"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "StoredJob",
+      "startLine": 115,
+      "endLine": 119,
+      "sha256": "a55c29348d1cc076cad350281d86d874fa200a8e1eb522cec16fb93a33711b7e"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "counterFactory",
+      "startLine": 101,
+      "endLine": 107,
+      "sha256": "f4265da049f9eefc8718145d8a1dabd7cf466fcc47ac4ef00702c77417a52bcb"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "snapshot",
+      "startLine": 245,
+      "endLine": 255,
+      "sha256": "ed0e5a0cc24f258ea57e3d869d2804e90150cc19bc171c30b0a9be8b695c6f6d"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "systemClock",
+      "startLine": 99,
+      "endLine": 99,
+      "sha256": "0a45de8967195f1a608951a26cf352c059eefa1d4033c195b66d6eb97ad53bcc"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "DEFAULT_LEASE_MS",
+      "startLine": 13,
+      "endLine": 13,
+      "sha256": "e8b7142bb86d1ba54c3c6e8c3d26b1c2cadc79419fcaac60c917e71b063f8171"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "JobHandler",
+      "startLine": 4,
+      "endLine": 4,
+      "sha256": "0440c0828c7b28d2a76aa2df2e29160ea4b52897dd0071489472f226b58d1aaa"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "WorkOptions",
+      "startLine": 15,
+      "endLine": 18,
+      "sha256": "568ce5edd252020b5ffaa8ea51dc4191ed330ffe166be921676f8b99dc1a7eea"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "WorkResult",
+      "startLine": 6,
+      "endLine": 11,
+      "sha256": "86301d1b7bb7e57e437b23e6d01899dff218d439aa6e4152afc9b193f092592b"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "errorMessage",
+      "startLine": 46,
+      "endLine": 48,
+      "sha256": "4137b8927988d2b21f508b944996f4b74ba5d06788294e1bc97ebc6eb3146271"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "workOnce",
+      "startLine": 29,
+      "endLine": 44,
+      "sha256": "74a58d0169ef899c941d0585983cf16f3187a7e2bd0f9b7ca1f5bd6625207c98"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C0",
+      "startLine": 16,
+      "endLine": 31,
+      "sha256": "967960089321eefaec86e77f3411cce794460093be6981d1f10df58a63be006c"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C1",
+      "startLine": 33,
+      "endLine": 45,
+      "sha256": "507668bac2a0fe5c814d951f2c3be57a0efb6f211b45c35b4ae9cbbbb45dd091"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C2",
+      "startLine": 70,
+      "endLine": 88,
+      "sha256": "c6717655cd0e2b2de0b88da618ad9001fa0af9531787569f2147bfe4d85cb604"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C3",
+      "startLine": 90,
+      "endLine": 115,
+      "sha256": "9ae6cb10196e922b407d3815ae1bd858f72eb288b01f0d4604a9b5f14273a5d1"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C4",
+      "startLine": 117,
+      "endLine": 142,
+      "sha256": "5f664c9a88706e6b5826ec68b60863aa71b5ef3a66cfa12442582d75279bc0d2"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C5",
+      "startLine": 47,
+      "endLine": 68,
+      "sha256": "5931e7505a6ac8417e9d4d71e54aae3573a7017e72fcb71fc762cb1b941e691c"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C7",
+      "startLine": 144,
+      "endLine": 169,
+      "sha256": "c73afd57de1686e571d3c27d24e572c0b734402bcd88b9bc1902b2527d4211f9"
+    }
+  ],
+  "notes": [
+    {
+      "text": "Producer/enqueue (unknown impact): decided no code change is needed. enqueue() still resolves once the job is pending in memory; under the new contract that resolution is the point of acceptance, after which the job is delivered at least once while the queue process runs. It is not a durability acknowledgement: a queue process restart loses the job. The README states this. enqueue now also initializes attempts=0 and no lease, which is internal.",
+      "source": "agent-reported"
+    },
+    {
+      "text": "dequeue() was removed rather than kept: any destructive dispatch path would reintroduce the job loss this change removes.",
+      "source": "agent-reported"
+    },
+    {
+      "text": "Failed handlers are retried only via lease expiry (no explicit nack/release), so a failing job waits out its full lease before redelivery. A deliberate simplification, not a correctness gap.",
+      "source": "agent-reported"
+    },
+    {
+      "text": "ack() also rejects a lease that has expired by the clock but has not been reaped yet (reason lease_expired), and claim() reaps expired leases before choosing a job, so the queue does not depend on an external reaper.",
+      "source": "agent-reported"
+    },
+    {
+      "text": "Dead-lettered jobs are kept in memory and listed by deadLetters()/inspect(); there is no API to requeue or purge them. Default maxAttempts is 5 (configurable).",
+      "source": "agent-reported"
+    },
+    {
+      "text": "Out of scope and not done: exactly-once processing (EQ-C4 demonstrates the duplicate), durable storage, and process-restart recovery.",
+      "source": "agent-reported"
+    }
+  ]
+}
