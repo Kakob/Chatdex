@@ -1,0 +1,32 @@
+name: Engineering shared model iteration 3
+
+on:
+  push:
+    branches:
+      - feature/engineering-model-iteration-3
+  pull_request:
+    paths:
+      - 'src/lib/engineering/**'
+      - 'src/components/engineering/**'
+      - 'src/pages/EngineeringExplorerPage*'
+      - 'src/pages/TodoExplorerPage*'
+      - 'src/pages/ProjectsPage.tsx'
+      - 'src/pages/EngineeringProjectPage*'
+      - '.github/workflows/engineering-model-iteration-3.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test -- src/lib/engineering/modelStore.test.ts src/components/engineering/ModelInspector.test.tsx src/lib/engineering/liveQueue.test.ts src/lib/engineering/todoModel.test.ts src/lib/engineering/demoProjects.test.ts src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx src/pages/EngineeringProjectPage.test.tsx
+      - run: npm run queue:test
+      - run: npm run build
