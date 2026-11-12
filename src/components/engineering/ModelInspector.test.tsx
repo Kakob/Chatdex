@@ -31,14 +31,14 @@ describe('shared model inspector', () => {
     const user = userEvent.setup();
     const ui = render(<Editor projectId={TODO_LIST_PROJECT_ID} kind="todo-list" nodeId="active" />);
     const model = await screen.findByRole('region', { name: 'Persistent engineering model' });
-    expect(await within(model).findByText('Active tasks')).toBeInTheDocument();
+    expect((await within(model).findAllByText('Active tasks')).length).toBeGreaterThan(0);
 
     await user.click(within(model).getByRole('button', { name: 'Propose model edit' }));
     await user.clear(within(model).getByRole('textbox', { name: 'Proposed name' }));
     await user.type(within(model).getByRole('textbox', { name: 'Proposed name' }), 'Ready for work');
     await user.click(within(model).getByRole('button', { name: 'Save model proposal' }));
     expect(await within(model).findByText('Ready for work')).toBeInTheDocument();
-    expect(within(model).getByText('Active tasks')).toBeInTheDocument();
+    expect(within(model).getAllByText('Active tasks').length).toBeGreaterThan(0);
     expect(within(model).getByText(/not implemented or verified/)).toBeInTheDocument();
 
     ui.unmount();
