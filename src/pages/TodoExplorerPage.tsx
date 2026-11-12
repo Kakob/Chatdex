@@ -62,7 +62,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
   const countCompleted = state.items.filter((task) => task.completed).length;
 
   return (
-    <div className="mx-auto flex h-[calc(100dvh-5.5rem)] min-h-[440px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100 sm:h-[calc(100dvh-6.5rem)]">
+    <div className="mx-auto flex min-h-[calc(100dvh-5.5rem)] max-w-7xl flex-col gap-3 text-gray-900 dark:text-gray-100 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[440px] lg:overflow-hidden">
       <header className="flex shrink-0 items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><BookOpen size={18} className="shrink-0 text-violet-600" /><h1 className="truncate text-base font-semibold sm:text-xl">{projectName}</h1><Badge tone="green">Live</Badge></div>
@@ -125,7 +125,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
           <p className={'shrink-0 text-[10px] ' + muted}>Pure todo reducer executes in this browser. Changes reset on reload; this is not your personal task list.</p>
         </div>
 
-        <section aria-label="Todo inspector" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
+        <section aria-label="Todo inspector" className="flex min-h-[60dvh] flex-1 flex-col overflow-hidden lg:min-h-0 rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
             <div className="min-w-0"><p className={'text-[10px] uppercase ' + muted}>Selected concept · project model</p><h2 className="truncate font-semibold">{displayTitleOf(selected)}</h2>{proposalOf(selected) && <p className="text-[10px] text-amber-700 dark:text-amber-300">Proposed only · runtime unchanged</p>}</div>
             <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-700 lg:hidden" type="button" aria-label={inspectorFocused ? 'Show diagram' : 'Expand inspector'} onClick={() => setInspectorFocused(!inspectorFocused)}>{inspectorFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
