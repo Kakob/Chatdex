@@ -13,6 +13,7 @@ import { engineeringExampleKind, exampleConceptId, type EngineeringExampleKind }
 import { fixtureTransitions, type EngineeringTransition, type EngineeringRelationKind } from './modelCatalog';
 import { fixtureSourceBindings, validateSourceBinding, type EngineeringSourceBinding } from './sourceCatalog';
 import type { LandscapeRegion } from '../../types/landscape';
+import type { SourceEditProposal } from './codingProtocol';
 
 export const ENGINEERING_MODEL_DB_NAME = 'chatdex-engineering-model-v1';
 
@@ -41,6 +42,8 @@ class EngineeringModelDB extends Dexie {
   transitions!: Table<EngineeringTransition, string>;
   proposals!: Table<ModelProposalEvent, string>;
   sourceBindings!: Table<EngineeringSourceBinding, string>;
+  /** Explicit, local-only full-file change proposals, including agent results. */
+  codeRevisions!: Table<SourceEditProposal, string>;
 
   constructor(name = ENGINEERING_MODEL_DB_NAME) {
     super(name);
@@ -52,6 +55,9 @@ class EngineeringModelDB extends Dexie {
     // Source text still belongs exclusively to the existing repoFiles cache.
     this.version(2).stores({
       sourceBindings: '&id, projectId, targetId, [projectId+targetId], repoKey',
+    });
+    this.version(3).stores({
+      codeRevisions: '&id, projectId, targetId, [projectId+targetId], createdAt',
     });
   }
 }
@@ -74,6 +80,8 @@ export interface ProjectEngineeringModel {
   concepts: LandscapeRegion[];
   transitions: EngineeringTransition[];
   sourceBindings: EngineeringSourceBinding[];
+  /** Staged human and agent changes; NOT part of the repository snapshot. */
+  codeRevisions: SourceEditProposal[];
   elements: Record<string, ModelElement>;
 }
 
@@ -133,11 +141,12 @@ export async function installExampleTransitions(projectId: string): Promise<numb
 export async function loadEngineeringModel(projectId: string): Promise<ProjectEngineeringModel> {
   const kind = engineeringExampleKind(projectId);
   if (!(await projectDb.understandingProjects.get(projectId))) throw new Error('Project not found');
-  const [concepts, transitions, proposals, sourceBindings] = await Promise.all([
+  const [concepts, transitions, proposals, sourceBindings, codeRevisions] = await Promise.all([
     projectDb.landscapeRegions.where('projectId').equals(projectId).toArray(),
     engineeringModelDb.transitions.where('projectId').equals(projectId).toArray(),
     engineeringModelDb.proposals.where('projectId').equals(projectId).toArray(),
     engineeringModelDb.sourceBindings.where('projectId').equals(projectId).toArray(),
+    engineeringModelDb.codeRevisions.where('projectId').equals(projectId).toArray(),
   ]);
   const elements: Record<string, ModelElement> = {};
   for (const concept of concepts) {
@@ -146,7 +155,7 @@ export async function loadEngineeringModel(projectId: string): Promise<ProjectEn
   for (const transition of transitions) {
     elements[transition.id] = summarize(transition.id, 'transition', transitionWording(transition), proposals.filter((p) => p.targetId === transition.id));
   }
-  return { projectId, kind, concepts, transitions, sourceBindings, elements };
+  return { projectId, kind, concepts, transitions, sourceBindings, codeRevisions, elements };
 }
 
 export function relationForNode(model: ProjectEngineeringModel, nodeId: string): EngineeringTransition[] {
