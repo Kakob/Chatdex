@@ -18,8 +18,16 @@ describe('LiveQueueSession — real queue observability', () => {
     expect(state.currentClaimId).toBeNull();
 
     state = await session.expireLeases();
-    expect(state.jobs[0]).toMatchObject({ id, state: 'pending', attempts: 1 });
+    expect(state.jobs[0]).toMatchObject({ id, state: 'pending', attempts: 1, availableAt: 6001 });
+    expect(state.scheduledCount).toBe(1);
+    expect(state.readyCount).toBe(0);
     expect(state.events.at(-1)?.edge).toBe('requeue');
+    await expect(session.claim()).rejects.toThrow('No pending job');
+
+    state = await session.expireLeases();
+    expect(state.readyCount).toBe(1);
+    expect(state.scheduledCount).toBe(0);
+    expect(state.events.at(-1)?.label).toBe('Retry delay elapsed');
 
     state = await session.claim();
     expect(state.jobs[0]).toMatchObject({ id, state: 'leased', attempts: 2 });
@@ -38,6 +46,10 @@ describe('LiveQueueSession — real queue observability', () => {
       session.failWorker();
       const state = await session.expireLeases();
       expect(state.jobs[0].state).toBe(attempt === 3 ? 'dead_lettered' : 'pending');
+      if (attempt < 3) {
+        expect(state.scheduledCount).toBe(1);
+        expect((await session.expireLeases()).readyCount).toBe(1);
+      }
     }
     const state = session.snapshot();
     expect(state.deadLetterCount).toBe(1);
