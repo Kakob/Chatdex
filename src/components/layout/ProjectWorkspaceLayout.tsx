@@ -5,6 +5,7 @@ import { getUnderstandingProject, getAssociationsForProject } from '../../lib/db
 import { countPendingForProject } from '../../lib/understanding/pendingReviews';
 import { landscapeHref } from '../../lib/landscape/route';
 import { db } from '../../lib/db/schema';
+import { engineeringExampleKind } from '../../lib/engineering/demoProjects';
 import type { UnderstandingProject } from '../../types/understanding';
 
 const WORKFLOW_TABS = [
@@ -89,6 +90,11 @@ export function ProjectWorkspaceLayout() {
           <span className="text-xs text-gray-400">
             {sourceCount} conversation source{sourceCount === 1 ? '' : 's'}
           </span>
+          {engineeringExampleKind(id) && (
+            <Link to={`/projects/${id}/engineering`} className="text-sm font-semibold text-violet-700 hover:underline dark:text-violet-300">
+              Open engineering model
+            </Link>
+          )}
           <Link
             to={landscapeHref({ project: id })}
             className="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
