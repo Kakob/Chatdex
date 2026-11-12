@@ -49,7 +49,7 @@ The Explorer fills the available viewport inside Chatdex's existing 56px app hea
 
 The page should not require long vertical scrolling to alternate between diagram and code. Code can scroll horizontally *inside its own preview*. Very short viewports or landscape orientation may still cause some page scrolling because of minimum-size constraints; these need actual device review.
 
-There is no drag-to-resize bottom sheet yet. If the phone experience calls for it, we can implement it without altering the model.
+A small-screen Expand inspector button hides the diagram temporarily so that long code/tests can use the remaining workspace height; Show diagram restores the split view. The Understand tab's Inspect implementation action also opens the expanded reader. There is no drag-to-resize sheet yet; we can evaluate that gesture after a phone review.
 
 ### Evidence boundaries
 
