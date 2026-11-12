@@ -57,7 +57,7 @@ Existing Iteration-2 example projects without newly installed binding records st
 
 `src/pages/GenericEngineeringExplorerPage.tsx` renders an ordinary Chatdex project's authored concepts in a compact hierarchical structure/inspector interface.
 
-All projects now use `/projects/:id/engineering`; the special Event Queue and Todo List routes still activate their real queue/reducer controls, while any other project receives the generic Explorer with model review, code/test inspection when bound, proposal history, and potential impact. A project with no authored concepts gets an honest empty state.
+Every project workspace now links to **Open engineering model** at `/projects/:id/engineering`; the special Event Queue and Todo List routes still activate their real queue/reducer controls, while any other project receives the generic Explorer with model review, code/test inspection when bound, proposal history, and potential impact. A project with no authored concepts gets an honest empty state.
 
 This **does not** mean Chatdex automatically extracts a full architecture from arbitrary code. A generic project needs concepts and bindings, or a future source analyzer. No new language parser or repository reader is introduced here.
 
