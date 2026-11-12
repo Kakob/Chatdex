@@ -66,6 +66,8 @@ export interface JobSnapshot extends Job {
   state: JobState;
   /** Number of times the job has been claimed. */
   attempts: number;
+  /** Earliest next claim time when pending (manual or system clock milliseconds). */
+  availableAt?: number;
   /** Present only while `state` is `leased`. */
   lease?: { workerId: string; expiresAt: number };
 }
@@ -94,6 +96,8 @@ export interface EventQueueOptions {
   leaseTokenFactory?: () => string;
   /** Claims allowed per job before it is dead-lettered. Default 5. */
   maxAttempts?: number;
+  /** Initial retry wait after first expired attempt; doubles on each further attempt. 0 preserves legacy immediate retry. */
+  retryBackoffMs?: number;
 }
 
 const systemClock: Clock = { now: () => Date.now() };
@@ -116,6 +120,8 @@ interface StoredJob extends Job {
   state: JobState;
   attempts: number;
   lease: Lease | null;
+  /** Earliest time a pending job may be claimed. */
+  availableAt: number;
 }
 
 export class EventQueue {
@@ -123,6 +129,7 @@ export class EventQueue {
   private readonly nextId: () => string;
   private readonly nextLeaseToken: () => string;
   private readonly maxAttempts: number;
+  private readonly retryBackoffMs: number;
   /** Insertion-ordered, so iteration order is enqueue order. */
   private readonly jobs = new Map<string, StoredJob>();
 
@@ -131,6 +138,11 @@ export class EventQueue {
     if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
       throw new Error(`maxAttempts must be a positive integer, got ${maxAttempts}`);
     }
+    const retryBackoffMs = options.retryBackoffMs ?? 0;
+    if (!Number.isSafeInteger(retryBackoffMs) || retryBackoffMs < 0) {
+      throw new Error(`retryBackoffMs must be a non-negative safe integer, got ${retryBackoffMs}`);
+    }
+    this.retryBackoffMs = retryBackoffMs;
     this.clock = options.clock ?? systemClock;
     this.nextId = options.idFactory ?? counterFactory('job');
     this.nextLeaseToken = options.leaseTokenFactory ?? counterFactory('lease');
@@ -144,7 +156,8 @@ export class EventQueue {
    */
   async enqueue(payload: unknown): Promise<string> {
     const id = this.nextId();
-    this.jobs.set(id, { id, payload, enqueuedAt: this.clock.now(), state: 'pending', attempts: 0, lease: null });
+    const now = this.clock.now();
+    this.jobs.set(id, { id, payload, enqueuedAt: now, state: 'pending', attempts: 0, lease: null, availableAt: now });
     return id;
   }
 
@@ -164,7 +177,7 @@ export class EventQueue {
     await this.reapExpired(now);
 
     for (const job of this.jobs.values()) {
-      if (job.state !== 'pending') continue;
+      if (job.state !== 'pending' || now < job.availableAt) continue;
       const lease: Lease = { token: this.nextLeaseToken(), workerId, expiresAt: now + leaseMs };
       job.state = 'leased';
       job.attempts += 1;
@@ -218,6 +231,11 @@ export class EventQueue {
       if (job.state !== 'leased' || !job.lease || now < job.lease.expiresAt) continue;
       job.lease = null;
       job.state = job.attempts >= this.maxAttempts ? 'dead_lettered' : 'pending';
+      if (job.state === 'pending') {
+        // Cap extremely large delays; no retry can overflow to Infinity.
+        const delay = Math.min(86_400_000, this.retryBackoffMs * 2 ** (job.attempts - 1));
+        job.availableAt = now + delay;
+      }
       expired += 1;
     }
     return expired;
