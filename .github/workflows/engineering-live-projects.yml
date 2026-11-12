@@ -28,4 +28,6 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test -- src/lib/engineering/liveQueue.test.ts src/lib/engineering/todoModel.test.ts src/lib/engineering/demoProjects.test.ts src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx
+      - run: npm test
+      - run: npm run queue:test
       - run: npm run build
