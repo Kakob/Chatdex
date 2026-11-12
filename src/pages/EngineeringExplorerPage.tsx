@@ -9,23 +9,19 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge, button, muted } from '../components/engineering/ui';
-import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
+import { BoundSourceInspector } from '../components/engineering/BoundSourceInspector';
 import { ModelInspector } from '../components/engineering/ModelInspector';
 import { useExampleEngineeringModel } from '../lib/engineering/useEngineeringModel';
 import { QueueLiveLab, type QueueAction } from '../components/engineering/QueueLiveLab';
 import { LiveQueueSession, type LiveQueueSnapshot } from '../lib/engineering/liveQueue';
-import { exampleConceptId } from '../lib/engineering/demoProjects';
+import { EVENT_QUEUE_PROJECT_ID, exampleConceptId } from '../lib/engineering/demoProjects';
 import type { LandscapeRegion } from '../types/landscape';
 import {
   SystemDiagram,
   type DiagramEdgeId,
   type DiagramNodeId,
 } from '../components/engineering/SystemDiagram';
-import queueSource from '../../examples/event-queue/src/queue.ts?raw';
-import workerSource from '../../examples/event-queue/src/worker.ts?raw';
-import deliveryTests from '../../examples/event-queue/test/delivery.test.ts?raw';
 
-type SourceId = 'queue' | 'worker' | 'tests';
 type InspectorTab = 'understand' | 'code' | 'tests';
 type ScenarioId = 'success' | 'failure';
 
@@ -34,8 +30,6 @@ interface Part {
   role: string;
   summary: string;
   detail: string;
-  source: SourceId;
-  needle: string;
   criterion: string;
   testDescription: string;
 }
@@ -45,81 +39,67 @@ const PARTS: Record<DiagramNodeId, Part> = {
     title: 'Producer',
     role: 'Entry point',
     summary: 'A producer adds work and receives a job ID.',
-    detail: 'enqueue() stores a new job as pending in process memory before returning the ID. It does not wait for a worker to finish.',
-    source: 'queue', needle: 'async enqueue(payload', criterion: 'EQ-C0',
+    detail: 'enqueue() stores a new job as pending in process memory before returning the ID. It does not wait for a worker to finish.', criterion: 'EQ-C0',
     testDescription: 'Jobs first reach workers in the order they were enqueued.',
   },
   queue: {
     title: 'Queue',
     role: 'System core',
     summary: 'The queue keeps track of jobs between submission and completion.',
-    detail: 'EventQueue stores jobs in an insertion-ordered Map. Because that Map lives only in this process, a queue process restart loses the jobs.',
-    source: 'queue', needle: 'export class EventQueue', criterion: 'EQ-C5',
+    detail: 'EventQueue stores jobs in an insertion-ordered Map. Because that Map lives only in this process, a queue process restart loses the jobs.', criterion: 'EQ-C5',
     testDescription: 'A job survives a worker failure as long as the queue process stays alive.',
   },
   worker: {
     title: 'Worker',
     role: 'Execution',
     summary: 'A worker claims one job, runs a handler, then acknowledges success.',
-    detail: 'workOnce() does not acknowledge a job when its handler throws. An unacknowledged job stays leased until expiry, when it can be retried.',
-    source: 'worker', needle: 'export async function workOnce', criterion: 'EQ-C5',
+    detail: 'workOnce() does not acknowledge a job when its handler throws. An unacknowledged job stays leased until expiry, when it can be retried.', criterion: 'EQ-C5',
     testDescription: 'A failed worker must not cause its job to disappear.',
   },
   pending: {
     title: 'Pending',
     role: 'Job state',
     summary: 'The job is stored, waiting for a worker to claim it.',
-    detail: 'Pending is a real JobState. enqueue() creates it; lease expiry can return an unfinished job here. This is a state of the job, not a separate service.',
-    source: 'queue', needle: 'export type JobState', criterion: 'EQ-C2',
+    detail: 'Pending is a real JobState. enqueue() creates it; lease expiry can return an unfinished job here. This is a state of the job, not a separate service.', criterion: 'EQ-C2',
     testDescription: 'An unacknowledged leased job becomes claimable again after expiry.',
   },
   leased: {
     title: 'Leased',
     role: 'Job state',
     summary: 'A worker is processing the job, but the queue still owns it.',
-    detail: 'claim() gives a worker a temporary lease token without removing the job. A stale token cannot acknowledge a later claim.',
-    source: 'queue', needle: 'async claim(workerId', criterion: 'EQ-C3',
+    detail: 'claim() gives a worker a temporary lease token without removing the job. A stale token cannot acknowledge a later claim.', criterion: 'EQ-C3',
     testDescription: 'A worker cannot acknowledge another worker’s newer claim.',
   },
   acked: {
     title: 'Completed',
     role: 'Terminal transition',
     summary: 'Successful acknowledgment removes the finished job.',
-    detail: 'Completed is drawn as an outcome, not a stored JobState. ack() validates the current lease token and deletes the job. It cannot be claimed again.',
-    source: 'queue', needle: 'async ack(jobId', criterion: 'EQ-C1',
+    detail: 'Completed is drawn as an outcome, not a stored JobState. ack() validates the current lease token and deletes the job. It cannot be claimed again.', criterion: 'EQ-C1',
     testDescription: 'An acknowledged job is not dispatched again.',
   },
   tests: {
     title: 'Tests',
     role: 'Evidence',
     summary: 'Tests exercise observable queue behavior through its public interface.',
-    detail: 'The worker-failure test enqueues a job, fails a worker, advances the manual clock, and checks that another worker can process the same job. Tests here are source, not browser-run results.',
-    source: 'tests', needle: "it('[EQ-C5]", criterion: 'EQ-C5',
+    detail: 'The worker-failure test enqueues a job, fails a worker, advances the manual clock, and checks that another worker can process the same job. Tests here are source, not browser-run results.', criterion: 'EQ-C5',
     testDescription: 'Worker failure does not silently lose accepted work.',
   },
   retry: {
     title: 'Retry',
     role: 'Recovery mechanism',
     summary: 'When a lease expires, unfinished work can become pending again.',
-    detail: 'reapExpired() examines leased jobs and either releases them for another attempt or dead-letters them if the configured attempt limit is exhausted.',
-    source: 'queue', needle: 'async reapExpired', criterion: 'EQ-C2',
+    detail: 'reapExpired() examines leased jobs and either releases them for another attempt or dead-letters them if the configured attempt limit is exhausted.', criterion: 'EQ-C2',
     testDescription: 'A job can be reclaimed after its lease expires.',
   },
   'dead-letter': {
     title: 'Dead letter',
     role: 'Job state',
     summary: 'A job that exhausted its allowed attempts remains inspectable.',
-    detail: 'Instead of silently dropping a repeatedly failing job, the queue marks it dead_lettered. It no longer counts as active work and deadLetters() can list it.',
-    source: 'queue', needle: 'deadLetters():', criterion: 'EQ-C7',
+    detail: 'Instead of silently dropping a repeatedly failing job, the queue marks it dead_lettered. It no longer counts as active work and deadLetters() can list it.', criterion: 'EQ-C7',
     testDescription: 'Exhausted jobs become dead letters rather than disappearing.',
   },
 };
 
-const SOURCES: Record<SourceId, { path: string; text: string; repoPath: string }> = {
-  queue: { path: 'src/queue.ts', text: queueSource, repoPath: 'examples/event-queue/src/queue.ts' },
-  worker: { path: 'src/worker.ts', text: workerSource, repoPath: 'examples/event-queue/src/worker.ts' },
-  tests: { path: 'test/delivery.test.ts', text: deliveryTests, repoPath: 'examples/event-queue/test/delivery.test.ts' },
-};
 
 interface ScenarioStep {
   label: string;
@@ -348,7 +328,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
             {tab === 'code' && (
               <div className="space-y-2">
                 <p className={'text-xs ' + muted}>Real checked-in TypeScript, bundled with this app build. Read-only; not revision-pinned evidence.</p>
-                <SourceExcerpt key={selected + ':code'} source={SOURCES[part.source]} needle={part.needle} title={part.title} />
+                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="implementation" title={part.title} exampleFallback={!projectId ? { kind: "event-queue", projectId: EVENT_QUEUE_PROJECT_ID } : undefined} />
               </div>
             )}
             {tab === 'tests' && (
@@ -358,7 +338,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
                   <p className="text-sm">{part.testDescription}</p>
                 </div>
                 <p className={'text-xs ' + muted}>This is a real test definition; no tests are executed by this explorer. Verification manifests live in the original workbench.</p>
-                <SourceExcerpt key={selected + ':tests'} source={SOURCES.tests} needle={"it('[" + part.criterion + "]"} title="Relevant test" />
+                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="test" title="Relevant test" exampleFallback={!projectId ? { kind: "event-queue", projectId: EVENT_QUEUE_PROJECT_ID } : undefined} />
               </div>
             )}
           </div>
