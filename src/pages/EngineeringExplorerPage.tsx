@@ -7,8 +7,9 @@
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge, button, muted } from '../components/engineering/ui';
+import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
 import {
   SystemDiagram,
   type DiagramEdgeId,
@@ -108,10 +109,10 @@ const PARTS: Record<DiagramNodeId, Part> = {
   },
 };
 
-const SOURCES: Record<SourceId, { path: string; text: string }> = {
-  queue: { path: 'src/queue.ts', text: queueSource },
-  worker: { path: 'src/worker.ts', text: workerSource },
-  tests: { path: 'test/delivery.test.ts', text: deliveryTests },
+const SOURCES: Record<SourceId, { path: string; text: string; repoPath: string }> = {
+  queue: { path: 'src/queue.ts', text: queueSource, repoPath: 'examples/event-queue/src/queue.ts' },
+  worker: { path: 'src/worker.ts', text: workerSource, repoPath: 'examples/event-queue/src/worker.ts' },
+  tests: { path: 'test/delivery.test.ts', text: deliveryTests, repoPath: 'examples/event-queue/test/delivery.test.ts' },
 };
 
 interface ScenarioStep {
@@ -141,58 +142,6 @@ const SCENARIOS: Record<ScenarioId, ScenarioStep[]> = {
   ],
 };
 
-function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: string; title: string }) {
-  const [full, setFull] = useState(false);
-  // Default to a readable phone-sized column; unwrapped mode is opt-in.
-  const [wrapLines, setWrapLines] = useState(true);
-  const file = SOURCES[fileId];
-  const lines = file.text.split('\n');
-  const match = lines.findIndex((line) => line.includes(needle));
-  const from = full ? 0 : Math.max(0, match - 4);
-  const to = full ? lines.length : Math.min(lines.length, Math.max(0, match) + 22);
-  const githubUrl = 'https://github.com/Kakob/Chatdex/blob/feature/engineering-explorer-iteration-1/examples/event-queue/' + file.path +
-    (match >= 0 ? '#L' + (match + 1) : '');
-
-  return (
-    <div className="min-w-0 space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={'min-w-0 break-all text-xs ' + muted}>{title} · {file.path}</p>
-        <a className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 underline dark:text-violet-300" href={githubUrl} target="_blank" rel="noreferrer">
-          GitHub <ExternalLink size={12} />
-        </a>
-      </div>
-      <div
-        className={'max-w-full rounded-lg border border-gray-700 bg-gray-950 text-gray-100 ' + (wrapLines ? 'overflow-x-hidden' : 'overflow-x-auto')}
-        aria-label={title + ' excerpt'}
-        data-testid="source-viewport"
-        data-wrap={wrapLines ? 'on' : 'off'}
-      >
-        <pre className={'p-3 font-mono text-[11px] leading-5 ' + (wrapLines ? 'w-full min-w-0' : 'w-max min-w-full')}>
-          <code className="block">
-            {lines.slice(from, to).map((line, i) => {
-              const n = from + i + 1;
-              return (
-                <span key={n} className={'grid ' + (wrapLines ? 'grid-cols-[2.25rem_minmax(0,1fr)]' : 'grid-cols-[2.25rem_max-content]') + (n === match + 1 ? ' bg-violet-900/70' : '')}>
-                  <span aria-hidden="true" className="select-none pr-2 text-right text-gray-500">{n}</span>
-                  <span className={'min-w-0 ' + (wrapLines ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre')}>{line || ' '}</span>
-                </span>
-              );
-            })}
-          </code>
-        </pre>
-      </div>
-      {match < 0 && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">This authored entry point was not found in the bundled source.</p>}
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" className={button} onClick={() => setFull(!full)}>
-          {full ? 'Show relevant excerpt' : 'View full file'}
-        </button>
-        <button type="button" className={button} aria-pressed={wrapLines} onClick={() => setWrapLines((value) => !value)}>
-          {wrapLines ? 'Wrap lines ✓' : 'Wrap lines'}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 export function EngineeringExplorerPage() {
   const [selected, setSelected] = useState<DiagramNodeId>('queue');
@@ -326,7 +275,7 @@ export function EngineeringExplorerPage() {
             {tab === 'code' && (
               <div className="space-y-2">
                 <p className={'text-xs ' + muted}>Real checked-in TypeScript, bundled with this app build. Read-only; not revision-pinned evidence.</p>
-                <SourceExcerpt key={selected + ':code'} fileId={part.source} needle={part.needle} title={part.title} />
+                <SourceExcerpt key={selected + ':code'} source={SOURCES[part.source]} needle={part.needle} title={part.title} />
               </div>
             )}
             {tab === 'tests' && (
@@ -336,7 +285,7 @@ export function EngineeringExplorerPage() {
                   <p className="text-sm">{part.testDescription}</p>
                 </div>
                 <p className={'text-xs ' + muted}>This is a real test definition; no tests are executed by this explorer. Verification manifests live in the original workbench.</p>
-                <SourceExcerpt key={selected + ':tests'} fileId="tests" needle={"it('[" + part.criterion + "]"} title="Relevant test" />
+                <SourceExcerpt key={selected + ':tests'} source={SOURCES.tests} needle={"it('[" + part.criterion + "]"} title="Relevant test" />
               </div>
             )}
           </div>
