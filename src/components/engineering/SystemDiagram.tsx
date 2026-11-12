@@ -77,9 +77,11 @@ interface Props {
   counts?: Partial<Record<DiagramNodeId, number>>;
   /** Project-stored names override only labels, not execution semantics. */
   titles?: Partial<Record<DiagramNodeId, string>>;
+  /** Design-only names from a proposed model revision, not running behavior. */
+  proposedTitles?: Partial<Record<DiagramNodeId, string>>;
 }
 
-export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect, counts, titles }: Props) {
+export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect, counts, titles, proposedTitles }: Props) {
   return (
     <div
       className="relative h-full w-full select-none overflow-hidden rounded-xl border border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-950"
@@ -123,14 +125,16 @@ export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect
       {NODES.map((node) => {
         const active = highlighted.includes(node.id);
         const chosen = selected === node.id;
+        const proposed = proposedTitles?.[node.id];
         return (
           <button
             type="button"
             key={node.id}
-            aria-label={titles?.[node.id] ?? node.title}
+            aria-label={proposed ?? titles?.[node.id] ?? node.title}
             aria-pressed={chosen}
-            title={(titles?.[node.id] ?? node.title) + ': ' + node.subtitle}
+            title={(titles?.[node.id] ?? node.title) + (proposed ? ' → proposed: ' + proposed + ' (not implemented)' : ': ' + node.subtitle)}
             data-node={node.id}
+            data-proposed={proposed ? 'true' : undefined}
             data-highlighted={active ? 'true' : undefined}
             style={position(node.x, node.y)}
             onClick={() => onSelect(node.id)}
@@ -139,11 +143,12 @@ export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect
               (active
                 ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100 '
                 : 'border-gray-300 bg-white text-gray-900 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 ') +
-              (chosen ? 'ring-2 ring-violet-500 ring-offset-1 ring-offset-gray-50 dark:ring-offset-gray-950' : 'hover:border-violet-400')
+              (chosen ? 'ring-2 ring-violet-500 ring-offset-1 ring-offset-gray-50 dark:ring-offset-gray-950' : 'hover:border-violet-400') +
+              (proposed ? ' border-dashed !border-amber-500' : '')
             }
           >
-            <span className="block text-[11px] font-semibold leading-tight sm:text-xs">{titles?.[node.id] ?? node.title}</span>
-            <span className="mt-0.5 block text-[9px] leading-tight opacity-70 sm:text-[10px]">{node.subtitle}{counts?.[node.id] !== undefined ? ' · ' + counts[node.id] : ''}</span>
+            <span className="block text-[11px] font-semibold leading-tight sm:text-xs">{proposed ?? titles?.[node.id] ?? node.title}</span>
+            <span className="mt-0.5 block text-[9px] leading-tight opacity-70 sm:text-[10px]">{proposed ? 'Proposed · ' : ''}{node.subtitle}{counts?.[node.id] !== undefined ? ' · ' + counts[node.id] : ''}</span>
           </button>
         );
       })}
