@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { button, muted } from './ui';
 
-export function SourceExcerpt({ source, needle, title }: { source: {path: string; text: string; repoPath: string}; needle: string; title: string }) {
+export function SourceExcerpt({ source, needle, title }: { source: {path: string; text: string; repoPath?: string; href?: string}; needle: string; title: string }) {
   const [full, setFull] = useState(false);
   // Default to a readable phone-sized column; unwrapped mode is opt-in.
   const [wrapLines, setWrapLines] = useState(true);
@@ -12,16 +12,19 @@ export function SourceExcerpt({ source, needle, title }: { source: {path: string
   const match = lines.findIndex((line) => line.includes(needle));
   const from = full ? 0 : Math.max(0, match - 4);
   const to = full ? lines.length : Math.min(lines.length, Math.max(0, match) + 22);
-  const githubUrl = 'https://github.com/Kakob/Chatdex/blob/feature/engineering-live-projects/' + file.repoPath +
-    (match >= 0 ? '#L' + (match + 1) : '');
+  // Source links are only offered when a binding supplies a trusted URL.
+  // An app-bundled snippet is not revision-pinned and has no immutable link.
+  const githubUrl = file.href ? file.href + (match >= 0 ? '#L' + (match + 1) : '') : null;
 
   return (
     <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={'min-w-0 break-all text-xs ' + muted}>{title} · {file.path}</p>
-        <a className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 underline dark:text-violet-300" href={githubUrl} target="_blank" rel="noreferrer">
-          GitHub <ExternalLink size={12} />
-        </a>
+        {githubUrl ? (
+          <a className="inline-flex items-center gap-1 text-xs font-medium text-violet-700 underline dark:text-violet-300" href={githubUrl} target="_blank" rel="noreferrer">
+            Open pinned code <ExternalLink size={12} />
+          </a>
+        ) : <span className={'text-[10px] ' + muted}>No pinned GitHub link</span>}
       </div>
       <div
         className={'max-w-full rounded-lg border border-gray-700 bg-gray-950 text-gray-100 ' + (wrapLines ? 'overflow-x-hidden' : 'overflow-x-auto')}
