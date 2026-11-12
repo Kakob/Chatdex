@@ -182,9 +182,10 @@ function headerAndBody(node: ts.Node, file: ts.SourceFile): { signature: string;
     };
   }
   if (ts.isPropertyDeclaration(node) || ts.isPropertySignature(node)) {
+    const initializer = ts.isPropertyDeclaration(node) ? node.initializer : undefined;
     return {
-      signature: file.text.slice(start, node.initializer?.getStart(file) ?? node.end).replace(/=\s*$/, '').trim(),
-      body: node.initializer?.getText(file) ?? '',
+      signature: file.text.slice(start, initializer?.getStart(file) ?? node.end).replace(/=\s*$/, '').trim(),
+      body: initializer?.getText(file) ?? '',
     };
   }
   return { signature: node.getText(file), body: '' };
