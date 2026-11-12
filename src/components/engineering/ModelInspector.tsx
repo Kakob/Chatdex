@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { AlertTriangle, ArrowLeft, GitBranch, Pencil, RotateCcw } from 'lucide-react';
 import type { EngineeringExampleKind } from '../../lib/engineering/demoProjects';
 import { exampleConceptId } from '../../lib/engineering/demoProjects';
+import { ModelImpactPreview } from './ModelImpactPreview';
 import {
   proposeModelEdit,
   relationForNode,
@@ -141,7 +142,8 @@ export function ModelInspector({
   onRefresh,
 }: {
   projectId: string;
-  kind: EngineeringExampleKind;
+  /** Optional legacy slug adapter. Generic projects pass the full concept ID. */
+  kind?: EngineeringExampleKind;
   nodeId: string;
   model: ProjectEngineeringModel | null;
   onRefresh: () => Promise<void>;
@@ -149,10 +151,10 @@ export function ModelInspector({
   const [transitionId, setTransitionId] = useState<string | null>(null);
   if (!model) return <p className={'text-xs ' + muted}>Loading persistent engineering model…</p>;
 
-  const conceptId = exampleConceptId(kind, nodeId);
+  const conceptId = model.elements[nodeId] ? nodeId : kind ? exampleConceptId(kind, nodeId) : nodeId;
   const targetId = transitionId ?? conceptId;
   const element = model.elements[targetId];
-  const relations = relationForNode(model, nodeId);
+  const relations = relationForNode(model, conceptId);
 
   return (
     <section className="space-y-2" aria-label="Persistent engineering model">
@@ -194,6 +196,7 @@ export function ModelInspector({
           )}
         </details>
       )}
+      {element && <ModelImpactPreview model={model} targetId={targetId} />}
       <p className={'text-[11px] leading-4 ' + muted}>
         Only design proposals are stored here. Live code, tests and queue/task behavior remain unchanged. Proposals are local to this browser.
       </p>
