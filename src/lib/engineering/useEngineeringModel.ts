@@ -1,8 +1,8 @@
-/** Project-level shared model loader used by both executable examples. */
+/** Project-level shared model loader, independent of any application adapter. */
 import { useCallback, useEffect, useState } from 'react';
 import { loadEngineeringModel, type ProjectEngineeringModel } from './modelStore';
 
-export function useExampleEngineeringModel(projectId: string | undefined) {
+export function useEngineeringModel(projectId: string | undefined) {
   const [model, setModel] = useState<ProjectEngineeringModel | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,3 +27,6 @@ export function useExampleEngineeringModel(projectId: string | undefined) {
   return { model: model?.projectId === projectId ? model : null, refresh, error };
 }
 
+
+/** Backwards-compatible alias while the two demo Explorers are migrating. */
+export const useExampleEngineeringModel = useEngineeringModel;
