@@ -10,6 +10,10 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge, button, muted } from '../components/engineering/ui';
 import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
+import { QueueLiveLab, type QueueAction } from '../components/engineering/QueueLiveLab';
+import { LiveQueueSession, type LiveQueueSnapshot } from '../lib/engineering/liveQueue';
+import { exampleConceptId } from '../lib/engineering/demoProjects';
+import type { LandscapeRegion } from '../types/landscape';
 import {
   SystemDiagram,
   type DiagramEdgeId,
@@ -143,8 +147,13 @@ const SCENARIOS: Record<ScenarioId, ScenarioStep[]> = {
 };
 
 
-export function EngineeringExplorerPage() {
+export function EngineeringExplorerPage({ projectId, projectName, concepts = [] }: { projectId?: string; projectName?: string; concepts?: LandscapeRegion[] }) {
   const [selected, setSelected] = useState<DiagramNodeId>('queue');
+  const [mode, setMode] = useState<'live' | 'illustrated'>('live');
+  const [session, setSession] = useState(() => new LiveQueueSession());
+  const [live, setLive] = useState<LiveQueueSnapshot>(() => session.snapshot());
+  const [liveBusy, setLiveBusy] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
   const [tab, setTab] = useState<InspectorTab>('understand');
   const [inspectorFocused, setInspectorFocused] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>('failure');
@@ -152,6 +161,38 @@ export function EngineeringExplorerPage() {
   const part = PARTS[selected];
   const currentSteps = SCENARIOS[scenario];
   const currentStep = currentSteps[stepIndex];
+  const latestEvent = live.events.at(-1);
+  const highlighted = mode === 'live' ? latestEvent?.highlighted ?? ['queue'] : currentStep.highlights;
+  const highlightedEdge = mode === 'live' ? latestEvent?.edge : currentStep.edge;
+  const titles: Partial<Record<DiagramNodeId, string>> = {};
+  if (projectId) for (const node of Object.keys(PARTS) as DiagramNodeId[]) {
+    const concept = concepts.find((item) => item.id === exampleConceptId('event-queue', node));
+    if (concept) titles[node] = concept.title;
+  }
+  const runLive = (action: QueueAction) => {
+    setLiveError(null);
+    setLiveBusy(true);
+    const run = async () => {
+      if (action === 'reset') {
+        const fresh = new LiveQueueSession();
+        setSession(fresh);
+        setLive(fresh.snapshot());
+        setSelected('queue');
+        return;
+      }
+      let next: LiveQueueSnapshot;
+      switch (action) {
+        case 'enqueue': next = await session.enqueue(); break;
+        case 'claim': next = await session.claim(); break;
+        case 'complete': next = await session.complete(); break;
+        case 'fail': next = session.failWorker(); break;
+        case 'expire': next = await session.expireLeases(); break;
+      }
+      setLive(next);
+      setSelected(next.events.at(-1)?.node ?? 'queue');
+    };
+    void run().catch((error: unknown) => setLiveError(error instanceof Error ? error.message : String(error))).finally(() => setLiveBusy(false));
+  };
 
   const goToStep = (next: number) => {
     const index = Math.max(0, Math.min(currentSteps.length - 1, next));
@@ -177,34 +218,42 @@ export function EngineeringExplorerPage() {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="shrink-0 text-violet-600 dark:text-violet-300" />
-            <h1 className="truncate text-base font-semibold sm:text-xl">Event Queue Explorer</h1>
-            <Badge tone="violet">1.5</Badge>
+            <h1 className="truncate text-base font-semibold sm:text-xl">{projectName ?? "Event Queue Explorer"}</h1>
+            <Badge tone="green">Live 2</Badge>
           </div>
-          <p className={'truncate text-[11px] ' + muted}>Tap the system · inspect its behavior and code</p>
+          <p className={'truncate text-[11px] ' + muted}>Real queue execution · project model · inspectable code</p>
         </div>
-        <Link to="/engineering" className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-2 text-xs dark:border-gray-700" aria-label="Original engineering workbench">
-          <ArrowLeft size={14} /> Workbench
+        <Link to={projectId ? "/projects/" + projectId : "/engineering"} className="flex shrink-0 items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-2 text-xs dark:border-gray-700" aria-label={projectId ? "Project overview" : "Original engineering workbench"}>
+          <ArrowLeft size={14} /> {projectId ? "Project" : "Workbench"}
         </Link>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(370px,.95fr)]">
         <div className={(inspectorFocused ? 'hidden lg:flex' : 'flex') + " min-h-0 shrink-0 flex-col gap-2 lg:min-h-0 lg:shrink"}>
-          <div className="flex shrink-0 items-center justify-between gap-2" role="group" aria-label="Scenario choice">
-            <span className={'text-xs font-medium ' + muted}>Illustrated path</span>
-            <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-              <button type="button" aria-pressed={scenario === 'success'} className={'rounded-md px-3 py-1.5 text-xs font-medium ' + (scenario === 'success' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-700 dark:text-violet-200' : muted)} onClick={() => changeScenario('success')}>
-                Successful job
-              </button>
-              <button type="button" aria-pressed={scenario === 'failure'} className={'rounded-md px-3 py-1.5 text-xs font-medium ' + (scenario === 'failure' ? 'bg-white text-violet-700 shadow-sm dark:bg-gray-700 dark:text-violet-200' : muted)} onClick={() => changeScenario('failure')}>
-                Worker crashes
-              </button>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-1" role="group" aria-label="Explorer mode">
+            <span className={'text-xs font-medium ' + muted}>{mode === 'live' ? 'Live execution' : 'Illustrated guide'}</span>
+            <div className="flex gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+              <button type="button" aria-pressed={mode === 'live'} className={'rounded-md px-3 py-1.5 text-xs ' + (mode === 'live' ? 'bg-white font-semibold text-emerald-700 dark:bg-gray-700 dark:text-emerald-300' : muted)} onClick={() => setMode('live')}>Live queue</button>
+              <button type="button" aria-pressed={mode === 'illustrated'} className={'rounded-md px-3 py-1.5 text-xs ' + (mode === 'illustrated' ? 'bg-white font-semibold text-violet-700 dark:bg-gray-700 dark:text-violet-300' : muted)} onClick={() => setMode('illustrated')}>Guided explanation</button>
             </div>
           </div>
+          {mode === 'illustrated' && (
+            <div className="flex shrink-0 items-center justify-between gap-2" role="group" aria-label="Scenario choice">
+              <span className={'text-xs ' + muted}>Illustrated path</span>
+              <div className="flex items-center gap-1">
+                <button type="button" aria-pressed={scenario === 'success'} className={scenario === 'success' ? button + ' !border-violet-500' : button} onClick={() => changeScenario('success')}>Successful job</button>
+                <button type="button" aria-pressed={scenario === 'failure'} className={scenario === 'failure' ? button + ' !border-violet-500' : button} onClick={() => changeScenario('failure')}>Worker crashes</button>
+              </div>
+            </div>
+          )}
 
           <div className="h-[clamp(185px,30dvh,280px)] shrink-0 lg:h-auto lg:min-h-0 lg:flex-1 lg:shrink">
-            <SystemDiagram selected={selected} highlighted={currentStep.highlights} highlightedEdge={currentStep.edge} onSelect={setSelected} />
+            <SystemDiagram selected={selected} highlighted={highlighted} highlightedEdge={highlightedEdge} onSelect={setSelected} titles={titles} counts={mode === 'live' ? { pending: live.pendingCount, leased: live.leasedCount, acked: live.completedIds.length, 'dead-letter': live.deadLetterCount } : undefined} />
           </div>
 
+          {mode === 'live' ? (
+            <QueueLiveLab state={live} busy={liveBusy} error={liveError} onAction={runLive} />
+          ) : (
           <section className="shrink-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900" aria-label="Scenario walkthrough">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -220,6 +269,8 @@ export function EngineeringExplorerPage() {
               </div>
             </div>
           </section>
+          )}
+
         </div>
 
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 lg:rounded-xl" aria-label="Inspector">
@@ -227,7 +278,7 @@ export function EngineeringExplorerPage() {
           <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-2">
             <div className="min-w-0">
               <p className={'text-[10px] font-semibold uppercase tracking-wide ' + muted}>Selected system part · {part.role}</p>
-              <h2 className="truncate text-base font-semibold">{part.title}</h2>
+              <h2 className="truncate text-base font-semibold">{titles[selected] ?? part.title}</h2>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="hidden rounded-full bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-200 sm:inline-flex">Authored model</span>
@@ -269,7 +320,7 @@ export function EngineeringExplorerPage() {
                   <button type="button" className={button} onClick={() => { setTab('code'); setInspectorFocused(true); }}><Code2 size={14} /> Inspect implementation <ArrowRight size={13} /></button>
                   <button type="button" className={button} onClick={() => setTab('tests')}>See test {part.criterion} <ArrowRight size={13} /></button>
                 </div>
-                <p className={'text-xs leading-5 ' + muted}>The diagram and connections are manually authored. The colored route is a walkthrough, not observed execution.</p>
+                <p className={'text-xs leading-5 ' + muted}>{mode === 'live' ? 'Green highlights follow actual EventQueue method calls and inspected queue states. The diagram layout and source bindings are authored; worker loss is simulated by not acknowledging.' : 'The diagram and connections are manually authored. The highlighted path is illustrative, not observed execution.'}</p>
               </div>
             )}
             {tab === 'code' && (
@@ -291,7 +342,7 @@ export function EngineeringExplorerPage() {
           </div>
         </section>
       </div>
-      <span className="sr-only">Select a diagram node to change the inspector; scenario controls illustrate the flow without executing the queue.</span>
+      <span className="sr-only">Select a diagram node to inspect source and tests. Live mode invokes the actual in-memory queue; guided mode is illustrative.</span>
     </div>
   );
 }
