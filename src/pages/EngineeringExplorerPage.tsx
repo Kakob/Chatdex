@@ -162,7 +162,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
   const currentSteps = SCENARIOS[scenario];
   const currentStep = currentSteps[stepIndex];
   const latestEvent = live.events.at(-1);
-  const highlighted = mode === 'live' ? latestEvent?.highlighted ?? ['queue'] : currentStep.highlights;
+  const highlighted: DiagramNodeId[] = mode === 'live' ? (latestEvent?.highlighted ?? ['queue']) : currentStep.highlights;
   const highlightedEdge = mode === 'live' ? latestEvent?.edge : currentStep.edge;
   const titles: Partial<Record<DiagramNodeId, string>> = {};
   if (projectId) for (const node of Object.keys(PARTS) as DiagramNodeId[]) {
@@ -321,6 +321,15 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
                   <button type="button" className={button} onClick={() => setTab('tests')}>See test {part.criterion} <ArrowRight size={13} /></button>
                 </div>
                 <p className={'text-xs leading-5 ' + muted}>{mode === 'live' ? 'Green highlights follow actual EventQueue method calls and inspected queue states. The diagram layout and source bindings are authored; worker loss is simulated by not acknowledging.' : 'The diagram and connections are manually authored. The highlighted path is illustrative, not observed execution.'}</p>
+                {projectId && (
+                  <nav aria-label="Related project workflows" className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 text-xs dark:border-gray-700">
+                    <span className={'w-full ' + muted}>Related project views (currently separate):</span>
+                    <Link className={button} to={'/projects/' + projectId + '/investigate'}>History</Link>
+                    <Link className={button} to={'/projects/' + projectId + '/understanding'}>Understanding</Link>
+                    <Link className={button} to={'/projects/' + projectId + '/prepare'}>Prepare Change</Link>
+                  </nav>
+                )}
+
               </div>
             )}
             {tab === 'code' && (
