@@ -10,6 +10,7 @@ import { db } from '../lib/db/schema';
 import { engineeringExampleKind } from '../lib/engineering/demoProjects';
 import { EngineeringExplorerPage } from './EngineeringExplorerPage';
 import { TodoExplorerPage } from './TodoExplorerPage';
+import { GenericEngineeringExplorerPage } from './GenericEngineeringExplorerPage';
 import type { LandscapeRegion } from '../types/landscape';
 import type { UnderstandingProject } from '../types/understanding';
 
@@ -56,14 +57,6 @@ export function EngineeringProjectPage() {
   if (kind === 'event-queue') return <EngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />;
   if (kind === 'todo-list') return <TodoExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />;
 
-  return (
-    <section className="mx-auto max-w-2xl space-y-4 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-      <h1 className="font-semibold text-gray-900 dark:text-white">Engineering model · {loaded.project.name}</h1>
-      <p className="text-sm text-gray-600 dark:text-gray-300">
-        This project does not have an executable engineering adapter or verified visualization yet.
-        The experimental Explorer works only with the two installed example projects; it does not infer a diagram for arbitrary source code.
-      </p>
-      <Link className="text-sm text-violet-600 underline" to={'/projects/' + loaded.project.id}>Back to project</Link>
-    </section>
-  );
+  return <GenericEngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} />;
+
 }
