@@ -5,31 +5,27 @@
 import { useReducer, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, Code2, Maximize2, Minimize2, Plus } from 'lucide-react';
-import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
+import { BoundSourceInspector } from '../components/engineering/BoundSourceInspector';
 import { ModelInspector } from '../components/engineering/ModelInspector';
 import { useExampleEngineeringModel } from '../lib/engineering/useEngineeringModel';
 import { Badge, button, muted } from '../components/engineering/ui';
 import { initialTodoState, todoTransition, type TodoAction } from '../lib/engineering/todoModel';
 import { exampleConceptId } from '../lib/engineering/demoProjects';
 import type { LandscapeRegion } from '../types/landscape';
-import todoSource from '../lib/engineering/todoModel.ts?raw';
-import todoTestSource from '../lib/engineering/todoModel.test.ts?raw';
 
 type TodoNode = 'input' | 'list' | 'active' | 'completed' | 'archive' | 'tests';
 type InspectorTab = 'understand' | 'code' | 'tests';
 
-const NODES: Record<TodoNode, { title: string; subtitle: string; summary: string; detail: string; needle: string }> = {
-  input: { title: 'Task input', subtitle: 'Create', summary: 'Create a new task with a title.', detail: 'addTask() validates a name, allocates a stable ID, and appends an incomplete task.', needle: 'export function addTask' },
-  list: { title: 'Task list', subtitle: 'Collection', summary: 'The state contains an ordered collection of task records.', detail: 'The reducer returns new state objects instead of mutating an existing list. This lets the interface render the latest task collection.', needle: 'export interface TodoState' },
-  active: { title: 'Active', subtitle: 'To do', summary: 'Incomplete tasks remain actionable.', detail: 'toggleTask() flips completed while preserving the task ID and title. A task stays in the list when marked done.', needle: 'export function toggleTask' },
-  completed: { title: 'Completed', subtitle: 'Done', summary: 'Completed tasks are still stored until cleared.', detail: 'Marking a task done changes completed from false to true. It does not remove the task.', needle: 'export function toggleTask' },
-  archive: { title: 'Remove', subtitle: 'Clear', summary: 'Delete one task or clear completed work.', detail: 'removeTask() deletes one ID; clearCompleted() removes every completed task. These are explicit changes to state, not background cleanup.', needle: 'export function clearCompleted' },
-  tests: { title: 'Tests', subtitle: 'Inspect', summary: 'Pure tests check the task state transitions.', detail: 'The tests cover addition, completion, stable IDs, immutable state and removal. This Explorer displays their source; it does not run Vitest in the browser.', needle: 'export function todoTransition' },
+const NODES: Record<TodoNode, { title: string; subtitle: string; summary: string; detail: string }> = {
+  input: { title: 'Task input', subtitle: 'Create', summary: 'Create a new task with a title.', detail: 'addTask() validates a name, allocates a stable ID, and appends an incomplete task.' },
+  list: { title: 'Task list', subtitle: 'Collection', summary: 'The state contains an ordered collection of task records.', detail: 'The reducer returns new state objects instead of mutating an existing list. This lets the interface render the latest task collection.' },
+  active: { title: 'Active', subtitle: 'To do', summary: 'Incomplete tasks remain actionable.', detail: 'toggleTask() flips completed while preserving the task ID and title. A task stays in the list when marked done.' },
+  completed: { title: 'Completed', subtitle: 'Done', summary: 'Completed tasks are still stored until cleared.', detail: 'Marking a task done changes completed from false to true. It does not remove the task.' },
+  archive: { title: 'Remove', subtitle: 'Clear', summary: 'Delete one task or clear completed work.', detail: 'removeTask() deletes one ID; clearCompleted() removes every completed task. These are explicit changes to state, not background cleanup.' },
+  tests: { title: 'Tests', subtitle: 'Inspect', summary: 'Pure tests check the task state transitions.', detail: 'The tests cover addition, completion, stable IDs, immutable state and removal. This Explorer displays their source; it does not run Vitest in the browser.' },
 };
 
 const LAYOUT: TodoNode[] = ['input', 'list', 'active', 'tests', 'archive', 'completed'];
-const source = { path: 'src/lib/engineering/todoModel.ts', repoPath: 'src/lib/engineering/todoModel.ts', text: todoSource };
-const tests = { path: 'src/lib/engineering/todoModel.test.ts', repoPath: 'src/lib/engineering/todoModel.test.ts', text: todoTestSource };
 
 interface Props {
   projectId: string;
@@ -158,10 +154,10 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
               </div>
             )}
             {tab === 'code' && (
-              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><SourceExcerpt source={source} title={titleOf(selected)} needle={part.needle} /></div>
+              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="implementation" title={titleOf(selected)} /></div>
             )}
             {tab === 'tests' && (
-              <div className="space-y-2"><p className={'text-xs ' + muted}>Actual Vitest test source. These tests do not run when you use the Explorer.</p><SourceExcerpt source={tests} title="Todo model tests" needle="describe('Todo engineering example'" /></div>
+              <div className="space-y-2"><p className={'text-xs ' + muted}>Actual Vitest test source. These tests do not run when you use the Explorer.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="test" title="Todo model tests" /></div>
             )}
           </div>
         </section>
