@@ -156,6 +156,19 @@ describe('EngineeringExplorerPage: visual system model', () => {
     expect(diagram.parentElement?.parentElement).toHaveClass('hidden');
   });
 
+  it('shows live queue scheduling facts inside the selected Retry engineering entity', async () => {
+    const user = userEvent.setup();
+    renderExplorer();
+    const diagram = screen.getByRole('group', { name: 'Event queue system diagram' });
+    const inspector = screen.getByRole('region', { name: 'Inspector' });
+    await user.click(within(diagram).getByRole('button', { name: 'Retry' }));
+    const observed = within(inspector).getByRole('region', { name: 'Observed retry implementation' });
+    expect(observed).toHaveTextContent('Initial retry backoff: 1000ms');
+    expect(observed).toHaveTextContent('maximum attempts: 3');
+    expect(observed).toHaveTextContent('ready: 0');
+    expect(observed).toHaveTextContent('waiting: 0');
+  });
+
   it('executes the real queue and highlights worker failure → lease expiry → retry → ack', async () => {
     const user = userEvent.setup();
     renderExplorer();
