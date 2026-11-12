@@ -10,7 +10,8 @@ import Dexie, { type Table } from 'dexie';
 import { db as projectDb } from '../db/schema';
 import { generateId } from '../utils/ids';
 import { engineeringExampleKind, exampleConceptId, type EngineeringExampleKind } from './demoProjects';
-import { fixtureTransitions, type EngineeringTransition } from './modelCatalog';
+import { fixtureTransitions, type EngineeringTransition, type EngineeringRelationKind } from './modelCatalog';
+import { fixtureSourceBindings, validateSourceBinding, type EngineeringSourceBinding } from './sourceCatalog';
 import type { LandscapeRegion } from '../../types/landscape';
 
 export const ENGINEERING_MODEL_DB_NAME = 'chatdex-engineering-model-v1';
@@ -39,12 +40,18 @@ export interface ModelProposalEvent {
 class EngineeringModelDB extends Dexie {
   transitions!: Table<EngineeringTransition, string>;
   proposals!: Table<ModelProposalEvent, string>;
+  sourceBindings!: Table<EngineeringSourceBinding, string>;
 
   constructor(name = ENGINEERING_MODEL_DB_NAME) {
     super(name);
     this.version(1).stores({
       transitions: '&id, projectId, fromConceptId, toConceptId',
       proposals: '&id, projectId, targetId, [projectId+targetId], at',
+    });
+    // Additive: pre-existing proposals/transitions survive the upgrade.
+    // Source text still belongs exclusively to the existing repoFiles cache.
+    this.version(2).stores({
+      sourceBindings: '&id, projectId, targetId, [projectId+targetId], repoKey',
     });
   }
 }
@@ -62,9 +69,11 @@ export interface ModelElement {
 
 export interface ProjectEngineeringModel {
   projectId: string;
-  kind: EngineeringExampleKind;
+  /** Null means a normal project with no example-specific runtime adapter. */
+  kind: EngineeringExampleKind | null;
   concepts: LandscapeRegion[];
   transitions: EngineeringTransition[];
+  sourceBindings: EngineeringSourceBinding[];
   elements: Record<string, ModelElement>;
 }
 
@@ -104,11 +113,17 @@ export async function installExampleTransitions(projectId: string): Promise<numb
     throw new Error('Project not installed');
   }
   let created = 0;
-  await engineeringModelDb.transaction('rw', engineeringModelDb.transitions, async () => {
+  await engineeringModelDb.transaction('rw', engineeringModelDb.transitions, engineeringModelDb.sourceBindings, async () => {
     for (const transition of fixtureTransitions(kind, projectId)) {
       if (await engineeringModelDb.transitions.get(transition.id)) continue;
       await engineeringModelDb.transitions.add(transition);
       created += 1;
+    }
+    for (const binding of fixtureSourceBindings(kind, projectId)) {
+      validateSourceBinding(binding);
+      if (!(await engineeringModelDb.sourceBindings.get(binding.id))) {
+        await engineeringModelDb.sourceBindings.add(binding);
+      }
     }
   });
   return created;
@@ -117,11 +132,12 @@ export async function installExampleTransitions(projectId: string): Promise<numb
 /** Read only: opening an example does not silently install or overwrite models. */
 export async function loadEngineeringModel(projectId: string): Promise<ProjectEngineeringModel> {
   const kind = engineeringExampleKind(projectId);
-  if (!kind) throw new Error('No engineering example adapter for this project');
-  const [concepts, transitions, proposals] = await Promise.all([
+  if (!(await projectDb.understandingProjects.get(projectId))) throw new Error('Project not found');
+  const [concepts, transitions, proposals, sourceBindings] = await Promise.all([
     projectDb.landscapeRegions.where('projectId').equals(projectId).toArray(),
     engineeringModelDb.transitions.where('projectId').equals(projectId).toArray(),
     engineeringModelDb.proposals.where('projectId').equals(projectId).toArray(),
+    engineeringModelDb.sourceBindings.where('projectId').equals(projectId).toArray(),
   ]);
   const elements: Record<string, ModelElement> = {};
   for (const concept of concepts) {
@@ -130,11 +146,11 @@ export async function loadEngineeringModel(projectId: string): Promise<ProjectEn
   for (const transition of transitions) {
     elements[transition.id] = summarize(transition.id, 'transition', transitionWording(transition), proposals.filter((p) => p.targetId === transition.id));
   }
-  return { projectId, kind, concepts, transitions, elements };
+  return { projectId, kind, concepts, transitions, sourceBindings, elements };
 }
 
 export function relationForNode(model: ProjectEngineeringModel, nodeId: string): EngineeringTransition[] {
-  const conceptId = exampleConceptId(model.kind, nodeId);
+  const conceptId = model.elements[nodeId] ? nodeId : model.kind ? exampleConceptId(model.kind, nodeId) : nodeId;
   return model.transitions.filter((edge) => edge.fromConceptId === conceptId || edge.toConceptId === conceptId);
 }
 
@@ -161,8 +177,7 @@ async function requireTarget(projectId: string, targetId: string): Promise<{ kin
  * A stale draft must be withdrawn and reauthored against current project data.
  */
 export async function proposeModelEdit(projectId: string, targetId: string, next: ModelWording): Promise<ModelProposalEvent> {
-  const kind = engineeringExampleKind(projectId);
-  if (!kind) throw new Error('Only installed examples support proposals in iteration 3');
+  if (!(await projectDb.understandingProjects.get(projectId))) throw new Error('Project not found');
   const proposed = validatedWording(next);
   const target = await requireTarget(projectId, targetId);
   const history = await engineeringModelDb.proposals.where('[projectId+targetId]').equals([projectId, targetId]).toArray();
@@ -191,4 +206,49 @@ export async function withdrawModelEdit(projectId: string, targetId: string): Pr
   };
   await engineeringModelDb.proposals.add(event);
   return event;
+}
+
+
+/** Generic relationship creation (no event-queue or todo-list assumptions). */
+export async function createModelRelationship(input: {
+  projectId: string;
+  fromConceptId: string;
+  toConceptId: string;
+  kind: EngineeringRelationKind;
+  title: string;
+  description: string;
+}): Promise<EngineeringTransition> {
+  const project = await projectDb.understandingProjects.get(input.projectId);
+  if (!project || project.reviewState === 'rejected') throw new Error('Project not found or rejected');
+  const [from, to] = await Promise.all([
+    projectDb.landscapeRegions.get(input.fromConceptId),
+    projectDb.landscapeRegions.get(input.toConceptId),
+  ]);
+  if (!from || !to || from.projectId !== input.projectId || to.projectId !== input.projectId) {
+    throw new Error('Both endpoints must belong to the same project');
+  }
+  if (!(['flow', 'state_transition', 'depends_on', 'verified_by'] as string[]).includes(input.kind)) {
+    throw new Error('Unsupported relationship kind');
+  }
+  const wording = validatedWording(input);
+  const relation: EngineeringTransition = {
+    id: generateId(), projectId: input.projectId,
+    fromConceptId: input.fromConceptId, toConceptId: input.toConceptId,
+    kind: input.kind, title: wording.title, description: wording.description,
+    origin: 'manual', createdAt: new Date(),
+  };
+  await engineeringModelDb.transitions.add(relation);
+  return relation;
+}
+
+/** Generic source binding registration; never fetches or writes repository code. */
+export async function createModelSourceBinding(input: Omit<EngineeringSourceBinding, 'id'>): Promise<EngineeringSourceBinding> {
+  const project = await projectDb.understandingProjects.get(input.projectId);
+  if (!project || project.reviewState === 'rejected') throw new Error('Project not found or rejected');
+  const target = await requireTarget(input.projectId, input.targetId);
+  if (!target) throw new Error('Model target missing');
+  const binding: EngineeringSourceBinding = { ...input, id: generateId() };
+  validateSourceBinding(binding);
+  await engineeringModelDb.sourceBindings.add(binding);
+  return binding;
 }
