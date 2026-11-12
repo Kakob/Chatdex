@@ -73,6 +73,34 @@ describe('EngineeringExplorerPage: visual system model', () => {
     expect(within(inspector).getByText(/it\('\[EQ-C7\]/)).toBeInTheDocument();
   });
 
+  it('wraps source and test lines by default on mobile while preserving an opt-in unwrapped view', async () => {
+    const user = userEvent.setup();
+    renderExplorer();
+
+    const diagram = screen.getByRole('group', { name: 'Event queue system diagram' });
+    const inspector = screen.getByRole('region', { name: 'Inspector' });
+    await user.click(within(diagram).getByRole('button', { name: 'Worker' }));
+    await user.click(within(inspector).getByRole('tab', { name: 'Code' }));
+
+    const codeViewport = within(inspector).getByTestId('source-viewport');
+    expect(codeViewport).toHaveAttribute('data-wrap', 'on');
+    expect(codeViewport).toHaveClass('overflow-x-hidden');
+    expect(within(inspector).getByRole('button', { name: /Wrap lines/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(codeViewport).getByText(/export async function workOnce/)).toHaveClass('whitespace-pre-wrap');
+
+    await user.click(within(inspector).getByRole('button', { name: /Wrap lines/ }));
+    expect(codeViewport).toHaveAttribute('data-wrap', 'off');
+    expect(codeViewport).toHaveClass('overflow-x-auto');
+    expect(within(codeViewport).getByText(/export async function workOnce/)).toHaveClass('whitespace-pre');
+
+    await user.click(within(inspector).getByRole('button', { name: /Wrap lines/ }));
+    expect(codeViewport).toHaveAttribute('data-wrap', 'on');
+    await user.click(within(inspector).getByRole('tab', { name: 'Tests' }));
+    const testViewport = within(inspector).getByTestId('source-viewport');
+    expect(testViewport).toHaveAttribute('data-wrap', 'on');
+    expect(testViewport).toHaveClass('overflow-x-hidden');
+  });
+
   it('steps through a worker failure and visually highlights the relevant components and transitions', async () => {
     const user = userEvent.setup();
     renderExplorer();
