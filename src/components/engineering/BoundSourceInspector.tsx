@@ -30,10 +30,14 @@ interface Props {
 
 export function BoundSourceInspector({ model, targetId, role, title, exampleFallback }: Props) {
   const sources = useMemo(() => {
-    if (model) return model.sourceBindings;
+    if (model?.sourceBindings.some((source) => source.targetId === targetId && source.role === role)) {
+      return model.sourceBindings;
+    }
+    // Until an existing Iteration-2 example is explicitly upgraded, its
+    // fixed demo code remains inspectable through the same binding catalog.
     if (exampleFallback) return fixtureSourceBindings(exampleFallback.kind, exampleFallback.projectId);
-    return [];
-  }, [model, exampleFallback?.kind, exampleFallback?.projectId]);
+    return model?.sourceBindings ?? [];
+  }, [model, targetId, role, exampleFallback?.kind, exampleFallback?.projectId]);
   const binding = sources.find((source) => source.targetId === targetId && source.role === role);
   const bindingKey = binding ? [binding.id, binding.path, binding.sha ?? '', binding.needle].join(':') : '';
   const [result, setResult] = useState<{ key: string; value: SourceResolution } | null>(null);
