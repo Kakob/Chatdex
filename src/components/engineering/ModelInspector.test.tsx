@@ -30,7 +30,7 @@ describe('shared model inspector', () => {
     const user = userEvent.setup();
     const ui = render(<Editor projectId={TODO_LIST_PROJECT_ID} kind="todo-list" nodeId="active" />);
     const model = await screen.findByRole('region', { name: 'Persistent engineering model' });
-    expect(within(model).getByText('Active tasks')).toBeInTheDocument();
+    expect(await within(model).findByText('Active tasks')).toBeInTheDocument();
 
     await user.click(within(model).getByRole('button', { name: 'Propose model edit' }));
     await user.clear(within(model).getByRole('textbox', { name: 'Proposed name' }));
@@ -49,7 +49,7 @@ describe('shared model inspector', () => {
 
     await user.click(within(loaded).getByRole('button', { name: 'Withdraw draft' }));
     await waitFor(() => expect(within(loaded).queryByText('Ready for work')).not.toBeInTheDocument());
-    await user.click(within(loaded).getByText('Model revision history (2)'));
+    await user.click(await within(loaded).findByText('Model revision history (2)'));
     expect(within(loaded).getByText(/#2 · Withdrawn/)).toBeInTheDocument();
   });
 
@@ -57,7 +57,7 @@ describe('shared model inspector', () => {
     const user = userEvent.setup();
     render(<Editor projectId={EVENT_QUEUE_PROJECT_ID} kind="event-queue" nodeId="leased" />);
     const section = await screen.findByRole('region', { name: 'Persistent engineering model' });
-    await user.click(within(section).getByText(/Connected transitions/));
+    await user.click(await within(section).findByText(/Connected transitions/));
     await user.click(within(section).getByRole('button', { name: /Pending → leased/ }));
     expect(within(section).getByText('Pending → leased')).toBeInTheDocument();
     await user.click(within(section).getByRole('button', { name: 'Propose model edit' }));
