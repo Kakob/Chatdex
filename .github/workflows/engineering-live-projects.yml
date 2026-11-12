@@ -1,0 +1,31 @@
+name: Engineering live projects checks
+
+on:
+  push:
+    branches:
+      - feature/engineering-live-projects
+  pull_request:
+    paths:
+      - 'src/components/engineering/**'
+      - 'src/lib/engineering/**'
+      - 'src/pages/Engineering*'
+      - 'src/pages/TodoExplorerPage*'
+      - 'src/pages/ProjectsPage.tsx'
+      - 'src/App.tsx'
+      - '.github/workflows/engineering-live-projects.yml'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test -- src/lib/engineering/liveQueue.test.ts src/lib/engineering/todoModel.test.ts src/lib/engineering/demoProjects.test.ts src/pages/EngineeringExplorerPage.test.tsx src/pages/TodoExplorerPage.test.tsx
+      - run: npm run build
