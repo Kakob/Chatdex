@@ -119,7 +119,12 @@ main Dexie schema. No in-app command execution, GitHub writes, or LLM calls.
 
 ## Verification
 
-Baseline (`5198800` + docs commit): recorded below when the run completes.
+Baseline before any code (`2a7f4c2`, docs only): `npm run typecheck` clean; `npm test` 138 files /
+1111 tests passed.
+
+Queue baseline `f354cf7`: `npm run queue:test` → 6 passed, 1 failed (EQ-C5, by design:
+"job was lost: removed on dispatch before the worker completed"). Pinned evidence
+`examples/event-queue/evidence/f354cf78ffad.json` captured from a clean tree.
 
 ## Open acceptance checks
 
