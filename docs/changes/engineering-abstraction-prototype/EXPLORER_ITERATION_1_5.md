@@ -94,6 +94,10 @@ Recommended:
 
 These commands and a browser screenshot walkthrough have not been run in this chat environment. GitHub connector writes are available but a local clone and its dependency tree are unavailable here. Do not treat this as verified on-device until checked.
 
+## Direction for real Chatdex projects
+
+The Explorer could become the project home, with Investigate History, Current Understanding and Prepare Change as different **lenses on a persistent system model**, not separately invented diagrams or one blended evidence status. This is a **proposal, not implemented by the standalone synthetic Explorer**. See [Explorer as Project Workspace](./EXPLORER_PROJECT_WORKSPACE_PROPOSAL.md) for object identity, provenance/review boundaries, and incremental integration steps.
+
 ## Next milestone
 
 Iteration 2 should run the **real** event-queue harness and controlled clock in the browser, show actual events and states on this diagram, and link transitions to implementation. Do not add a separate simulator page or more long forms. Keep observed execution distinct from the illustrated walkthrough.
