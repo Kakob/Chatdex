@@ -7,6 +7,7 @@
  * This API is unsupported on iOS/Safari; use the copy/handoff path there.
  */
 import { sha256Hex } from '../utils/hash';
+import { engineeringModelDb } from './modelStore';
 import type { SourceEditProposal } from './codingProtocol';
 import { validateSourceBinding } from './sourceCatalog';
 import { recordSuccessfulWrite } from './codingStore';
@@ -39,6 +40,12 @@ export async function writeRevisionToPickedFolder(
   edit: SourceEditProposal,
   pick: DirectoryPicker,
 ): Promise<LocalWriteResult> {
+  const staged = await engineeringModelDb.codeRevisions.get(edit.id);
+  if (!staged || staged.projectId !== edit.projectId || staged.path !== edit.path ||
+      staged.baselineHash !== edit.baselineHash || staged.proposedHash !== edit.proposedHash ||
+      staged.proposedText !== edit.proposedText) {
+    throw new Error('This revision is not an unchanged, staged code edit');
+  }
   validateSourceBinding({
     id: edit.bindingId, projectId: edit.projectId, targetId: edit.targetId,
     role: 'implementation', repoKey: edit.repoKey, path: edit.path,
