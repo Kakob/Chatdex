@@ -43,6 +43,7 @@ export function BoundSourceInspector({ model, targetId, role, title, exampleFall
   const binding = sources.find((source) => source.targetId === targetId && source.role === role);
   const bindingKey = binding ? [binding.id, binding.path, binding.sha ?? '', binding.needle].join(':') : '';
   const [result, setResult] = useState<{ key: string; value: SourceResolution } | null>(null);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   useEffect(() => {
     if (!binding) return;
@@ -54,7 +55,7 @@ export function BoundSourceInspector({ model, targetId, role, title, exampleFall
     // Bind to the immutable identifying fields. Otherwise the explicit demo
     // fallback creates a fresh object on each render and loops this effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bindingKey]);
+  }, [bindingKey, refreshCount]);
 
   if (!binding) return (
     <p className={'text-xs leading-5 ' + muted}>
@@ -66,7 +67,14 @@ export function BoundSourceInspector({ model, targetId, role, title, exampleFall
     return <p className={'text-xs ' + muted}>Resolving source from the local repository reader…</p>;
   }
 
-  return <BoundSourceResult binding={binding} resolved={result.value} title={title} model={model} onModelRefresh={onModelRefresh} />;
+  return (
+    <div className="space-y-2">
+      <button type="button" className="text-xs text-violet-700 underline dark:text-violet-300" onClick={() => setRefreshCount((n) => n + 1)}>
+        Refresh bound source from cache
+      </button>
+      <BoundSourceResult binding={binding} resolved={result.value} title={title} model={model} onModelRefresh={onModelRefresh} />
+    </div>
+  );
 }
 
 function BoundSourceResult({
