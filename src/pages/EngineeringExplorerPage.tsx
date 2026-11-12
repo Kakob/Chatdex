@@ -143,6 +143,8 @@ const SCENARIOS: Record<ScenarioId, ScenarioStep[]> = {
 
 function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: string; title: string }) {
   const [full, setFull] = useState(false);
+  // Default to a readable phone-sized column; unwrapped mode is opt-in.
+  const [wrapLines, setWrapLines] = useState(true);
   const file = SOURCES[fileId];
   const lines = file.text.split('\n');
   const match = lines.findIndex((line) => line.includes(needle));
@@ -159,14 +161,20 @@ function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: st
           GitHub <ExternalLink size={12} />
         </a>
       </div>
-      <div className="max-w-full overflow-auto rounded-lg border border-gray-700 bg-gray-950 text-gray-100" aria-label={title + ' excerpt'}>
-        <pre className="w-max min-w-full p-3 font-mono text-[11px] leading-5">
-          <code>
+      <div
+        className={'max-w-full rounded-lg border border-gray-700 bg-gray-950 text-gray-100 ' + (wrapLines ? 'overflow-x-hidden' : 'overflow-x-auto')}
+        aria-label={title + ' excerpt'}
+        data-testid="source-viewport"
+        data-wrap={wrapLines ? 'on' : 'off'}
+      >
+        <pre className={'p-3 font-mono text-[11px] leading-5 ' + (wrapLines ? 'w-full min-w-0' : 'w-max min-w-full')}>
+          <code className="block">
             {lines.slice(from, to).map((line, i) => {
               const n = from + i + 1;
               return (
-                <span key={n} className={'block whitespace-pre pr-2 ' + (n === match + 1 ? 'bg-violet-900/70' : '')}>
-                  <span className="mr-3 inline-block w-7 select-none text-right text-gray-500">{n}</span>{line || ' '}{'\n'}
+                <span key={n} className={'grid ' + (wrapLines ? 'grid-cols-[2.25rem_minmax(0,1fr)]' : 'grid-cols-[2.25rem_max-content]') + (n === match + 1 ? ' bg-violet-900/70' : '')}>
+                  <span aria-hidden="true" className="select-none pr-2 text-right text-gray-500">{n}</span>
+                  <span className={'min-w-0 ' + (wrapLines ? 'whitespace-pre-wrap [overflow-wrap:anywhere]' : 'whitespace-pre')}>{line || ' '}</span>
                 </span>
               );
             })}
@@ -174,9 +182,14 @@ function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: st
         </pre>
       </div>
       {match < 0 && <p role="alert" className="text-xs text-amber-700 dark:text-amber-300">This authored entry point was not found in the bundled source.</p>}
-      <button type="button" className={button} onClick={() => setFull(!full)}>
-        {full ? 'Show relevant excerpt' : 'View full file'}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className={button} onClick={() => setFull(!full)}>
+          {full ? 'Show relevant excerpt' : 'View full file'}
+        </button>
+        <button type="button" className={button} aria-pressed={wrapLines} onClick={() => setWrapLines((value) => !value)}>
+          {wrapLines ? 'Wrap lines ✓' : 'Wrap lines'}
+        </button>
+      </div>
     </div>
   );
 }
