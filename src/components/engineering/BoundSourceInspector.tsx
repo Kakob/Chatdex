@@ -15,6 +15,7 @@ import {
   type SourceResolution,
 } from '../../lib/engineering/sourceCatalog';
 import { SourceExcerpt } from './SourceExcerpt';
+import { SourceBuildWorkspace } from './SourceBuildWorkspace';
 import { muted } from './ui';
 
 type Role = 'implementation' | 'test';
@@ -26,9 +27,10 @@ interface Props {
   title: string;
   /** Explicit-only fallback for the legacy standalone queue Explorer. */
   exampleFallback?: { kind: EngineeringExampleKind; projectId: string };
+  onModelRefresh?: () => Promise<void>;
 }
 
-export function BoundSourceInspector({ model, targetId, role, title, exampleFallback }: Props) {
+export function BoundSourceInspector({ model, targetId, role, title, exampleFallback, onModelRefresh }: Props) {
   const sources = useMemo(() => {
     if (model?.sourceBindings.some((source) => source.targetId === targetId && source.role === role)) {
       return model.sourceBindings;
@@ -64,15 +66,17 @@ export function BoundSourceInspector({ model, targetId, role, title, exampleFall
     return <p className={'text-xs ' + muted}>Resolving source from the local repository reader…</p>;
   }
 
-  return <BoundSourceResult binding={binding} resolved={result.value} title={title} />;
+  return <BoundSourceResult binding={binding} resolved={result.value} title={title} model={model} onModelRefresh={onModelRefresh} />;
 }
 
 function BoundSourceResult({
-  binding, resolved, title,
+  binding, resolved, title, model, onModelRefresh,
 }: {
   binding: EngineeringSourceBinding;
   resolved: SourceResolution;
   title: string;
+  model: ProjectEngineeringModel | null;
+  onModelRefresh?: () => Promise<void>;
 }) {
   if (resolved.status === 'not-indexed') return (
     <p className="text-xs text-amber-700 dark:text-amber-300">
@@ -106,6 +110,10 @@ function BoundSourceResult({
         needle={binding.needle}
         title={title}
       />
+      {binding.role === 'implementation' && model && (
+        <SourceBuildWorkspace key={binding.id + ':' + (binding.sha ?? 'bundled')} model={model} binding={binding}
+          originalText={text} targetName={title} onRefresh={onModelRefresh} />
+      )}
     </div>
   );
 }
