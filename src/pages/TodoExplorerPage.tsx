@@ -6,6 +6,7 @@ import { useReducer, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, BookOpen, Code2, Maximize2, Minimize2, Plus } from 'lucide-react';
 import { SourceExcerpt } from '../components/engineering/SourceExcerpt';
+import { ModelInspector, useExampleEngineeringModel } from '../components/engineering/ModelInspector';
 import { Badge, button, muted } from '../components/engineering/ui';
 import { initialTodoState, todoTransition, type TodoAction } from '../lib/engineering/todoModel';
 import { exampleConceptId } from '../lib/engineering/demoProjects';
@@ -43,9 +44,12 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
   const [inspectorFocused, setInspectorFocused] = useState(false);
   const [lastAction, setLastAction] = useState('Add a task to begin.');
   const [highlighted, setHighlighted] = useState<TodoNode[]>(['list']);
+  const { model: engineeringModel, refresh: refreshModel, error: modelError } = useExampleEngineeringModel(projectId);
 
   const selectNode = (node: TodoNode) => setSelected(node);
   const titleOf = (node: TodoNode) => concepts.find((concept) => concept.id === exampleConceptId('todo-list', node))?.title ?? NODES[node].title;
+  const proposalOf = (node: TodoNode) => engineeringModel?.elements[exampleConceptId('todo-list', node)]?.proposed;
+  const displayTitleOf = (node: TodoNode) => proposalOf(node)?.title ?? titleOf(node);
   const apply = (action: TodoAction, focus: TodoNode, message: string) => {
     dispatch(action);
     setSelected(focus);
@@ -79,14 +83,15 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
                 const current = NODES[node];
                 const chosen = selected === node;
                 const active = highlighted.includes(node);
+                const proposed = Boolean(proposalOf(node));
                 const count = node === 'active' ? state.items.length - countCompleted : node === 'completed' ? countCompleted : node === 'list' ? state.items.length : null;
                 return (
-                  <button key={node} type="button" aria-pressed={chosen} onClick={() => selectNode(node)} data-node={node} data-highlighted={active ? 'true' : undefined}
+                  <button key={node} type="button" aria-pressed={chosen} onClick={() => selectNode(node)} data-node={node} data-proposed={proposed ? 'true' : undefined} data-highlighted={active ? 'true' : undefined}
                     className={'relative flex min-h-[60px] min-w-0 flex-col items-center justify-center rounded-lg border px-1 text-center focus-visible:outline-2 focus-visible:outline-violet-600 ' +
                       (chosen ? 'border-violet-500 bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-950' :
-                        active ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950' : 'border-gray-300 dark:border-gray-600')}>
-                    <span className="text-[11px] font-semibold sm:text-xs">{titleOf(node)}</span>
-                    <span className={'text-[9px] ' + muted}>{current.subtitle}{count !== null ? ' · ' + count : ''}</span>
+                        active ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950' : 'border-gray-300 dark:border-gray-600') + (proposed ? ' !border-amber-500 border-dashed' : '')}>
+                    <span className="text-[11px] font-semibold sm:text-xs">{displayTitleOf(node)}</span>
+                    <span className={'text-[9px] ' + muted}>{proposed ? 'Proposed · ' : ''}{current.subtitle}{count !== null ? ' · ' + count : ''}</span>
                     {(index === 0 || index === 1 || index === 4) && <span aria-hidden="true" className="absolute -right-2.5 z-10 text-gray-500">→</span>}
                   </button>
                 );
@@ -125,7 +130,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
 
         <section aria-label="Todo inspector" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
           <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2">
-            <div className="min-w-0"><p className={'text-[10px] uppercase ' + muted}>Selected concept · project model</p><h2 className="truncate font-semibold">{titleOf(selected)}</h2></div>
+            <div className="min-w-0"><p className={'text-[10px] uppercase ' + muted}>Selected concept · project model</p><h2 className="truncate font-semibold">{displayTitleOf(selected)}</h2>{proposalOf(selected) && <p className="text-[10px] text-amber-700 dark:text-amber-300">Proposed only · runtime unchanged</p>}</div>
             <button className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-700 lg:hidden" type="button" aria-label={inspectorFocused ? 'Show diagram' : 'Expand inspector'} onClick={() => setInspectorFocused(!inspectorFocused)}>{inspectorFocused ? <Minimize2 size={16} /> : <Maximize2 size={16} />}</button>
           </div>
           <div role="tablist" aria-label="Todo inspector views" className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
@@ -138,6 +143,8 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
             {tab === 'understand' && (
               <div className="space-y-3 text-sm">
                 <p className="font-semibold">{part.summary}</p><p className="leading-6">{part.detail}</p>
+                <ModelInspector key={selected} projectId={projectId} kind="todo-list" nodeId={selected} model={engineeringModel} onRefresh={refreshModel} />
+                {modelError && <p role="alert" className="text-xs text-red-700">{modelError}</p>}
                 <p className={'text-xs ' + muted}>Model concept ID: {exampleConceptId('todo-list', selected)}. The concept is persisted in the Chatdex project; runtime task state is not.</p>
                 <button type="button" className={button} onClick={() => { setTab('code'); setInspectorFocused(true); }}><Code2 size={14} /> Inspect actual implementation <ArrowRight size={13} /></button>
                 <nav aria-label="Related project workflows" className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 text-xs dark:border-gray-700">
