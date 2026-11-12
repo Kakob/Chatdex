@@ -65,7 +65,7 @@ Install or refresh example projects explicitly, then open their engineering mode
     npm install
     npm run dev -- --host 0.0.0.0
 
-Use the same network address you already use on the phone.
+On your phone, use the computer's local-network address and Vite's port. Open **Projects → Add engineering examples** again, even if the two projects already exist from Iteration 2; that action idempotently installs the newly added relationship records without overwriting your existing projects or concepts. Then open either example's **Open engineering model** route.
 
 **Todo List:** select Active → Understand → Shared model → Propose model edit. Rename to "Ready to work" and save. The diagram shows the proposed name, but a task can still be checked complete/reopened through the real reducer. Open Code and Tests: they remain unchanged. Reload and check the proposal/history. Withdraw and verify the overlay disappears but the history persists.
 
