@@ -119,8 +119,15 @@ function BoundSourceResult({
         title={title}
       />
       {binding.role === 'implementation' && model && (
-        <SourceBuildWorkspace key={binding.id + ':' + (binding.sha ?? 'bundled')} model={model} binding={binding}
-          originalText={text} targetName={title} onRefresh={onModelRefresh} />
+        model.sourceBindings.some((registered) => registered.id === binding.id) ? (
+          <SourceBuildWorkspace key={binding.id + ':' + (binding.sha ?? 'bundled')} model={model} binding={binding}
+            originalText={text} targetName={title} onRefresh={onModelRefresh} />
+        ) : (
+          <p className={'text-xs ' + muted}>
+            This legacy example is readable, but its coding binding is not installed yet.
+            Open Projects and choose Add engineering examples to upgrade the source bindings safely.
+          </p>
+        )
       )}
     </div>
   );
