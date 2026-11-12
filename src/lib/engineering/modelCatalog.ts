@@ -19,7 +19,7 @@ export interface EngineeringTransition {
   kind: EngineeringRelationKind;
   title: string;
   description: string;
-  origin: 'authored-fixture';
+  origin: 'authored-fixture' | 'manual';
   createdAt: Date;
 }
 
