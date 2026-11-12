@@ -173,8 +173,12 @@ describe('EngineeringExplorerPage: visual system model', () => {
     expect(live).toHaveTextContent('Leased: 1');
 
     await user.click(within(live).getByRole('button', { name: 'Advance clock' }));
-    await waitFor(() => expect(live).toHaveTextContent('Pending: 1'));
+    await waitFor(() => expect(live).toHaveTextContent('Waiting: 1'));
+    expect(live).toHaveTextContent('Pending: 1');
+    expect(within(live).getByRole('button', { name: 'Claim' })).toBeDisabled();
     expect(diagram.querySelector('[data-edge="requeue"]')).toHaveAttribute('data-highlighted', 'true');
+    await user.click(within(live).getByRole('button', { name: 'Advance clock' }));
+    await waitFor(() => expect(live).toHaveTextContent('Ready: 1'));
 
     await user.click(within(live).getByRole('button', { name: 'Claim' }));
     await waitFor(() => expect(live).toHaveTextContent('Leased: 1'));
