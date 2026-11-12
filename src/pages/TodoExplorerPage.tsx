@@ -132,7 +132,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
           </div>
           <div role="tablist" aria-label="Todo inspector views" className="flex shrink-0 border-b border-gray-200 dark:border-gray-700">
             {(['understand', 'code', 'tests'] as const).map((name) => (
-              <button key={name} type="button" role="tab" aria-selected={name === tab} onClick={() => setTab(name)}
+              <button key={name} type="button" role="tab" aria-selected={name === tab} onClick={() => { setTab(name); if (name !== 'understand') setInspectorFocused(true); }}
                 className={'min-h-11 flex-1 border-b-2 text-sm capitalize ' + (name === tab ? 'border-violet-600 font-semibold text-violet-700 dark:text-violet-300' : 'border-transparent text-gray-500')}>{name.charAt(0).toUpperCase() + name.slice(1)}</button>
             ))}
           </div>
@@ -154,7 +154,7 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
               </div>
             )}
             {tab === 'code' && (
-              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="implementation" title={titleOf(selected)} exampleFallback={{ kind: "todo-list", projectId }} /></div>
+              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="implementation" title={titleOf(selected)} onModelRefresh={refreshModel} exampleFallback={{ kind: "todo-list", projectId }} /></div>
             )}
             {tab === 'tests' && (
               <div className="space-y-2"><p className={'text-xs ' + muted}>Actual Vitest test source. These tests do not run when you use the Explorer.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="test" title="Todo model tests" exampleFallback={{ kind: "todo-list", projectId }} /></div>
