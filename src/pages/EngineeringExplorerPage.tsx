@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, ChevronLeft, ChevronRight, Code2, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
 import { Badge, button, muted } from '../components/engineering/ui';
 import {
   SystemDiagram,
@@ -184,6 +184,7 @@ function SourceExcerpt({ fileId, needle, title }: { fileId: SourceId; needle: st
 export function EngineeringExplorerPage() {
   const [selected, setSelected] = useState<DiagramNodeId>('queue');
   const [tab, setTab] = useState<InspectorTab>('understand');
+  const [inspectorFocused, setInspectorFocused] = useState(false);
   const [scenario, setScenario] = useState<ScenarioId>('failure');
   const [stepIndex, setStepIndex] = useState(0);
   const part = PARTS[selected];
@@ -225,7 +226,7 @@ export function EngineeringExplorerPage() {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(370px,.95fr)]">
-        <div className="flex min-h-0 shrink-0 flex-col gap-2 lg:min-h-0 lg:shrink">
+        <div className={(inspectorFocused ? 'hidden lg:flex' : 'flex') + " min-h-0 shrink-0 flex-col gap-2 lg:min-h-0 lg:shrink"}>
           <div className="flex shrink-0 items-center justify-between gap-2" role="group" aria-label="Scenario choice">
             <span className={'text-xs font-medium ' + muted}>Illustrated path</span>
             <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
@@ -266,7 +267,12 @@ export function EngineeringExplorerPage() {
               <p className={'text-[10px] font-semibold uppercase tracking-wide ' + muted}>Selected system part · {part.role}</p>
               <h2 className="truncate text-base font-semibold">{part.title}</h2>
             </div>
-            <span className="shrink-0 rounded-full bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-200">Authored model</span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="hidden rounded-full bg-violet-50 px-2 py-1 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-200 sm:inline-flex">Authored model</span>
+              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 lg:hidden" onClick={() => setInspectorFocused((current) => !current)} aria-label={inspectorFocused ? 'Show diagram' : 'Expand inspector'} aria-pressed={inspectorFocused} title={inspectorFocused ? 'Show the diagram' : 'Expand the inspector'}>
+                {inspectorFocused ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+              </button>
+            </div>
           </div>
 
           <div role="tablist" aria-label="Inspect selected system part" className="flex shrink-0 gap-1 border-b border-gray-200 px-3 dark:border-gray-700">
@@ -298,7 +304,7 @@ export function EngineeringExplorerPage() {
                 <p className="font-medium">{part.summary}</p>
                 <p className="text-gray-600 dark:text-gray-300">{part.detail}</p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className={button} onClick={() => setTab('code')}><Code2 size={14} /> Inspect implementation <ArrowRight size={13} /></button>
+                  <button type="button" className={button} onClick={() => { setTab('code'); setInspectorFocused(true); }}><Code2 size={14} /> Inspect implementation <ArrowRight size={13} /></button>
                   <button type="button" className={button} onClick={() => setTab('tests')}>See test {part.criterion} <ArrowRight size={13} /></button>
                 </div>
                 <p className={'text-xs leading-5 ' + muted}>The diagram and connections are manually authored. The colored route is a walkthrough, not observed execution.</p>
