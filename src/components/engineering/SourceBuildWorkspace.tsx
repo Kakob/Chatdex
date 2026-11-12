@@ -27,6 +27,8 @@ export function SourceBuildWorkspace({
   const [open, setOpen] = useState(false);
   const [actor, setActor] = useState<CodingActor>('human');
   const [intent, setIntent] = useState('');
+  /** Freeze the source baseline while editing; a refresh cannot silently overwrite the draft. */
+  const [editorBase, setEditorBase] = useState(originalText);
   const [edited, setEdited] = useState(originalText);
   const [handoffVisible, setHandoffVisible] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,8 +47,10 @@ export function SourceBuildWorkspace({
     projectId: model.projectId, targetId: binding.targetId,
     targetName, binding, baselineText: originalText, intent: intent || '(describe your goal before sending)',
   });
-  const diff = summarizeCodeDiff(originalText, edited);
-  const hasChange = edited !== originalText;
+  const diff = summarizeCodeDiff(editorBase, edited);
+  const hasChange = edited !== editorBase;
+  const staleEditor = editorBase !== originalText;
+  const resetToCurrent = () => { setEditorBase(originalText); setEdited(originalText); setError(null); };
 
   const copy = async (value: string, message: string) => {
     try {
@@ -65,7 +69,7 @@ export function SourceBuildWorkspace({
     try {
       const next = await stageCodeRevision({
         projectId: model.projectId, targetId: binding.targetId,
-        bindingId: binding.id, baselineText: originalText,
+        bindingId: binding.id, baselineText: editorBase,
         proposedText: edited, intent, actor, providerId: provider.id,
       });
       setStaged(next);
@@ -155,6 +159,11 @@ export function SourceBuildWorkspace({
               )}
             </div>
           )}
+          {staleEditor && (
+            <p role="alert" className="rounded-md border border-amber-400 p-2 text-xs text-amber-800 dark:text-amber-200">
+              Source changed since this editing session began. Copy your draft, reset to the current source, and reapply the edit before staging.
+            </p>
+          )}
           <label className="block text-xs font-medium">
             {actor === 'human' ? 'Edit or paste the complete source file' : 'Paste the complete file returned by the agent'}
             <textarea aria-label="Editable source file" className={field + ' mt-1 min-h-[220px] font-mono text-[12px] leading-5'}
@@ -162,7 +171,7 @@ export function SourceBuildWorkspace({
           </label>
           <div className="flex items-center justify-between gap-2 text-xs">
             <span className={muted}>{edited.split('\n').length} lines · {new TextEncoder().encode(edited).length} bytes</span>
-            <button type="button" className={button} onClick={() => setEdited(originalText)}>Reset editor</button>
+            <button type="button" className={button} onClick={resetToCurrent}>Reset editor to current source</button>
           </div>
           <div className="rounded-lg bg-gray-50 p-2 text-xs dark:bg-gray-800/40" aria-label="Code change summary">
             <p className="inline-flex items-center gap-1 font-semibold"><GitCompare size={14}/> Proposed source difference</p>
@@ -176,7 +185,7 @@ export function SourceBuildWorkspace({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={primaryButton} disabled={busy || !hasChange || !intent.trim()} onClick={() => void stage()}>
+            <button type="button" className={primaryButton} disabled={busy || staleEditor || !hasChange || !intent.trim()} onClick={() => void stage()}>
               <Save size={14}/> Stage revision
             </button>
             <button type="button" className={button} onClick={() => void copy(edited, 'Edited source copied for your IDE or coding agent.')}>
