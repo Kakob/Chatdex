@@ -4,6 +4,7 @@ import { useSyncLifecycle } from './hooks';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import { EngineeringPrototypePage } from './pages/EngineeringPrototypePage';
+import { EngineeringExplorerPage } from './pages/EngineeringExplorerPage';
 import {
   LandingPage,
   SearchPage,
@@ -57,6 +58,8 @@ export function App() {
           <Route path="research" element={<ResearchAtlasPage />} />
           {/* Experimental, local-only (docs/changes/engineering-abstraction-prototype). */}
           <Route path="engineering" element={<EngineeringPrototypePage />} />
+          {/* Read-only concept → behavior → source exploration. */}
+          <Route path="engineering/explore" element={<EngineeringExplorerPage />} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
