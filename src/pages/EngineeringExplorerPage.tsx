@@ -200,7 +200,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
 
   return (
     <div
-      className="mx-auto flex h-[calc(100dvh-5.5rem)] min-h-[440px] max-w-7xl flex-col gap-3 overflow-hidden text-gray-900 dark:text-gray-100 sm:h-[calc(100dvh-6.5rem)]"
+      className="mx-auto flex min-h-[calc(100dvh-5.5rem)] max-w-7xl flex-col gap-3 text-gray-900 dark:text-gray-100 lg:h-[calc(100dvh-6.5rem)] lg:min-h-[440px] lg:overflow-hidden"
     >
       <header className="flex shrink-0 items-center justify-between gap-2">
         <div className="min-w-0">
@@ -261,7 +261,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
 
         </div>
 
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 lg:rounded-xl" aria-label="Inspector">
+        <section className="flex min-h-[60dvh] flex-1 flex-col overflow-hidden lg:min-h-0 rounded-t-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900 lg:rounded-xl" aria-label="Inspector">
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-gray-300 dark:bg-gray-600 lg:hidden" aria-hidden="true" />
           <div className="flex shrink-0 items-center justify-between gap-2 px-4 pb-2 pt-2">
             <div className="min-w-0">
