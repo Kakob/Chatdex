@@ -1,13 +1,14 @@
 /**
- * API-neutral test harness for the event queue.
+ * Test harness for the event queue.
  *
- * Scenario tests drive the queue only through this harness, so the same
- * tests keep working unchanged when the queue's internals move from
- * destructive `dequeue()` to claim/ack. Only this file (and the queue and
- * worker) should need to change when the implementation changes.
+ * Scenario tests drive the queue through this harness. Time is a manual
+ * clock, and `advance()` runs lease expiry, so lease timing in tests is
+ * deterministic.
  */
-import { EventQueue, type Clock } from './queue.ts';
-import { workOnce, type JobHandler, type WorkResult } from './worker.ts';
+import { EventQueue, type ClaimedJob, type Clock } from './queue.ts';
+import { DEFAULT_LEASE_MS, workOnce, type JobHandler, type WorkResult } from './worker.ts';
+
+export { DEFAULT_LEASE_MS };
 
 /** A clock that only moves when told to. Starts at 0. */
 export class ManualClock implements Clock {
@@ -28,8 +29,10 @@ export class ManualClock implements Clock {
 }
 
 export interface HarnessOptions {
-  /** Lease length a worker would hold a job for. Unused until leases exist. */
+  /** Lease length workers hold a job for. Default `DEFAULT_LEASE_MS`. */
   leaseMs?: number;
+  /** Claims allowed per job before it is dead-lettered. Default: the queue's default. */
+  maxAttempts?: number;
 }
 
 export interface Harness {
@@ -37,16 +40,19 @@ export interface Harness {
   clock: ManualClock;
   leaseMs: number;
   enqueue(payload: unknown): Promise<string>;
-  workOnce(handler: JobHandler): Promise<WorkResult>;
-  /** Move time forward. */
+  /** Claim, run `handler`, ack on success. */
+  workOnce(handler: JobHandler, workerId?: string): Promise<WorkResult>;
+  /** Claim a job with the harness lease length, without processing it. */
+  claim(workerId: string): Promise<ClaimedJob | null>;
+  /** Ack a claim with the token it was issued. */
+  ack(job: ClaimedJob): Promise<void>;
+  /** Move time forward, then expire any leases that ran out. */
   advance(ms: number): Promise<void>;
 }
 
-export const DEFAULT_LEASE_MS = 30_000;
-
 export function createHarness(opts: HarnessOptions = {}): Harness {
   const clock = new ManualClock(0);
-  const queue = new EventQueue({ clock });
+  const queue = new EventQueue({ clock, maxAttempts: opts.maxAttempts });
   const leaseMs = opts.leaseMs ?? DEFAULT_LEASE_MS;
 
   return {
@@ -54,13 +60,12 @@ export function createHarness(opts: HarnessOptions = {}): Harness {
     clock,
     leaseMs,
     enqueue: (payload) => queue.enqueue(payload),
-    workOnce: (handler) => workOnce(queue, handler),
+    workOnce: (handler, workerId) => workOnce(queue, handler, { workerId, leaseMs }),
+    claim: (workerId) => queue.claim(workerId, leaseMs),
+    ack: (job) => queue.ack(job.id, job.leaseToken),
     advance: async (ms) => {
       clock.advance(ms);
-      // Baseline: there are no leases, so advancing time only moves the clock.
-      // Implementer: once claim/ack exists, also run lease expiry here (for
-      // example `await queue.reapExpired(clock.now())`) so scenario tests that
-      // advance past `leaseMs` see expired claims become claimable again.
+      await queue.reapExpired(clock.now());
     },
   };
 }
