@@ -2,12 +2,11 @@
  * Shared engineering proposal inspector used by both small applications.
  * The actual program stays untouched: a draft is a local model overlay only.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertTriangle, ArrowLeft, GitBranch, Pencil, RotateCcw } from 'lucide-react';
 import type { EngineeringExampleKind } from '../../lib/engineering/demoProjects';
 import { exampleConceptId } from '../../lib/engineering/demoProjects';
 import {
-  loadEngineeringModel,
   proposeModelEdit,
   relationForNode,
   withdrawModelEdit,
@@ -16,30 +15,6 @@ import {
 } from '../../lib/engineering/modelStore';
 import { button, muted, primaryButton } from './ui';
 
-export function useExampleEngineeringModel(projectId: string | undefined) {
-  const [model, setModel] = useState<ProjectEngineeringModel | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    if (!projectId) return;
-    const next = await loadEngineeringModel(projectId);
-    setModel(next);
-    setError(null);
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    let cancelled = false;
-    void loadEngineeringModel(projectId).then((next) => {
-      if (!cancelled) setModel(next);
-    }).catch((failure: unknown) => {
-      if (!cancelled) setError(failure instanceof Error ? failure.message : String(failure));
-    });
-    return () => { cancelled = true; };
-  }, [projectId]);
-
-  return { model: model?.projectId === projectId ? model : null, refresh, error };
-}
 
 function EditTarget({
   element,
