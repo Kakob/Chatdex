@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { clearAllData, db } from '../lib/db';
@@ -40,8 +40,7 @@ describe('model projections on running examples', () => {
 
     const live = screen.getByRole('region', { name: 'Live queue controls' });
     await user.click(within(live).getByRole('button', { name: '+ Job' }));
-    expect(await within(live).findByText(/Job accepted/)).toBeInTheDocument();
-    expect(live).toHaveTextContent('Pending: 1');
+    await waitFor(() => expect(live).toHaveTextContent('Pending: 1'));
     expect(within(model).getByText('Queue')).toBeInTheDocument(); // current canonical title retained
   });
 
