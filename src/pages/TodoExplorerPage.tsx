@@ -140,6 +140,13 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
                 <p className="font-semibold">{part.summary}</p><p className="leading-6">{part.detail}</p>
                 <p className={'text-xs ' + muted}>Model concept ID: {exampleConceptId('todo-list', selected)}. The concept is persisted in the Chatdex project; runtime task state is not.</p>
                 <button type="button" className={button} onClick={() => { setTab('code'); setInspectorFocused(true); }}><Code2 size={14} /> Inspect actual implementation <ArrowRight size={13} /></button>
+                <nav aria-label="Related project workflows" className="flex flex-wrap gap-2 border-t border-gray-200 pt-3 text-xs dark:border-gray-700">
+                  <span className={'w-full ' + muted}>Related project views (currently separate):</span>
+                  <Link className={button} to={'/projects/' + projectId + '/investigate'}>History</Link>
+                  <Link className={button} to={'/projects/' + projectId + '/understanding'}>Understanding</Link>
+                  <Link className={button} to={'/projects/' + projectId + '/prepare'}>Prepare Change</Link>
+                </nav>
+
               </div>
             )}
             {tab === 'code' && (
