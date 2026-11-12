@@ -328,7 +328,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
             {tab === 'code' && (
               <div className="space-y-2">
                 <p className={'text-xs ' + muted}>Real checked-in TypeScript, bundled with this app build. Read-only; not revision-pinned evidence.</p>
-                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="implementation" title={part.title} exampleFallback={!projectId ? { kind: "event-queue", projectId: EVENT_QUEUE_PROJECT_ID } : undefined} />
+                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="implementation" title={part.title} exampleFallback={{ kind: "event-queue", projectId: projectId ?? EVENT_QUEUE_PROJECT_ID }} />
               </div>
             )}
             {tab === 'tests' && (
@@ -338,7 +338,7 @@ export function EngineeringExplorerPage({ projectId, projectName, concepts = [] 
                   <p className="text-sm">{part.testDescription}</p>
                 </div>
                 <p className={'text-xs ' + muted}>This is a real test definition; no tests are executed by this explorer. Verification manifests live in the original workbench.</p>
-                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="test" title="Relevant test" exampleFallback={!projectId ? { kind: "event-queue", projectId: EVENT_QUEUE_PROJECT_ID } : undefined} />
+                <BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("event-queue", selected)} role="test" title="Relevant test" exampleFallback={{ kind: "event-queue", projectId: projectId ?? EVENT_QUEUE_PROJECT_ID }} />
               </div>
             )}
           </div>
