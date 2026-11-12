@@ -154,10 +154,10 @@ export function TodoExplorerPage({ projectId, projectName, concepts = [] }: Prop
               </div>
             )}
             {tab === 'code' && (
-              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="implementation" title={titleOf(selected)} /></div>
+              <div className="space-y-2"><p className={'text-xs ' + muted}>Real reducer source bundled with this build, not editable or revision-pinned.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="implementation" title={titleOf(selected)} exampleFallback={{ kind: "todo-list", projectId }} /></div>
             )}
             {tab === 'tests' && (
-              <div className="space-y-2"><p className={'text-xs ' + muted}>Actual Vitest test source. These tests do not run when you use the Explorer.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="test" title="Todo model tests" /></div>
+              <div className="space-y-2"><p className={'text-xs ' + muted}>Actual Vitest test source. These tests do not run when you use the Explorer.</p><BoundSourceInspector model={engineeringModel} targetId={exampleConceptId("todo-list", selected)} role="test" title="Todo model tests" exampleFallback={{ kind: "todo-list", projectId }} /></div>
             )}
           </div>
         </section>
