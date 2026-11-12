@@ -51,12 +51,9 @@ describe('shared coding workspace', () => {
     await user.click(screen.getByRole('button', { name: 'Open editor' }));
     await user.click(screen.getByRole('button', { name: 'Agent result' }));
     await user.type(screen.getByRole('textbox', { name: 'Engineering goal' }), 'Implement bounded backoff');
-    expect(screen.getByRole('textbox', { name: 'Agent handoff instructions' })).toHaveValue(
-      expect.stringContaining('Goal: Implement bounded backoff'),
-    );
-    expect(screen.getByRole('textbox', { name: 'Agent handoff instructions' })).toHaveValue(
-      expect.stringContaining(binding.path),
-    );
+    const handoff = screen.getByRole('textbox', { name: 'Agent handoff instructions' }) as HTMLTextAreaElement;
+    expect(handoff.value).toContain('Goal: Implement bounded backoff');
+    expect(handoff.value).toContain(binding.path);
     fireEvent.change(screen.getByRole('textbox', { name: 'Editable source file' }), {
       target: { value: originalText + '\n// agent-supplied change\n' },
     });
