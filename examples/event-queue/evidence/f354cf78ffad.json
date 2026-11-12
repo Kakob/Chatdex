@@ -1,0 +1,287 @@
+{
+  "schema": "chatdex.engineering.evidence/v1",
+  "repository": {
+    "remote": "https://github.com/Kakob/Chatdex",
+    "root": "examples/event-queue"
+  },
+  "revision": {
+    "sha": "f354cf78ffad2603f0860833fc724bf0199b104c",
+    "dirty": false,
+    "dirtyScope": "examples/event-queue",
+    "branch": "feature/engineering-abstraction-prototype"
+  },
+  "changedPaths": [],
+  "uncommittedPaths": [],
+  "command": "npx vitest run --config examples/event-queue/vitest.config.ts --reporter=json",
+  "environment": {
+    "node": "v22.16.0",
+    "platform": "darwin",
+    "vitest": "4.1.1"
+  },
+  "capturedAt": "2026-11-12T08:27:52.091Z",
+  "tests": [
+    {
+      "id": "EQ-C0",
+      "name": "[EQ-C0] dispatches jobs in enqueue order on first delivery",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 1.353
+    },
+    {
+      "id": "EQ-C1",
+      "name": "[EQ-C1] does not dispatch a completed job again",
+      "file": "test/delivery.test.ts",
+      "status": "passed",
+      "durationMs": 0.275
+    },
+    {
+      "id": "EQ-C5",
+      "name": "[EQ-C5] an accepted job survives a worker failure before completion",
+      "file": "test/delivery.test.ts",
+      "status": "failed",
+      "durationMs": 3.97,
+      "failureMessage": "AssertionError: job was lost: removed on dispatch before the worker completed: expected [] to deeply equal [ { order: 42 } ]"
+    },
+    {
+      "id": null,
+      "name": "dequeue on an empty queue returns null",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.112
+    },
+    {
+      "id": null,
+      "name": "dequeue removes the job from the queue",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.165
+    },
+    {
+      "id": null,
+      "name": "enqueue returns a deterministic job id",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 1.007
+    },
+    {
+      "id": null,
+      "name": "uses the supplied id factory and clock",
+      "file": "test/queue.test.ts",
+      "status": "passed",
+      "durationMs": 0.444
+    }
+  ],
+  "symbols": [
+    {
+      "path": "src/harness.ts",
+      "symbol": "DEFAULT_LEASE_MS",
+      "startLine": 45,
+      "endLine": 45,
+      "sha256": "e8b7142bb86d1ba54c3c6e8c3d26b1c2cadc79419fcaac60c917e71b063f8171"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "Harness",
+      "startLine": 35,
+      "endLine": 43,
+      "sha256": "45992627ea4c1d5829ababd16a2a08368fced7627b0b24ca0b8134d9bb2d8553"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "HarnessOptions",
+      "startLine": 30,
+      "endLine": 33,
+      "sha256": "047eb736232086d00efbe3c0dbf07edf38d61b7f983e9fe589917c66f62ff6c2"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock",
+      "startLine": 13,
+      "endLine": 28,
+      "sha256": "1251005772a655dd1ad52d305b6759f6ba24dfdf3a2ff181c38ed97e99967ee8"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.advance",
+      "startLine": 24,
+      "endLine": 27,
+      "sha256": "d1e7cb4240e5653aeebae056471b4dac7e0bc5590b3bb79af3074dd85e2e9881"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.constructor",
+      "startLine": 16,
+      "endLine": 18,
+      "sha256": "8e1a9e8beb130dc05307477d3394cce93a2a6753ddf0c151cef89e8952834ffd"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.current",
+      "startLine": 14,
+      "endLine": 14,
+      "sha256": "e88ebae75d409d7172783688c6cd6073a964cff3df7c77830e253c138a4375ce"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "ManualClock.now",
+      "startLine": 20,
+      "endLine": 22,
+      "sha256": "aee403ac145ba15119ee2cc966600c6697f68e2b60ce0fe72a22e8e98ed18cb8"
+    },
+    {
+      "path": "src/harness.ts",
+      "symbol": "createHarness",
+      "startLine": 47,
+      "endLine": 66,
+      "sha256": "e9a797517d6578a2ce92ca0186fa3ae8da9a0a2e384afeeaa7e5e752f983b13a"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "Clock",
+      "startLine": 15,
+      "endLine": 17,
+      "sha256": "53db82fbd89f26b6dc65fbbfef8500caa8814bfa11bc74ed7ae3ee0feb8ca03c"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue",
+      "startLine": 52,
+      "endLine": 86,
+      "sha256": "dec50ff0f821ba9b9d69c8744c855ecd89f4d4e46eb01fa26b3d22ce9744d494"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.clock",
+      "startLine": 53,
+      "endLine": 53,
+      "sha256": "2d38e1ef8b85a73e79f7aa712bcfcba2f236b8507105b227b794c1a572315a53"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.constructor",
+      "startLine": 57,
+      "endLine": 60,
+      "sha256": "2b4fc251333842cbbdf3db23ea0e02e5b7b3da917cef6e0d84f7a66d3c079509"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.dequeue",
+      "startLine": 76,
+      "endLine": 80,
+      "sha256": "54159e818ab88c453754fea3d9ce5567b340c0e61e9d894e10b913141b8741ef"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.enqueue",
+      "startLine": 63,
+      "endLine": 67,
+      "sha256": "ff52bed86a79a5cb96efda6ad8c645c0473435eda7f02734cf88dd6707436acc"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.jobs",
+      "startLine": 55,
+      "endLine": 55,
+      "sha256": "da1de995a4a71300eaa5ca3145cd276035d0683adf4455078eee74321bb9c92b"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.nextId",
+      "startLine": 54,
+      "endLine": 54,
+      "sha256": "08a2be454f7be36751e5097484632b81c1523e3887254ee7d9485bd3c7e8f2de"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueue.size",
+      "startLine": 83,
+      "endLine": 85,
+      "sha256": "0887cae9fd381eb1c79d5eed6a5cd3de4635d0ec7ff28b497cea8744856f4d6d"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "EventQueueOptions",
+      "startLine": 33,
+      "endLine": 36,
+      "sha256": "411ee98e5f3f81496031aec3afbbd8cfee0c745e51d1e1e8d15ed38e62d5e547"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "Job",
+      "startLine": 20,
+      "endLine": 24,
+      "sha256": "4b4b40a01b27ad3c615fc3068597c42041ac4b8ed47a74fea233ad20ce6ff8cc"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "JobState",
+      "startLine": 31,
+      "endLine": 31,
+      "sha256": "d83997ff972a16fbc0531092f49378f499dadecb8a0b64139b4b648961a4fb22"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "StoredJob",
+      "startLine": 48,
+      "endLine": 50,
+      "sha256": "39486c3834b88921050a30b7f76328c5c24635b9fd222725a137a72834c1aee8"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "counterIdFactory",
+      "startLine": 40,
+      "endLine": 46,
+      "sha256": "fa5ba9c0b43478e2d5c17d42c3f68348fbeb88bd45b1d818bffe824c2a74d03f"
+    },
+    {
+      "path": "src/queue.ts",
+      "symbol": "systemClock",
+      "startLine": 38,
+      "endLine": 38,
+      "sha256": "0a45de8967195f1a608951a26cf352c059eefa1d4033c195b66d6eb97ad53bcc"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "JobHandler",
+      "startLine": 4,
+      "endLine": 4,
+      "sha256": "b9cec8d6f40632a0f17755fe77edc52da8f7bd5492dc9f1ad95dacfb77bd1892"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "WorkResult",
+      "startLine": 6,
+      "endLine": 9,
+      "sha256": "dd5fb6c4b5f183602c35a811c8095625e7f9f1266436f68e2c3dd1e511fc7b7b"
+    },
+    {
+      "path": "src/worker.ts",
+      "symbol": "workOnce",
+      "startLine": 19,
+      "endLine": 28,
+      "sha256": "a44353a022845378693b8d21404073bca3a87fde6d5927796d1aa6b47d99b561"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C0",
+      "startLine": 14,
+      "endLine": 29,
+      "sha256": "967960089321eefaec86e77f3411cce794460093be6981d1f10df58a63be006c"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C1",
+      "startLine": 31,
+      "endLine": 43,
+      "sha256": "507668bac2a0fe5c814d951f2c3be57a0efb6f211b45c35b4ae9cbbbb45dd091"
+    },
+    {
+      "path": "test/delivery.test.ts",
+      "symbol": "test:EQ-C5",
+      "startLine": 45,
+      "endLine": 66,
+      "sha256": "5931e7505a6ac8417e9d4d71e54aae3573a7017e72fcb71fc762cb1b941e691c"
+    }
+  ],
+  "notes": []
+}

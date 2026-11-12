@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useSyncLifecycle } from './hooks';
 import { Layout, ProjectWorkspaceLayout } from './components/layout';
 import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
+import { EngineeringPrototypePage } from './pages/EngineeringPrototypePage';
 import {
   LandingPage,
   SearchPage,
@@ -54,6 +55,8 @@ export function App() {
           {import.meta.env.DEV && <Route path="landscape/lab" element={<LandscapeLabPage />} />}
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="research" element={<ResearchAtlasPage />} />
+          {/* Experimental, local-only (docs/changes/engineering-abstraction-prototype). */}
+          <Route path="engineering" element={<EngineeringPrototypePage />} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
