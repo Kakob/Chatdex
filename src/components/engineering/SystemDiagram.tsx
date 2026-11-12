@@ -73,9 +73,13 @@ interface Props {
   highlighted: readonly DiagramNodeId[];
   highlightedEdge?: DiagramEdgeId;
   onSelect: (id: DiagramNodeId) => void;
+  /** Real runtime counters, optional so illustrative mode stays reusable. */
+  counts?: Partial<Record<DiagramNodeId, number>>;
+  /** Project-stored names override only labels, not execution semantics. */
+  titles?: Partial<Record<DiagramNodeId, string>>;
 }
 
-export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect }: Props) {
+export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect, counts, titles }: Props) {
   return (
     <div
       className="relative h-full w-full select-none overflow-hidden rounded-xl border border-gray-200 bg-gray-50/80 dark:border-gray-700 dark:bg-gray-950"
@@ -123,9 +127,9 @@ export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect
           <button
             type="button"
             key={node.id}
-            aria-label={node.title}
+            aria-label={titles?.[node.id] ?? node.title}
             aria-pressed={chosen}
-            title={node.title + ': ' + node.subtitle}
+            title={(titles?.[node.id] ?? node.title) + ': ' + node.subtitle}
             data-node={node.id}
             data-highlighted={active ? 'true' : undefined}
             style={position(node.x, node.y)}
@@ -138,8 +142,8 @@ export function SystemDiagram({ selected, highlighted, highlightedEdge, onSelect
               (chosen ? 'ring-2 ring-violet-500 ring-offset-1 ring-offset-gray-50 dark:ring-offset-gray-950' : 'hover:border-violet-400')
             }
           >
-            <span className="block text-[11px] font-semibold leading-tight sm:text-xs">{node.title}</span>
-            <span className="mt-0.5 block text-[9px] leading-tight opacity-70 sm:text-[10px]">{node.subtitle}</span>
+            <span className="block text-[11px] font-semibold leading-tight sm:text-xs">{titles?.[node.id] ?? node.title}</span>
+            <span className="mt-0.5 block text-[9px] leading-tight opacity-70 sm:text-[10px]">{node.subtitle}{counts?.[node.id] !== undefined ? ' · ' + counts[node.id] : ''}</span>
           </button>
         );
       })}
