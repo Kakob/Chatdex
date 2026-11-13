@@ -8,6 +8,10 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, FileCode2, GitBranch, Network, RefreshCw } from 'lucide-react';
 import { getUnderstandingProject } from '../lib/db/understanding';
 import { analyzeBoundProject, type BoundSourceAnalysisResult, type SourceAnalysisProgress } from '../lib/engineering/core/fromRepository';
+import { analyzeBundledExample, type BundledSourceAnalysisResult } from '../lib/engineering/core/fromBundled';
+import { engineeringExampleKind } from '../lib/engineering/demoProjects';
+
+type AnalyzedProjectSource = BoundSourceAnalysisResult | BundledSourceAnalysisResult;
 import type { SourceEntity } from '../lib/engineering/core/contracts';
 import { button, muted, primaryButton } from '../components/engineering/ui';
 import type { UnderstandingProject } from '../types/understanding';
@@ -19,7 +23,7 @@ function progressText(progress: SourceAnalysisProgress | null): string {
   return 'Constructing the deterministic TypeScript model…';
 }
 
-function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResult; scope: string }) {
+function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; scope: string }) {
   const { graph, coverage } = result;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
@@ -67,7 +71,9 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
     <div className="space-y-3" aria-label="Generated source model">
       <section className="rounded-xl border border-gray-200 bg-white p-3 text-xs dark:border-gray-700 dark:bg-gray-900">
         <p className="font-semibold">Source-derived · read-only · {graph.entities.length} entities · {graph.relations.length} relationships</p>
-        <p className={'mt-1 break-all ' + muted}>{result.repository.owner}/{result.repository.repo} · {result.repository.ref} · {result.repository.sha}</p>
+        <p className={'mt-1 break-all ' + muted}>{'repository' in result
+          ? `${result.repository.owner}/${result.repository.repo} · ${result.repository.ref} · ${result.repository.sha}`
+          : `${result.bundled.label} · shipped source snapshot (not Git-pinned)`}</p>
         <p className={'mt-1 ' + muted}>
           Scope: {scope || '(repository root)'} · Analyzed {coverage.analyzedCount} of {coverage.candidateCount} TypeScript files in scope
         </p>
@@ -77,7 +83,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
             {' '}{coverage.deniedCount} excluded by source policy,
             {' '}{coverage.skipped.length} skipped during indexing or analysis
             {coverage.treeTruncated ? ', and the repository tree was truncated' : ''}.
-            Narrow the folder scope to analyze a particular subsystem. Missing relationships may reflect incomplete input.
+            {'repository' in result ? 'Narrow the folder scope to analyze a particular subsystem.' : 'The bundled example is incomplete.'} Missing relationships may reflect incomplete input.
           </p>
         )}
         <p className={'mt-1 ' + muted}>Compiler-derived structure is not a software concept or behavioral verification. No source files were modified or sent to an LLM.</p>
@@ -115,7 +121,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
                 ))
               )}
             </div>
-            <p className={'mt-2 text-[11px] ' + muted}>Select a source entity. Files and symbols come from the analyzed revision, not an authored model.</p>
+            <p className={'mt-2 text-[11px] ' + muted}>Select a source entity. Files and symbols come from actual analyzed source text, not an authored model.</p>
           </section>
 
           <section aria-label="Derived source inspector" className="min-w-0 space-y-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
@@ -129,7 +135,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
                   </div>
                 </div>
                 <p className={'break-all text-xs ' + muted}>Signature: {active.signature.slice(0, 240) || '(none)'}</p>
-                <div className="overflow-x-hidden rounded-lg bg-gray-950 text-gray-100" aria-label="Source at analyzed revision">
+                <div className="overflow-x-hidden rounded-lg bg-gray-950 text-gray-100" aria-label="Analyzed source text">
                   <pre className="max-h-[52dvh] overflow-y-auto whitespace-pre-wrap break-words p-3 font-mono text-[11px] leading-5">
                     {visible.map((line, index) => (
                       <span className="block" key={from + index}>
@@ -182,7 +188,7 @@ export function SourceDerivedProjectPage() {
   const [prefix, setPrefix] = useState('');
   const [progress, setProgress] = useState<SourceAnalysisProgress | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ projectId: string; scope: string; data: BoundSourceAnalysisResult } | null>(null);
+  const [result, setResult] = useState<{ projectId: string; scope: string; data: AnalyzedProjectSource } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -208,7 +214,13 @@ export function SourceDerivedProjectPage() {
     setError(null);
     setResult(null);
     try {
-      const data = await analyzeBoundProject(project, { prefix, onProgress: setProgress });
+      const example = engineeringExampleKind(project.id);
+      const data = project.repository
+        ? await analyzeBoundProject(project, { prefix, onProgress: setProgress })
+        : example
+          ? await analyzeBundledExample(example)
+          : null;
+      if (!data) throw new Error('No repository or bundled source is available for this project.');
       setResult({ projectId: project.id, scope: prefix.trim(), data });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
@@ -217,6 +229,8 @@ export function SourceDerivedProjectPage() {
       setProgress(null);
     }
   }
+
+  const bundledKind = project ? engineeringExampleKind(project.id) : null;
 
   return (
     <main className="mx-auto max-w-7xl space-y-3 text-gray-900 dark:text-gray-100">
@@ -229,34 +243,49 @@ export function SourceDerivedProjectPage() {
       </header>
       {loadingProject && <p className={'text-sm ' + muted}>Loading project binding…</p>}
       {!loadingProject && !project && <p role="alert" className="text-sm">Project not found.</p>}
-      {project && !project.repository && (
+      {project && !project.repository && !bundledKind && (
         <section className="rounded-lg border border-amber-300 p-4 text-sm">
           This project has no GitHub repository binding. <Link className="font-medium text-violet-700 underline dark:text-violet-300" to={'/projects/' + project.id}>Open project overview and bind a repository</Link> to analyze real source.
         </section>
       )}
-      {project?.repository && (
-        <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900" aria-label="Repository source analysis controls">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <GitBranch size={16}/> {project.repository.owner}/{project.repository.repo}
-            <span className={'text-xs ' + muted}>· {project.repository.pinnedRef || project.repository.defaultBranch || 'default branch'}</span>
-          </div>
-          <label className="block space-y-1 text-xs font-medium">
-            Folder or file to analyze (optional)
-            <input aria-label="Source folder scope" value={prefix} onChange={(event) => setPrefix(event.target.value)}
-              placeholder="e.g. src/ or packages/core/" className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"/>
-          </label>
-          <p className={'text-xs leading-5 ' + muted}>
-            Reads up to 40 supported TypeScript files and 3 MB from a pinned GitHub commit.
-            Larger repositories need a narrower folder scope. Files are cached locally on this device only.
-          </p>
+      {project && (project.repository || bundledKind) && (
+        <section className="space-y-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900"
+          aria-label={project.repository ? 'Repository source analysis controls' : 'Bundled source analysis controls'}>
+          {project.repository ? (
+            <>
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <GitBranch size={16}/> {project.repository.owner}/{project.repository.repo}
+                <span className={'text-xs ' + muted}>· {project.repository.pinnedRef || project.repository.defaultBranch || 'default branch'}</span>
+              </div>
+              <label className="block space-y-1 text-xs font-medium">
+                Folder or file to analyze (optional)
+                <input aria-label="Source folder scope" value={prefix} onChange={(event) => setPrefix(event.target.value)}
+                  placeholder="e.g. src/ or packages/core/" className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"/>
+              </label>
+              <p className={'text-xs leading-5 ' + muted}>
+                Reads up to 40 supported TypeScript files and 3 MB from a pinned GitHub commit.
+                Larger repositories need a narrower folder scope. Files are cached locally on this device only.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={16}/> Bundled {bundledKind === 'todo-list' ? 'Todo List' : 'Event Queue'} source</p>
+              <p className={'text-xs leading-5 ' + muted}>
+                Analyze the actual implementation and tests shipped with this Chatdex build, without a repository binding.
+                This is a read-only build-time snapshot, not a live local working tree or a Git-pinned revision.
+              </p>
+            </>
+          )}
           <button type="button" disabled={busy} className={primaryButton} onClick={() => void runAnalysis()}>
-            <RefreshCw size={15}/> {busy ? 'Analyzing…' : 'Analyze repository source'}
+            <RefreshCw size={15}/> {busy ? 'Analyzing…' : project.repository ? 'Analyze repository source' : 'Analyze bundled source'}
           </button>
-          {busy && <p role="status" className={'text-xs ' + muted}>{progressText(progress)}</p>}
+          {busy && <p role="status" className={'text-xs ' + muted}>
+            {project.repository ? progressText(progress) : 'Analyzing bundled source…'}
+          </p>}
         </section>
       )}
       {error && <p role="alert" className="rounded-lg border border-red-400 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
-      {result && result.projectId === id && <SourceModelResult key={result.data.repository.sha + ':' + result.scope} result={result.data} scope={result.scope} />}
+      {result && result.projectId === id && <SourceModelResult key={result.data.graph.snapshotFingerprint + ':' + result.scope} result={result.data} scope={result.scope} />}
     </main>
   );
 }
