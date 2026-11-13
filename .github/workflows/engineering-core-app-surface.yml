@@ -1,17 +1,19 @@
-name: Engineering source model — app integration
+name: Engineering platform — unified validation
 
 on:
   push:
     branches:
-      - feature/engineering-core-app-surface-1-1
+      - feature/engineering
   pull_request:
     paths:
-      - 'src/lib/engineering/core/**'
+      - 'src/lib/engineering/**'
+      - 'src/components/engineering/**'
       - 'src/pages/SourceDerivedProjectPage*'
       - 'src/pages/EngineeringProjectPage*'
       - 'src/components/layout/ProjectWorkspaceLayout.tsx'
       - 'src/App.tsx'
       - '.github/workflows/engineering-core-app-surface.yml'
+      - 'docs/changes/model-native-engineering/**'
 
 jobs:
   validate:
@@ -26,6 +28,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
-      - run: npm test -- src/lib/engineering/core/analyzeTypeScript.test.ts src/lib/engineering/core/fromRepository.test.ts src/pages/SourceDerivedProjectPage.test.tsx src/pages/EngineeringProjectPage.test.tsx src/lib/repo/index.test.ts
+      - run: npm test -- src/lib/engineering src/components/engineering src/pages/EngineeringProjectPage.test.tsx src/pages/GenericEngineeringExplorerPage.test.tsx src/pages/SourceDerivedProjectPage.test.tsx src/pages/TodoExplorerPage.test.tsx src/pages/EngineeringExplorerPage.test.tsx src/pages/EngineeringModelIntegration.test.tsx src/lib/repo/index.test.ts
       - run: npm run queue:test
       - run: npm run build
