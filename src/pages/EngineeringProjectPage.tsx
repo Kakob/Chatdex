@@ -65,7 +65,7 @@ export function EngineeringProjectPage() {
       <nav aria-label="Engineering view choice" className="mx-auto flex max-w-7xl justify-end">
         <Link to={'/projects/' + loaded.project.id + '/engineering/source'}
           className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-semibold text-violet-700 dark:border-violet-800 dark:text-violet-300">
-          Analyze real repository source
+          Explore source-derived model
         </Link>
       </nav>
       {editor}
