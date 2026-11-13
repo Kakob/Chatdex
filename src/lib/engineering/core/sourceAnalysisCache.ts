@@ -24,7 +24,7 @@ export interface PersistedSourceAnalysis {
   savedAt: number;
 }
 
-function matchesCurrentProject(project: UnderstandingProject, data: SavedAnalysisResult): boolean {
+function matchesProjectBinding(project: UnderstandingProject, data: SavedAnalysisResult): boolean {
   if (project.repository) {
     if (!('repository' in data)) return false;
     const { owner, repo, pinnedRef, defaultBranch } = project.repository;
@@ -33,12 +33,23 @@ function matchesCurrentProject(project: UnderstandingProject, data: SavedAnalysi
     return !boundRef || data.repository.ref === boundRef;
   }
   const kind = engineeringExampleKind(project.id);
-  if (!kind || !('bundled' in data) || data.bundled.kind !== kind) return false;
+  return Boolean(kind && 'bundled' in data && data.bundled.kind === kind);
+}
+
+function bundledSourceChanged(project: UnderstandingProject, data: SavedAnalysisResult): boolean {
+  if (!('bundled' in data)) return false;
+  const kind = engineeringExampleKind(project.id);
+  if (!kind) return true;
   const files = bundledExampleSourcePaths[kind].map((path) => ({
     path, text: bundledEngineeringSources[path],
   }));
-  if (files.some((file) => typeof file.text !== 'string')) return false;
-  return snapshotFingerprint(files) === data.graph.snapshotFingerprint;
+  if (files.some((file) => typeof file.text !== 'string')) return true;
+  return snapshotFingerprint(files) !== data.graph.snapshotFingerprint;
+}
+
+export interface RestoredSourceAnalysis extends PersistedSourceAnalysis {
+  /** Historical analysis is still viewable after a development build changes. */
+  sourceChanged: boolean;
 }
 
 /** Persist a complete read-only result after a successful, explicit analysis. */
@@ -59,10 +70,10 @@ export async function saveSourceAnalysis(input: PersistedSourceAnalysis): Promis
  */
 export async function restoreSourceAnalysis(
   project: UnderstandingProject,
-): Promise<PersistedSourceAnalysis | null> {
+): Promise<RestoredSourceAnalysis | null> {
   const saved = await engineeringModelDb.sourceAnalyses.get(project.id);
-  if (!saved || !matchesCurrentProject(project, saved.data)) return null;
-  return saved;
+  if (!saved || !matchesProjectBinding(project, saved.data)) return null;
+  return { ...saved, sourceChanged: bundledSourceChanged(project, saved.data) };
 }
 
 /** A symbol selection is lightweight and persists independently of reanalysis. */
