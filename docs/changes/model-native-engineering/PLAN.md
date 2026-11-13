@@ -2,7 +2,8 @@
 
 **Status:** In progress — Task 1 core implemented and read-only UI integration 1.1 built; manual phone acceptance pending; Tasks 2–5 not implemented  
 **Date:** 2026-11-12  
-**Working branch at time of assessment:** `feature/engineering-shared-code-workspace`  
+**Active development branch:** [`feature/engineering`](https://github.com/Kakob/Chatdex/tree/feature/engineering)  
+**Original assessment branch:** `feature/engineering-shared-code-workspace` (historical)  
 **Primary purpose:** Make Chatdex a practical environment for creating, understanding, modifying, verifying, and maintaining *real* software through a persistent model, initially from a phone connected privately to the user's laptop.  
 **Related capabilities:** [Repository Integration](../../capabilities/repository-integration/SPEC.md), [Understanding Workspace](../../capabilities/understanding-workspace/PRD.md), [Change Workspace](../../capabilities/change-workspace/SPEC.md).  
 **Earlier experimental implementation:** [Engineering abstraction prototype](../engineering-abstraction-prototype/PLAN.md) and [Iteration 4 coding workspace](../engineering-abstraction-prototype/EXPLORER_CODING_WORKSPACE_4.md).
@@ -256,7 +257,7 @@ Each task is a useful tested deliverable, not a separate UI demo. Finish with a 
 
 **Implemented:** Source-to-structural-graph analysis only. **Not implemented:** phone/laptop connection, code writing, model-to-code transforms, persistent source-entity identity through renames, concept resolution/reconciliation, model-directed change checks, or Explorer UI integration.
 
-**Branch:** [`feature/engineering-core-analyzer-1`](https://github.com/Kakob/Chatdex/tree/feature/engineering-core-analyzer-1), based on `feature/engineering-shared-code-workspace`. Existing product data and `main` were not modified.
+**Active branch:** [`feature/engineering`](https://github.com/Kakob/Chatdex/tree/feature/engineering). Task 1 was originally developed on `feature/engineering-core-analyzer-1`, based on `feature/engineering-shared-code-workspace`; both are ancestors of the consolidated branch. Existing product data and `main` were not modified.
 
 **New files:**
 - `src/lib/engineering/core/contracts.ts`: portable `SourceSnapshot`, `SourceEntity`, `SourceRelation`, `DerivedGraph`, diagnostics, source ranges and noncryptographic fingerprints; sorted bounded inputs, no absolute/traversal paths.
