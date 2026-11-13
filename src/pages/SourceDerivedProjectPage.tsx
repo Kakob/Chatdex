@@ -75,7 +75,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
           ? `${result.repository.owner}/${result.repository.repo} · ${result.repository.ref} · ${result.repository.sha}`
           : `${result.bundled.label} · shipped source snapshot (not Git-pinned)`}</p>
         <p className={'mt-1 ' + muted}>
-          Scope: {scope || '(repository root)'} · Analyzed {coverage.analyzedCount} of {coverage.candidateCount} TypeScript files in scope
+          Scope: {scope || ('repository' in result ? '(repository root)' : '(bundled example files)')} · Analyzed {coverage.analyzedCount} of {coverage.candidateCount} TypeScript files in scope
         </p>
         {coverage.partial && (
           <p role="alert" className="mt-2 rounded-md border border-amber-300 p-2 text-amber-800 dark:text-amber-200">
