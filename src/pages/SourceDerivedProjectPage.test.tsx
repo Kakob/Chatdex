@@ -6,6 +6,7 @@ import { clearAllData } from '../lib/db';
 import { db } from '../lib/db/schema';
 import { createHumanProject } from '../lib/db/understanding';
 import { createEngineeringExampleProjects, EVENT_QUEUE_PROJECT_ID, TODO_LIST_PROJECT_ID } from '../lib/engineering/demoProjects';
+import { engineeringModelDb } from '../lib/engineering/modelStore';
 import { analyzeTypeScript } from '../lib/engineering/core/analyzeTypeScript';
 import { analyzeBoundProject } from '../lib/engineering/core/fromRepository';
 import { SourceDerivedProjectPage } from './SourceDerivedProjectPage';
@@ -21,6 +22,7 @@ const graph = analyzeTypeScript({ revision: sha, files: [sourceFile] });
 
 beforeEach(async () => {
   await clearAllData();
+  await engineeringModelDb.sourceAnalyses.clear();
   analyzeMock.mockReset();
 });
 afterEach(cleanup);
@@ -97,9 +99,6 @@ describe('project source-derived engineering screen', () => {
     await user.click(within(visual).getByRole('button', {
       name: new RegExp('Choose operation ' + kind + ' ' + symbol),
     }));
-    const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
-    await user.type(within(structure).getByRole('textbox', { name: 'Filter source entities' }), symbol);
-    await user.click(within(structure).getByRole('button', { name: new RegExp(kind + ' ' + symbol) }));
     const inspector = within(modeled).getByRole('region', { name: 'Derived source inspector' });
     expect(within(inspector).getByRole('heading', { name: symbol })).toBeInTheDocument();
     expect(within(inspector).getByText(/Signature:/)).toBeInTheDocument();
