@@ -14,6 +14,7 @@ import { fixtureTransitions, type EngineeringTransition, type EngineeringRelatio
 import { fixtureSourceBindings, validateSourceBinding, type EngineeringSourceBinding } from './sourceCatalog';
 import type { LandscapeRegion } from '../../types/landscape';
 import type { SourceEditProposal, SourceWriteReceipt } from './codingProtocol';
+import type { PersistedSourceAnalysis } from './core/sourceAnalysisCache';
 
 export const ENGINEERING_MODEL_DB_NAME = 'chatdex-engineering-model-v1';
 
@@ -45,6 +46,8 @@ class EngineeringModelDB extends Dexie {
   /** Explicit, local-only full-file change proposals, including agent results. */
   codeRevisions!: Table<SourceEditProposal, string>;
   codeWrites!: Table<SourceWriteReceipt, string>;
+  /** Last derived source model per project; LOCAL-ONLY, never synced. */
+  sourceAnalyses!: Table<PersistedSourceAnalysis, string>;
 
   constructor(name = ENGINEERING_MODEL_DB_NAME) {
     super(name);
@@ -60,6 +63,11 @@ class EngineeringModelDB extends Dexie {
     this.version(3).stores({
       codeRevisions: '&id, projectId, targetId, [projectId+targetId], createdAt',
       codeWrites: '&id, projectId, revisionId, [projectId+revisionId], at',
+    });
+    // A local-only, bounded source analysis cache. No sync table or network
+    // change; no schema changes to the user's canonical understanding.
+    this.version(4).stores({
+      sourceAnalyses: '&projectId, savedAt',
     });
   }
 }
