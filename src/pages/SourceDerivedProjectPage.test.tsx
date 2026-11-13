@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { clearAllData } from '../lib/db';
 import { db } from '../lib/db/schema';
 import { createHumanProject } from '../lib/db/understanding';
+import { createEngineeringExampleProjects, EVENT_QUEUE_PROJECT_ID, TODO_LIST_PROJECT_ID } from '../lib/engineering/demoProjects';
 import { analyzeTypeScript } from '../lib/engineering/core/analyzeTypeScript';
 import { analyzeBoundProject } from '../lib/engineering/core/fromRepository';
 import { SourceDerivedProjectPage } from './SourceDerivedProjectPage';
@@ -67,6 +68,33 @@ describe('project source-derived engineering screen', () => {
     expect(within(inspector).getByRole('heading', { name: 'add' })).toBeInTheDocument();
     expect(within(inspector).getByText(/return a \+ b/)).toBeInTheDocument();
     expect(within(inspector).getByText(/src\/math.ts:1/)).toBeInTheDocument();
+  });
+
+  it.each([
+    [EVENT_QUEUE_PROJECT_ID, 'EventQueue', 'class'],
+    [TODO_LIST_PROJECT_ID, 'todoTransition', 'function'],
+  ] as const)('analyzes bundled example %s with no repository binding', async (projectId, symbol, kind) => {
+    await createEngineeringExampleProjects();
+    const project = await db.understandingProjects.get(projectId);
+    expect(project?.repository).toBeUndefined();
+    const user = userEvent.setup();
+    route(projectId);
+    const controls = await screen.findByRole('region', { name: 'Bundled source analysis controls' });
+    expect(within(controls).getByText(/Bundled (Todo List|Event Queue) source/)).toBeInTheDocument();
+    expect(screen.queryByText(/no GitHub repository binding/)).not.toBeInTheDocument();
+    expect(analyzeMock).not.toHaveBeenCalled();
+    await user.click(within(controls).getByRole('button', { name: 'Analyze bundled source' }));
+
+    const modeled = await screen.findByLabelText('Generated source model');
+    expect(within(modeled).getByText(/shipped source snapshot \(not Git-pinned\)/)).toBeInTheDocument();
+    expect(within(modeled).getByText(/Source-derived · read-only/)).toBeInTheDocument();
+    const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
+    await user.type(within(structure).getByRole('textbox', { name: 'Filter source entities' }), symbol);
+    await user.click(within(structure).getByRole('button', { name: new RegExp(kind + ' ' + symbol) }));
+    const inspector = within(modeled).getByRole('region', { name: 'Derived source inspector' });
+    expect(within(inspector).getByRole('heading', { name: symbol })).toBeInTheDocument();
+    expect(within(inspector).getByText(/Signature:/)).toBeInTheDocument();
+    expect(analyzeMock).not.toHaveBeenCalled(); // GitHub was never consulted
   });
 
   it('offers repository binding rather than fabricating source when none exists', async () => {
