@@ -32,7 +32,8 @@ The companion private JSON lives in local, gitignored `research-data/mit/`, not 
 
 ### Model-native engineering — current proposed direction
 
-- **[Vision, architecture, capability inventory, and next five tasks](./changes/model-native-engineering/PLAN.md)** — proposed phone-to-laptop engineering loop: portable source analyzer, secure local bridge, source-derived model, guarded edits/reconciliation, concept scopes and local Git controls. Task 1 (portable source analyzer) is implemented on a feature branch; phone-to-laptop editing and Git integration remain proposed.
+- **[Vision, architecture, capability inventory, and next five tasks](./changes/model-native-engineering/PLAN.md)** — proposed phone-to-laptop engineering loop and acceptance contracts.
+- **[Source-derived model in the app — Task 1.1](./changes/model-native-engineering/SOURCE_MODEL_APP_1_1.md)** — read-only repository-bound TypeScript analysis and navigation available in the project UI on the engineering-core-app-surface feature branch; manual phone acceptance pending. Laptop working-tree access and editing are not yet implemented.
 
 ### Engineering abstraction prototype handoff
 
