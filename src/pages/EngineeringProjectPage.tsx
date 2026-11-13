@@ -54,9 +54,22 @@ export function EngineeringProjectPage() {
   if (!loaded || loaded.project.id !== id) return <p className="text-sm text-gray-500">Loading engineering model…</p>;
   const kind = engineeringExampleKind(loaded.project.id);
 
-  if (kind === 'event-queue') return <EngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />;
-  if (kind === 'todo-list') return <TodoExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />;
+  const editor = kind === 'event-queue'
+    ? <EngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />
+    : kind === 'todo-list'
+      ? <TodoExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} concepts={loaded.concepts} />
+      : <GenericEngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} />;
 
-  return <GenericEngineeringExplorerPage projectId={loaded.project.id} projectName={loaded.project.name} />;
+  return (
+    <div className="space-y-2">
+      <nav aria-label="Engineering view choice" className="mx-auto flex max-w-7xl justify-end">
+        <Link to={'/projects/' + loaded.project.id + '/engineering/source'}
+          className="rounded-lg border border-violet-300 px-3 py-2 text-xs font-semibold text-violet-700 dark:border-violet-800 dark:text-violet-300">
+          Analyze real repository source
+        </Link>
+      </nav>
+      {editor}
+    </div>
+  );
 
 }
