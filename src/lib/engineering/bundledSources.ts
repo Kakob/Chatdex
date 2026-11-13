@@ -7,14 +7,18 @@
  */
 import queueSource from '../../../examples/event-queue/src/queue.ts?raw';
 import workerSource from '../../../examples/event-queue/src/worker.ts?raw';
+import harnessSource from '../../../examples/event-queue/src/harness.ts?raw';
 import deliveryTests from '../../../examples/event-queue/test/delivery.test.ts?raw';
+import queueTests from '../../../examples/event-queue/test/queue.test.ts?raw';
 import todoSource from './todoModel.ts?raw';
 import todoTests from './todoModel.test.ts?raw';
 
 export const bundledEngineeringSources: Readonly<Record<string, string>> = {
   'examples/event-queue/src/queue.ts': queueSource,
   'examples/event-queue/src/worker.ts': workerSource,
+  'examples/event-queue/src/harness.ts': harnessSource,
   'examples/event-queue/test/delivery.test.ts': deliveryTests,
+  'examples/event-queue/test/queue.test.ts': queueTests,
   'src/lib/engineering/todoModel.ts': todoSource,
   'src/lib/engineering/todoModel.test.ts': todoTests,
 };
@@ -34,7 +38,9 @@ export const bundledExampleSourcePaths: Readonly<Record<EngineeringExampleKind, 
   'event-queue': [
     'examples/event-queue/src/queue.ts',
     'examples/event-queue/src/worker.ts',
+    'examples/event-queue/src/harness.ts',
     'examples/event-queue/test/delivery.test.ts',
+    'examples/event-queue/test/queue.test.ts',
   ],
   'todo-list': [
     'src/lib/engineering/todoModel.ts',
