@@ -146,7 +146,14 @@ export function OperationExplorer({ graph, sourceFiles, selectedId, onSelect }: 
               {detail.decisions.map((decision, i) => (
                 <div key={i} className="flex items-start gap-2 rounded-md bg-slate-900 px-2 py-1.5 text-xs">
                   <span className="shrink-0 rounded bg-slate-700 px-1 text-[10px] uppercase text-slate-200">{decision.kind}</span>
-                  <span className="min-w-0 flex-1 break-words font-mono text-slate-200">{decision.expression}</span>
+                  <span className="min-w-0 flex-1 break-words font-mono text-slate-200">
+                    {decision.expression}
+                    {decision.invokes?.length ? (
+                      <span className="mt-1 block font-sans text-emerald-300">
+                        Contains calls: {decision.invokes.join(', ')}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className="shrink-0 text-slate-500">L{decision.line}</span>
                 </div>
               ))}
