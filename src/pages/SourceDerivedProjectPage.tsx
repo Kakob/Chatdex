@@ -42,7 +42,10 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
     for (const group of groups.values()) group.sort((a, b) => a.location.startOffset - b.location.startOffset || a.id.localeCompare(b.id));
     return groups;
   }, [graph]);
-  const modules = graph.entities.filter((entity) => entity.kind === 'module').sort((a, b) => a.path.localeCompare(b.path));
+  const modules = graph.entities.filter((entity) => entity.kind === 'module').sort((a, b) => {
+    const isTest = (path: string) => /(?:\.test\.|\.spec\.|\/__tests__\/|\/tests?\/)/.test(path);
+    return Number(isTest(a.path)) - Number(isTest(b.path)) || a.path.localeCompare(b.path);
+  });
   const selected = selectedId ? entitiesById.get(selectedId) : undefined;
   const active = selected ?? modules[0] ?? null;
   const source = active ? result.sourceFiles.find((file) => file.path === active.path) : undefined;
@@ -87,7 +90,10 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
             {'repository' in result ? 'Narrow the folder scope to analyze a particular subsystem.' : 'The bundled example is incomplete.'} Missing relationships may reflect incomplete input.
           </p>
         )}
-        <p className={'mt-1 ' + muted}>Compiler-derived structure is not a software concept or behavioral verification. No source files were modified or sent to an LLM.</p>
+        <details className={'mt-2 ' + muted}>
+          <summary className="cursor-pointer text-[11px]">About this model and its limits</summary>
+          <p className="mt-1">Compiler-derived structure is not a software concept or behavioral verification. No source files were modified or sent to an LLM.</p>
+        </details>
       </section>
 
       {graph.entities.length === 0 ? (
@@ -267,22 +273,22 @@ export function SourceDerivedProjectPage() {
                 <input aria-label="Source folder scope" value={prefix} onChange={(event) => setPrefix(event.target.value)}
                   placeholder="e.g. src/ or packages/core/" className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"/>
               </label>
-              <p className={'text-xs leading-5 ' + muted}>
+              {!result && <p className={'text-xs leading-5 ' + muted}>
                 Reads up to 40 supported TypeScript files and 3 MB from a pinned GitHub commit.
                 Larger repositories need a narrower folder scope. Files are cached locally on this device only.
-              </p>
+              </p>}
             </>
           ) : (
             <>
               <p className="flex items-center gap-2 text-sm font-medium"><FileCode2 size={16}/> Bundled {bundledKind === 'todo-list' ? 'Todo List' : 'Event Queue'} source</p>
-              <p className={'text-xs leading-5 ' + muted}>
+              {!result && <p className={'text-xs leading-5 ' + muted}>
                 Analyze the actual implementation and tests shipped with this Chatdex build, without a repository binding.
                 This is a read-only build-time snapshot, not a live local working tree or a Git-pinned revision.
-              </p>
+              </p>}
             </>
           )}
           <button type="button" disabled={busy} className={primaryButton} onClick={() => void runAnalysis()}>
-            <RefreshCw size={15}/> {busy ? 'Analyzing…' : project.repository ? 'Analyze repository source' : 'Analyze bundled source'}
+            <RefreshCw size={15}/> {busy ? 'Analyzing…' : result ? 'Reanalyze source' : project.repository ? 'Analyze repository source' : 'Analyze bundled source'}
           </button>
           {busy && <p role="status" className={'text-xs ' + muted}>
             {project.repository ? progressText(progress) : 'Analyzing bundled source…'}
