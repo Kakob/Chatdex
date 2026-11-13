@@ -31,7 +31,7 @@ describe('local-only persisted source-derived model', () => {
       const record = await recordFor(projectId);
       await saveSourceAnalysis(record);
       const restored = await restoreSourceAnalysis(project);
-      expect(restored).toEqual(record);
+      expect(restored).toEqual({ ...record, sourceChanged: false });
       expect(restored?.data.graph.entities.length).toBeGreaterThan(15);
       const id = record.data.graph.entities.find((entity) => entity.kind === 'function')!.id;
       await saveSourceSelection(projectId, id);
@@ -41,7 +41,7 @@ describe('local-only persisted source-derived model', () => {
     },
   );
 
-  it('invalidates a bundled analysis when its source snapshot fingerprint no longer matches', async () => {
+  it('restores old bundled source as historical when its fingerprint differs from the current build', async () => {
     await createEngineeringExampleProjects();
     const project = (await db.understandingProjects.get(TODO_LIST_PROJECT_ID))!;
     const record = await recordFor(TODO_LIST_PROJECT_ID);
@@ -49,7 +49,9 @@ describe('local-only persisted source-derived model', () => {
       ...record,
       data: { ...record.data, graph: { ...record.data.graph, snapshotFingerprint: 'older-build' } },
     });
-    expect(await restoreSourceAnalysis(project)).toBeNull();
+    const stale = await restoreSourceAnalysis(project);
+    expect(stale?.sourceChanged).toBe(true);
+    expect(stale?.data.graph.snapshotFingerprint).toBe('older-build');
   });
 
   it('keeps a GitHub model tied to its original repository/ref and recorded SHA', async () => {
