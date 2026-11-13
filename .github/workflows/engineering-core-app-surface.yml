@@ -15,6 +15,10 @@ on:
       - '.github/workflows/engineering-core-app-surface.yml'
       - 'docs/changes/model-native-engineering/**'
 
+concurrency:
+  group: engineering-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
