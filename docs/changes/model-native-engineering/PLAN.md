@@ -294,7 +294,7 @@ console.log(graph.entities, graph.relations, graph.diagnostics);
 
 ## 7B. Task 1.1 — project UI integration and source reading
 
-The first analyzer deliverable was library-only and could not be used from Chatdex. The follow-up [source-derived model app integration](./SOURCE_MODEL_APP_1_1.md) connects the portable analyzer to **real GitHub-bound project source** via the existing repository reader and local-only indexer. It adds a read-only project route, explicit analyze button, mobile structural navigator, code inspector, and honest scope/coverage markers. This is **not** live local-machine access and does not implement the local service or write path in Tasks 2–5. Its mobile usability requires a real-device acceptance pass; CI covers code and mocked/fixture interaction tests.
+The first analyzer deliverable was library-only and could not be used from Chatdex. The follow-up [source-derived model app integration](./SOURCE_MODEL_APP_1_1.md) connects the portable analyzer to **real GitHub-bound project source** via the existing repository reader and local-only indexer, **as well as built-in Todo List and Event Queue source and tests** without requiring repository bindings. It adds a read-only project route, explicit analyze button for either source type, mobile structural navigator, code inspector, and honest scope/coverage/provenance markers. This is **not** live local-machine access and does not implement the local service or write path in Tasks 2–5. Its mobile usability requires a real-device acceptance pass; CI covers code and mocked/fixture interaction tests.
 
 ## 8. Exclusions and decision register
 
