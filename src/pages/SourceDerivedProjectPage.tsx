@@ -107,7 +107,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
                   ))
               ) : (
                 modules.map((module, index) => (
-                  <details key={module.id} defaultOpen={index === 0}
+                  <details key={module.id} open={index === 0}
                     className="rounded-lg border border-gray-100 px-1 py-1 dark:border-gray-800">
                     <summary className="cursor-pointer break-all px-2 py-1 text-xs font-semibold">{module.path}</summary>
                     {showEntity(module, 0)}
