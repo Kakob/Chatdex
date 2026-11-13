@@ -92,6 +92,9 @@ export function ProjectWorkspaceLayout() {
           <Link to={`/projects/${id}/engineering`} className="text-sm font-semibold text-violet-700 hover:underline dark:text-violet-300">
             Open engineering model
           </Link>
+          <Link to={`/projects/${id}/engineering/source`} className="text-sm font-semibold text-violet-700 hover:underline dark:text-violet-300">
+            Analyze source (new)
+          </Link>
           <Link
             to={landscapeHref({ project: id })}
             className="text-sm font-medium text-emerald-700 dark:text-emerald-400 hover:underline"
