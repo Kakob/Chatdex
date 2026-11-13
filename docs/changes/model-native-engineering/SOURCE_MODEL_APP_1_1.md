@@ -31,7 +31,7 @@ For private repositories, configure the existing device-local GitHub credential 
 - Tests: `src/lib/engineering/core/fromRepository.test.ts` and `src/pages/SourceDerivedProjectPage.test.tsx`.
 - CI: `.github/workflows/engineering-core-app-surface.yml`.
 
-## Visual source graph (new)
+## Raw visual source graph (now advanced, not the mobile default)
 
 The source-analysis result now opens with **Visual source model**, an interactive graph **derived entirely from the analyzer's current source entities and typed relationship edges**. The earlier source list and code inspector remain below it as alternate navigation.
 
@@ -47,6 +47,23 @@ The source-analysis result now opens with **Visual source model**, an interactiv
 **Tests:** `src/lib/engineering/core/graphLayout.test.ts` verifies deterministic, source-faithful layout and visual truncation; `src/components/engineering/SourceGraphCanvas.test.tsx` verifies real node/edge SVG output, filtering, taps, switching views and zoom. `src/pages/SourceDerivedProjectPage.test.tsx` verifies graph-to-code-inspector selection. The unified engineering CI runs these with existing Todo and Event Queue tests.
 
 **Manual acceptance to check on iPhone:** Analyze the unbound Todo List; scroll to **Visual source model**; choose a source entity (such as `todoTransition`), switch to **Connections**, and tap a related node. The inspector below should show that selected entity's real code. Repeat on Event Queue and on a small GitHub-bound folder.
+
+## Operation-focused mobile redesign and reload recovery (November 12)
+
+After real iPhone dogfooding, the all-entities graph proved visually overwhelming and not informative about system behavior. The analysis also vanished after a page reload because it existed only in component state. The current behavior is:
+
+- **Operation lens first:** The default visual experience selects an actual function or method and shows *called by → selected operation → direct calls* as a compact, one-operation-at-a-time map, with no pan/zoom or dozens of repeated properties. A searchable row lists non-test implementation operations. The call edges are analyzer facts, not observed execution order.
+- **More useful source evidence:** The selected operation shows declared parameters and return types, referenced data types, literal switch/case and if/loop conditions, and source-level calls appearing in switch cases. It can point to test files mentioning a function name, explicitly **not** proof of coverage or correctness.
+- **Code inspection nearby:** The real source inspector appears immediately after the operation view on mobile; the exhaustive source list is secondary. The earlier raw symbol graph is available under **Raw source relationship map (advanced)**, not shown by default.
+- **Local snapshot persistence:** After successful analysis, one bounded result per project, its exact analyzed source text, and the last selected symbol are saved in the existing **local-only** engineering Dexie database (additive version 4). On page reload, Chatdex restores the result without another GitHub/LLM request or full parse. A **Forget saved analysis** action deletes that project's cached result.
+- **Truthful freshness:** The last analysis of a GitHub-bound repository stays linked to the original commit SHA. If the bound repository or ref changes, an incompatible saved result isn't reused. For a bundled example, if a new development build changes the raw source text, the old analysis is restored as **historical/stale**, with a warning and a reanalysis control; it does not silently masquerade as the new code.
+- **Persistence limitations:** Storage is per browser/device and can be lost if site data is cleared or the browser refuses storage; failures display an explicit warning. The analysis is not synced and is not a live model of the laptop's working tree.
+
+**Why reloads may still happen:** Chatdex is often opened on an iPhone through Vite's **development** server. Vite hot updates and full page reloads can occur when frontend source files change or are pulled into the laptop working tree. The analysis page itself does not request recurring navigation or reloads, but we have **not verified the precise trigger on the user's machine**. Persistence addresses losing analysis, not eliminating Vite's development reloads. To evaluate a more stable snapshot without HMR, one can serve a built version using the existing `npm run build` and `npm run preview -- --host 0.0.0.0` commands (on an unused port); that preview does not update until rebuilt.
+
+**Still missing:** Persistent, authored *software concepts* in Jackson's sense; verified behavioral contracts; execution traces; model-to-code edits; code-to-concept reconciliation; and phone-to-laptop guarded writes. Static call structure and branch recognition are a better starting point for investigation, but not yet a complete semantics-level engineering abstraction.
+
+**Test contracts:** `operationLens.test.ts` checks real Todo dispatch cases, call structure and Event Queue operations; `sourceAnalysisCache.test.ts` checks restored snapshots, selections, local version boundaries and stale build snapshots; `SourceDerivedProjectPage.test.tsx` simulates a full reload and checks that operation selection persists. Existing source and CI tests must remain green.
 
 ## Explicit bounds
 
