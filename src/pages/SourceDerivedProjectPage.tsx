@@ -11,6 +11,12 @@ import { analyzeBoundProject, type BoundSourceAnalysisResult, type SourceAnalysi
 import { analyzeBundledExample, type BundledSourceAnalysisResult } from '../lib/engineering/core/fromBundled';
 import { engineeringExampleKind } from '../lib/engineering/demoProjects';
 import { SourceGraphCanvas } from '../components/engineering/SourceGraphCanvas';
+import { OperationExplorer } from '../components/engineering/OperationExplorer';
+import { sourceOperations } from '../lib/engineering/core/operationLens';
+import {
+  restoreSourceAnalysis, saveSourceAnalysis, saveSourceSelection,
+  forgetSourceAnalysis,
+} from '../lib/engineering/core/sourceAnalysisCache';
 
 type AnalyzedProjectSource = BoundSourceAnalysisResult | BundledSourceAnalysisResult;
 import type { SourceEntity } from '../lib/engineering/core/contracts';
@@ -24,9 +30,27 @@ function progressText(progress: SourceAnalysisProgress | null): string {
   return 'Constructing the deterministic TypeScript model…';
 }
 
-function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; scope: string }) {
+function SourceModelResult({ result, scope, projectId, initialSelectedId }: {
+  result: AnalyzedProjectSource;
+  scope: string;
+  projectId: string;
+  initialSelectedId: string | null;
+}) {
   const { graph, coverage } = result;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => {
+    if (initialSelectedId && graph.entities.some((item) => item.id === initialSelectedId)) {
+      return initialSelectedId;
+    }
+    return sourceOperations(graph)[0]?.entity.id ?? null;
+  });
+  const [showRawGraph, setShowRawGraph] = useState(false);
+  const selectEntity = (entityId: string) => {
+    setSelectedId(entityId);
+    setFullSource(false);
+    void saveSourceSelection(projectId, entityId).catch(() => {
+      // Selection is still usable even if the browser declines persistence.
+    });
+  };
   const [filter, setFilter] = useState('');
   const [fullSource, setFullSource] = useState(false);
 
@@ -59,7 +83,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
 
   const showEntity = (entity: SourceEntity, depth: number): ReactNode => (
     <div key={entity.id}>
-      <button type="button" aria-label={entity.kind + " " + entity.name} onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
+      <button type="button" aria-label={entity.kind + " " + entity.name} onClick={() => { selectEntity(entity.id); }}
         aria-pressed={entity.id === active?.id}
         className={'flex min-h-9 w-full items-center gap-1 rounded-md px-2 py-1 text-left text-xs ' +
           (entity.id === active?.id ? 'bg-violet-100 font-semibold text-violet-800 dark:bg-violet-900/50 dark:text-violet-100' : 'hover:bg-gray-100 dark:hover:bg-gray-800')}
@@ -100,10 +124,25 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
         <p className={'rounded-lg border p-4 text-sm ' + muted}>No supported TypeScript entities were found in this selection. Try a different folder scope.</p>
       ) : (
         <>
-          <SourceGraphCanvas graph={graph} selectedId={active?.id ?? null}
-            onSelect={(entityId) => { setSelectedId(entityId); setFullSource(false); }}/>
+          <OperationExplorer graph={graph} sourceFiles={result.sourceFiles}
+            selectedId={active?.id ?? null} onSelect={selectEntity}/>
+          <details className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+            <summary className="cursor-pointer text-sm font-medium">
+              Raw source relationship map (advanced)
+            </summary>
+            <p className={'my-2 text-xs ' + muted}>
+              The complete structural graph is noisy and isn't a model of runtime behavior.
+              Use this to inspect individual low-level edges.
+            </p>
+            {showRawGraph ? <SourceGraphCanvas graph={graph} selectedId={active?.id ?? null}
+              onSelect={selectEntity}/> : (
+              <button type="button" className={button} onClick={() => setShowRawGraph(true)}>
+                Show raw graph
+              </button>
+            )}
+          </details>
           <div className="grid gap-3 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
-          <section aria-label="Derived source structure" className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <section aria-label="Derived source structure" className="order-2 min-w-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:order-1">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <Network size={16}/> Source list (alternative view)
             </div>
@@ -114,7 +153,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
                 graph.entities.filter((entity) => entity.name.toLowerCase().includes(filter.trim().toLowerCase()) ||
                   entity.path.toLowerCase().includes(filter.trim().toLowerCase()))
                   .slice(0, 120).map((entity) => (
-                    <button type="button" key={entity.id} aria-label={entity.kind + " " + entity.name} onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
+                    <button type="button" key={entity.id} aria-label={entity.kind + " " + entity.name} onClick={() => { selectEntity(entity.id); }}
                       className={'block w-full rounded-md p-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 ' +
                         (entity.id === active?.id ? 'bg-violet-100 dark:bg-violet-900/40' : '')}>
                       <span className="font-medium">{entity.name}</span>
@@ -134,7 +173,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
             <p className={'mt-2 text-[11px] ' + muted}>Select a source entity. Files and symbols come from actual analyzed source text, not an authored model.</p>
           </section>
 
-          <section aria-label="Derived source inspector" className="min-w-0 space-y-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
+          <section aria-label="Derived source inspector" className="order-1 min-w-0 space-y-3 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900 lg:order-2">
             {active && (
               <>
                 <div className="flex items-center gap-2">
@@ -164,7 +203,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
                     linked.map((relation) => {
                       const otherId = relation.fromId === active.id ? relation.toId : relation.fromId;
                       const other = entitiesById.get(otherId);
-                      return <button type="button" key={relation.id} onClick={() => { setSelectedId(otherId); setFullSource(false); }}
+                      return <button type="button" key={relation.id} onClick={() => { selectEntity(otherId); }}
                         className="block w-full rounded-md border border-gray-200 px-2 py-1.5 text-left text-xs dark:border-gray-700">
                         {relation.fromId === active.id ? '→ ' : '← '}{relation.kind} · {other?.name ?? otherId}
                         <span className={'ml-1 ' + muted}>{other?.path ?? ''}</span>
@@ -199,7 +238,15 @@ export function SourceDerivedProjectPage() {
   const [prefix, setPrefix] = useState('');
   const [progress, setProgress] = useState<SourceAnalysisProgress | null>(null);
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ projectId: string; scope: string; data: AnalyzedProjectSource } | null>(null);
+  const [result, setResult] = useState<{
+    projectId: string;
+    scope: string;
+    data: AnalyzedProjectSource;
+    selectedId: string | null;
+    savedAt: number;
+  } | null>(null);
+  const [cacheWarning, setCacheWarning] = useState<string | null>(null);
+  const [restored, setRestored] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -207,12 +254,31 @@ export function SourceDerivedProjectPage() {
     setLoadingProject(true);
     setProject(null);
     setResult(null);
+    setRestored(false);
+    setCacheWarning(null);
     if (id) {
-      void getUnderstandingProject(id).then((p) => {
-        if (!cancelled) { setProject(p ?? null); setLoadingProject(false); }
-      }).catch((reason: unknown) => {
-        if (!cancelled) { setError(reason instanceof Error ? reason.message : String(reason)); setLoadingProject(false); }
-      });
+      void (async () => {
+        try {
+          const p = await getUnderstandingProject(id);
+          if (cancelled) return;
+          setProject(p ?? null);
+          if (p) {
+            const saved = await restoreSourceAnalysis(p);
+            if (cancelled) return;
+            if (saved) {
+              setResult(saved);
+              setPrefix(saved.scope);
+              setRestored(true);
+            }
+          }
+        } catch (reason) {
+          if (!cancelled) {
+            setError(reason instanceof Error ? reason.message : String(reason));
+          }
+        } finally {
+          if (!cancelled) setLoadingProject(false);
+        }
+      })();
     } else {
       setLoadingProject(false);
     }
@@ -223,7 +289,7 @@ export function SourceDerivedProjectPage() {
     if (!project || busy) return;
     setBusy(true);
     setError(null);
-    setResult(null);
+    setCacheWarning(null);
     try {
       const example = engineeringExampleKind(project.id);
       const data = project.repository
@@ -232,7 +298,20 @@ export function SourceDerivedProjectPage() {
           ? await analyzeBundledExample(example)
           : null;
       if (!data) throw new Error('No repository or bundled source is available for this project.');
-      setResult({ projectId: project.id, scope: prefix.trim(), data });
+      const saved = {
+        projectId: project.id,
+        scope: project.repository ? prefix.trim() : '',
+        data,
+        selectedId: null,
+        savedAt: Date.now(),
+      };
+      try {
+        await saveSourceAnalysis(saved);
+      } catch {
+        setCacheWarning('This browser could not save the analysis locally. It may need to be rerun after a reload.');
+      }
+      setRestored(false);
+      setResult(saved);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
@@ -296,7 +375,24 @@ export function SourceDerivedProjectPage() {
         </section>
       )}
       {error && <p role="alert" className="rounded-lg border border-red-400 p-3 text-sm text-red-700 dark:text-red-300">{error}</p>}
-      {result && result.projectId === id && <SourceModelResult key={result.data.graph.snapshotFingerprint + ':' + result.scope} result={result.data} scope={result.scope} />}
+      {cacheWarning && <p role="alert" className="rounded-lg border border-amber-400 p-3 text-sm text-amber-700 dark:text-amber-300">{cacheWarning}</p>}
+      {result && result.projectId === id && (
+        <>
+          <div className={'flex flex-wrap items-center justify-between gap-2 text-xs ' + muted}>
+            <span>{restored ? 'Restored saved analysis' : 'Saved locally'} · {new Date(result.savedAt).toLocaleString()}
+              {'repository' in result.data ? ' · at the recorded Git SHA (branch may have moved)' : ' · bundled build snapshot'}</span>
+            <button type="button" className={button} onClick={() => {
+              void forgetSourceAnalysis(result.projectId).then(() => {
+                setResult(null);
+                setRestored(false);
+              }).catch(() => setCacheWarning('Could not clear the saved local analysis.'));
+            }}>Forget saved analysis</button>
+          </div>
+          <SourceModelResult key={result.data.graph.snapshotFingerprint + ':' + result.scope}
+            projectId={result.projectId} result={result.data} scope={result.scope}
+            initialSelectedId={result.selectedId}/>
+        </>
+      )}
     </main>
   );
 }
