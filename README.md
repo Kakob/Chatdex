@@ -108,7 +108,78 @@ npm run db:push
 npm run dev:all
 ```
 
-Create `.env.local` from `.env.example`. Docker exposes PostgreSQL on host port `5434`; the backend container connects on its internal port.
+Create `.env.local` from `.env.example` and `backend/.env` from `backend/.env.example`.
+For a backend running on the host, use database port `5434`; the backend container
+connects on PostgreSQL's internal port. Vite proxies `/api` to `DEV_API_TARGET`
+(default `http://localhost:3003`). An existing absolute `VITE_API_URL` is used as
+the proxy target when `DEV_API_TARGET` is unset. The browser always calls the
+frontend origin during development, so a phone never contacts its own localhost.
+
+## Mobile login and shared projects
+
+Both devices must use the same Chatdex hostname, backend/database, and account.
+The phone needs trusted HTTPS: `http://192.168.x.x:4002` cannot use passkeys.
+Use a hostname rather than an IP address for the passkey relying-party ID.
+See the [WebAuthn origin rules](https://www.w3.org/TR/webauthn-3/#rp-id).
+
+For local development on a Mac and iPhone on the same network:
+
+1. Find the Mac's local hostname with `scutil --get LocalHostName`. Use that name
+   plus `.local` below (replace `your-mac.local`). It must resolve on both devices.
+2. Install [mkcert](https://github.com/FiloSottile/mkcert#installation), then create
+   a certificate for that hostname:
+
+   ```bash
+   mkcert -install
+   mkdir -p .certs
+   mkcert -cert-file .certs/chatdex.pem -key-file .certs/chatdex-key.pem your-mac.local
+   ```
+
+   Install mkcert's **public** `rootCA.pem` from the directory printed by
+   `mkcert -CAROOT` on the phone and enable full trust for that certificate in
+   iOS Certificate Trust Settings. Never transfer `rootCA-key.pem`. See
+   [mkcert's mobile instructions](https://github.com/FiloSottile/mkcert#mobile-devices).
+3. Set these values in the frontend's `.env.local`:
+
+   ```dotenv
+   VITE_API_URL=/api
+   DEV_API_TARGET=http://localhost:3003
+   DEV_HOSTNAME=your-mac.local
+   DEV_HTTPS_CERT=.certs/chatdex.pem
+   DEV_HTTPS_KEY=.certs/chatdex-key.pem
+   ```
+
+4. Set these values in `backend/.env`, keeping the existing database and JWT secret:
+
+   ```dotenv
+   CORS_ORIGIN=https://your-mac.local:4000
+   WEBAUTHN_RP_ID=your-mac.local
+   WEBAUTHN_ORIGIN=https://your-mac.local:4000
+   ```
+
+   These settings apply to `npm run dev:backend`. If running the backend in
+   Docker instead, set the same values in that service's environment. Restart
+   both servers. Vite uses a fixed port because passkey verification includes
+   the port; to use `4002`, run `npm run dev -- --port 4002` and use `4002` in
+   both backend origin values.
+5. Open `https://your-mac.local:4000` on both devices. Enable cloud sync once,
+   save the recovery code, then **Log in** with the same account and synced passkey
+   on the other device. Wait for a successful sync on desktop; projects arriving
+   on mobile appear automatically. A passkey provider supporting PRF is required
+   to unlock the encrypted data.
+
+**Existing localhost account:** passkeys are scoped to their original hostname.
+Before switching addresses, sync your existing desktop data successfully and save
+your recovery code (or export a backup from Settings if sync is not working).
+Then configure the new hostname and use **Recover with code** there once to enroll
+a replacement passkey for the same account. This replaces the old passkey. Log in
+from both devices at the new address. Browser storage is also scoped to the origin:
+projects that were never uploaded remain at the old address until backed up/imported.
+
+For hosted use, configure the shared HTTPS deployment described above. Without
+`VITE_API_URL`, production requests use same-origin `/api`, which the host must
+route to the backend; otherwise set an absolute HTTPS API URL. The development
+proxy and certificate settings do not apply to production builds.
 
 ## Repository map
 

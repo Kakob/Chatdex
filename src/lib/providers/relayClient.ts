@@ -4,6 +4,7 @@
 // or logs content (CLAUDE.md invariant 6).
 
 import { getAuthToken } from '../auth/session';
+import { BACKEND_URL } from '../backendUrl';
 import { getProviderAuthMode, getProviderKey } from './credentials';
 import { ALL_PROVIDERS, getProviderInfo } from './registry';
 import { SSEParser } from './sse';
@@ -13,9 +14,6 @@ import type {
   CompletionResponse,
   SubscriptionStatus,
 } from './types';
-
-const BACKEND_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3003';
 
 function authHeaders(): Headers {
   const headers = new Headers({ 'Content-Type': 'application/json' });

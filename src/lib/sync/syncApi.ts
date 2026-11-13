@@ -2,9 +2,7 @@
 // already-encrypted; this module knows nothing about plaintext.
 
 import { getAuthToken } from '../auth/session';
-
-const BACKEND_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3003';
+import { BACKEND_URL } from '../backendUrl';
 
 export interface WireSealed {
   iv: string; // base64

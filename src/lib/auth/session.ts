@@ -26,15 +26,13 @@ import {
   enrollPasskey,
   assertPasskey,
   prfOutputToKey,
-  isPasskeySupported,
+  getPasskeySupportError,
 } from './webauthn';
+import { BACKEND_URL } from '../backendUrl';
 import type {
   PublicKeyCredentialCreationOptionsJSON,
   PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser';
-
-const BACKEND_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:3003';
 
 const TOKEN_KEY = 'chatdex.authToken';
 const USER_KEY = 'chatdex.user';
@@ -134,9 +132,8 @@ export interface SignupResult {
  * code), and create the server account.
  */
 export async function signup(email: string): Promise<SignupResult> {
-  if (!isPasskeySupported()) {
-    throw new Error('This browser does not support passkeys');
-  }
+  const supportError = getPasskeySupportError();
+  if (supportError) throw new Error(supportError);
 
   // 1. Server gives us registration options + a signed challenge token.
   const init = await postJson<{
@@ -183,9 +180,8 @@ export async function signup(email: string): Promise<SignupResult> {
  * the master key. Persists the JWT for subsequent reloads.
  */
 export async function login(email: string): Promise<SessionUser> {
-  if (!isPasskeySupported()) {
-    throw new Error('This browser does not support passkeys');
-  }
+  const supportError = getPasskeySupportError();
+  if (supportError) throw new Error(supportError);
 
   const init = await postJson<{
     options: PublicKeyCredentialRequestOptionsJSON;
@@ -234,9 +230,8 @@ export async function recoverWithCode(
   email: string,
   recoveryCode: string
 ): Promise<SessionUser> {
-  if (!isPasskeySupported()) {
-    throw new Error('This browser does not support passkeys');
-  }
+  const supportError = getPasskeySupportError();
+  if (supportError) throw new Error(supportError);
 
   // 1. Server verifies the code and returns wrappedByRecovery + a new
   //    registration challenge.

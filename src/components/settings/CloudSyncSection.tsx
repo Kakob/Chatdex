@@ -20,7 +20,7 @@ import {
   getStayUnlocked,
   setStayUnlocked,
 } from '../../lib/auth/session';
-import { isPasskeySupported } from '../../lib/auth/webauthn';
+import { getPasskeySupportError } from '../../lib/auth/webauthn';
 import { syncEngine } from '../../lib/sync/engine';
 
 type Mode = 'idle' | 'signup' | 'login' | 'recover' | 'recovery-shown';
@@ -37,7 +37,8 @@ export function CloudSyncSection() {
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [savedRecovery, setSavedRecovery] = useState(false);
 
-  const passkeysOk = isPasskeySupported();
+  const passkeySupportError = getPasskeySupportError();
+  const passkeysOk = passkeySupportError === null;
 
   useEffect(() => {
     hydrate();
@@ -152,12 +153,12 @@ export function CloudSyncSection() {
         <Cloud size={20} /> Cloud Sync
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Optional. End-to-end encrypted with your device passkey — touch your fingerprint or face to unlock. The server stores opaque ciphertext and cannot read your conversations.
+        Log in to the same account at the same Chatdex address on desktop and mobile to sync your projects and conversations. End-to-end encrypted with your passkey; the server cannot read your data.
       </p>
 
       {!passkeysOk && (
-        <div className="flex items-center gap-2 px-3 py-2 mb-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-yellow-700 dark:text-yellow-300 text-sm">
-          <AlertCircle size={14} /> This browser doesn't support passkeys. Use Chrome, Safari 17.4+, or Firefox 122+.
+        <div role="alert" className="flex items-start gap-2 px-3 py-2 mb-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-yellow-700 dark:text-yellow-300 text-sm">
+          <AlertCircle size={14} className="shrink-0 mt-0.5" /> {passkeySupportError}
         </div>
       )}
 
@@ -259,7 +260,7 @@ export function CloudSyncSection() {
             <Lock size={14} /> Logged in as {user?.email} — vault is locked
           </div>
           <button
-            disabled={busy}
+            disabled={busy || !passkeysOk}
             onClick={() => void handleUnlock()}
             className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-lg text-sm flex items-center justify-center gap-2"
           >
@@ -278,7 +279,7 @@ export function CloudSyncSection() {
       {mode === 'idle' && status === 'unlocked' && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-700 dark:text-green-400">
-            <CheckCircle2 size={14} /> Synced as {user?.email}
+            <CheckCircle2 size={14} /> Logged in as {user?.email}
             {syncing && <Loader2 size={12} className="animate-spin ml-auto" />}
           </div>
           {lastSyncAt && (

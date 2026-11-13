@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { liveQuery } from 'dexie';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FlaskConical,
@@ -120,38 +121,52 @@ export function ProjectsPage() {
   const [loadingSample, setLoadingSample] = useState(false);
   const [loadingEngineering, setLoadingEngineering] = useState(false);
 
-  const load = useCallback(async () => {
-    const [loadedOverview, associations, configured, hasSample] = await Promise.all([
-      loadUnderstandingOverview(),
-      db.projectAssociations.toArray(),
-      listReadyProviders(),
-      isSampleWorkspaceLoaded(),
-    ]);
-    const convIds = [...new Set(associations.map((a) => a.conversationId))];
-    const convs = await db.conversations.where('id').anyOf(convIds).toArray();
-    const nameById = new Map(convs.map((c) => [c.id, c.name]));
+  useEffect(() => {
+    // Sync writes directly to Dexie. Observe the data so a project arriving
+    // after login (or a change from another device) appears without a reload.
+    const subscription = liveQuery(async () => {
+      const [loadedOverview, associations, hasSample] = await Promise.all([
+        loadUnderstandingOverview(),
+        db.projectAssociations.toArray(),
+        isSampleWorkspaceLoaded(),
+      ]);
+      const convIds = [...new Set(associations.map((a) => a.conversationId))];
+      const convs = await db.conversations.where('id').anyOf(convIds).toArray();
+      const nameById = new Map(convs.map((c) => [c.id, c.name]));
 
-    const grouped = new Map<string, AssociationRow[]>();
-    for (const association of associations) {
-      if (association.reviewState === 'rejected') continue;
-      const rows = grouped.get(association.projectId) ?? [];
-      rows.push({
-        association,
-        conversationName: nameById.get(association.conversationId) ?? '(deleted conversation)',
-      });
-      grouped.set(association.projectId, rows);
-    }
+      const grouped = new Map<string, AssociationRow[]>();
+      for (const association of associations) {
+        if (association.reviewState === 'rejected') continue;
+        const rows = grouped.get(association.projectId) ?? [];
+        rows.push({
+          association,
+          conversationName: nameById.get(association.conversationId) ?? '(deleted conversation)',
+        });
+        grouped.set(association.projectId, rows);
+      }
 
-    setOverview(loadedOverview);
-    setAssociationsByProject(grouped);
-    setProviders(configured);
-    setProvider((prev) => prev ?? configured[0] ?? null);
-    setSampleLoaded(hasSample);
-  }, []);
+      return { loadedOverview, grouped, hasSample };
+    }).subscribe({
+      next: ({ loadedOverview, grouped, hasSample }) => {
+        setOverview(loadedOverview);
+        setAssociationsByProject(grouped);
+        setSampleLoaded(hasSample);
+      },
+      error: (error: unknown) => addToast(error instanceof Error ? error.message : String(error), 'error'),
+    });
+    return () => subscription.unsubscribe();
+  }, [addToast]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    // Provider checks involve the network and must not delay local/synced data.
+    let active = true;
+    void listReadyProviders().then((configured) => {
+      if (!active) return;
+      setProviders(configured);
+      setProvider((prev) => prev ?? configured[0] ?? null);
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleDiscoverClick = async () => {
     if (!provider) return;
@@ -187,18 +202,15 @@ export function ProjectsPage() {
       }
     } finally {
       setProgress(null);
-      await load();
     }
   };
 
   const handleProjectReview = async (projectId: string, state: ReviewState) => {
     await setProjectReviewState(projectId, state);
-    await load();
   };
 
   const handleAssociationReview = async (associationId: string, state: ReviewState) => {
     await setAssociationReviewState(associationId, state);
-    await load();
   };
 
   const handleCreateProject = async () => {
@@ -226,7 +238,6 @@ export function ProjectsPage() {
     try {
       const result = await seedSampleWorkspace();
       addToast('Privacy-safe sample workspace loaded');
-      await load();
       navigate(`/projects/${result.projectId}`);
     } catch (error) {
       addToast(error instanceof Error ? error.message : String(error), 'error');
@@ -244,7 +255,6 @@ export function ProjectsPage() {
       await installExampleTransitions(result.queueProjectId);
       await installExampleTransitions(result.todoProjectId);
       addToast(result.created ? 'Event Queue and Todo List example projects added' : 'Engineering example projects are ready');
-      await load();
       navigate('/projects/' + result.queueProjectId + '/engineering');
     } catch (error) {
       addToast(error instanceof Error ? error.message : String(error), 'error');

@@ -112,6 +112,14 @@ The one dimension where Argon2id has a real advantage is universal browser suppo
 
 ## Recovery paths today
 
+Desktop and mobile use the same HTTPS hostname and backend/database. WebAuthn
+requires a secure context and scopes credentials to the relying-party hostname;
+an HTTP LAN IP cannot use passkeys even when the browser supports them. The
+capability check reports the connection problem before checking browser APIs.
+Development API calls use Vite's same-origin proxy so `localhost` refers to the
+development computer only on the server side. See the [mobile setup and existing
+account migration](../../README.md#mobile-login-and-shared-projects).
+
 Two paths exist. See `backend/src/routes/auth.ts` for the exact route handlers.
 
 **Path A: normal login.** User has the passkey (either on the enrolling device or synced via a password manager). `assertPasskey` in `src/lib/auth/webauthn.ts:90` runs the ceremony, PRF output derives the wrapping key, server hands back the wrapped master key, client unwraps.

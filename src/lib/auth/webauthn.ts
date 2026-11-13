@@ -81,7 +81,7 @@ export async function enrollPasskey(
   const prfOutput = readPrfFirst(ext);
   if (!prfOutput) {
     throw new PrfNotSupportedError(
-      'Passkey created, but your browser/authenticator did not return a PRF result. Try Chrome, Safari 17.4+, or a security key.'
+      'Passkey created, but your browser or passkey provider did not return the encryption key needed for cloud sync. Try an updated browser and a passkey provider that supports PRF.'
     );
   }
   return { response, prfOutput };
@@ -109,14 +109,22 @@ export async function prfOutputToKey(prfOutput: Uint8Array): Promise<CryptoKey> 
   return importRawKey(digest);
 }
 
-/**
- * Quick browser capability sniff — used to gate the enrollment UI behind a
- * "your browser supports this" check.
- */
+/** Check the connection first: mobile browsers hide WebAuthn on LAN HTTP. */
+export function getPasskeySupportError(): string | null {
+  if (typeof window !== 'undefined' && window.isSecureContext === false) {
+    return 'Cloud sync needs a secure connection. Open the same HTTPS Chatdex address on desktop and mobile, then log in to the same account. Passkeys are blocked on HTTP network addresses; localhost only works on the device running Chatdex.';
+  }
+  if (
+    typeof window === 'undefined' ||
+    typeof window.PublicKeyCredential === 'undefined' ||
+    typeof navigator.credentials?.create !== 'function' ||
+    typeof navigator.credentials?.get !== 'function'
+  ) {
+    return 'Passkeys are unavailable in this browser. Open Chatdex in an updated Safari, Chrome, or Firefox with a passkey provider that supports PRF encryption.';
+  }
+  return null;
+}
+
 export function isPasskeySupported(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.PublicKeyCredential !== 'undefined' &&
-    typeof navigator.credentials !== 'undefined'
-  );
+  return getPasskeySupportError() === null;
 }
