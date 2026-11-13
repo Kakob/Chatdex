@@ -30,10 +30,10 @@ This folder is the **canonical home for all project documentation** (PRDs, visio
 
 The companion private JSON lives in local, gitignored `research-data/mit/`, not in tracked docs. It lists source leads; it contains no imported primary-source evidence.
 
-### Model-native engineering — current proposed direction
+### Model-native engineering — active development
 
-- **[Vision, architecture, capability inventory, and next five tasks](./changes/model-native-engineering/PLAN.md)** — proposed phone-to-laptop engineering loop and acceptance contracts.
-- **[Source-derived model in the app — Task 1.1](./changes/model-native-engineering/SOURCE_MODEL_APP_1_1.md)** — read-only repository-bound TypeScript analysis and navigation available in the project UI on the engineering-core-app-surface feature branch; manual phone acceptance pending. Laptop working-tree access and editing are not yet implemented.
+- **[Vision, architecture, capability inventory, and next five tasks](./changes/model-native-engineering/PLAN.md)** — active development on `feature/engineering`; phone-to-laptop engineering loop and acceptance contracts.
+- **[Source-derived model in the app — Task 1.1](./changes/model-native-engineering/SOURCE_MODEL_APP_1_1.md)** — read-only repository-bound TypeScript analysis and navigation available in the project UI on `feature/engineering`; manual phone acceptance pending. Laptop working-tree access and editing are not yet implemented.
 
 ### Engineering abstraction prototype handoff
 
