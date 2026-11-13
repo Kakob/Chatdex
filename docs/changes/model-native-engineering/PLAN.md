@@ -1,6 +1,6 @@
 # Model-native engineering platform — vision, architecture, and first five tasks
 
-**Status:** In progress — Task 1 implemented and CI-validated; Tasks 2–5 not implemented  
+**Status:** In progress — Task 1 core implemented and read-only UI integration 1.1 built; manual phone acceptance pending; Tasks 2–5 not implemented  
 **Date:** 2026-11-12  
 **Working branch at time of assessment:** `feature/engineering-shared-code-workspace`  
 **Primary purpose:** Make Chatdex a practical environment for creating, understanding, modifying, verifying, and maintaining *real* software through a persistent model, initially from a phone connected privately to the user's laptop.  
@@ -290,6 +290,10 @@ console.log(graph.entities, graph.relations, graph.diagnostics);
 - The current Explorer still shows its authored model. Task 3 will wire the new derived graph to UI; Task 4 will use it to reconcile real source writes.
 
 **Next authorized task remains Task 2**, the secure read-only laptop workspace bridge; it was not implemented as part of Task 1.
+
+## 7B. Task 1.1 — project UI integration and source reading
+
+The first analyzer deliverable was library-only and could not be used from Chatdex. The follow-up [source-derived model app integration](./SOURCE_MODEL_APP_1_1.md) connects the portable analyzer to **real GitHub-bound project source** via the existing repository reader and local-only indexer. It adds a read-only project route, explicit analyze button, mobile structural navigator, code inspector, and honest scope/coverage markers. This is **not** live local-machine access and does not implement the local service or write path in Tasks 2–5. Its mobile usability requires a real-device acceptance pass; CI covers code and mocked/fixture interaction tests.
 
 ## 8. Exclusions and decision register
 
