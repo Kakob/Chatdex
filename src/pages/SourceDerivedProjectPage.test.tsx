@@ -62,10 +62,10 @@ describe('project source-derived engineering screen', () => {
     const modeled = await screen.findByLabelText('Generated source model');
     expect(within(modeled).getByText(/Source-derived · read-only/)).toBeInTheDocument();
     expect(within(modeled).getByText(/Analyzed 1 of 1 TypeScript files/)).toBeInTheDocument();
-    const graphView = within(modeled).getByRole('region', { name: 'Visual source relationship graph' });
-    expect(within(graphView).getByRole('button', { name: 'System map' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(graphView).getByRole('img', { name: 'Directed source relationships' })).toBeInTheDocument();
-    await user.click(within(graphView).getByRole('button', { name: /Graph entity function add in src\/math\.ts/ }));
+    const opView = within(modeled).getByRole('region', { name: 'Operation behavior explorer' });
+    expect(within(opView).getByRole('group', { name: 'Selected operation flow' })).toBeInTheDocument();
+    await user.click(within(opView).getByRole('button', { name: 'Choose operation function add' }));
+    expect(within(modeled).getByText('Raw source relationship map (advanced)')).toBeInTheDocument();
     const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
     await user.click(within(structure).getByRole('button', { name: /function add/ }));
     const inspector = within(modeled).getByRole('region', { name: 'Derived source inspector' });
@@ -75,7 +75,7 @@ describe('project source-derived engineering screen', () => {
   });
 
   it.each([
-    [EVENT_QUEUE_PROJECT_ID, 'EventQueue', 'class'],
+    [EVENT_QUEUE_PROJECT_ID, 'enqueue', 'method'],
     [TODO_LIST_PROJECT_ID, 'todoTransition', 'function'],
   ] as const)('analyzes bundled example %s with no repository binding', async (projectId, symbol, kind) => {
     await createEngineeringExampleProjects();
@@ -92,10 +92,10 @@ describe('project source-derived engineering screen', () => {
     const modeled = await screen.findByLabelText('Generated source model');
     expect(within(modeled).getByText(/shipped source snapshot \(not Git-pinned\)/)).toBeInTheDocument();
     expect(within(modeled).getByText(/Source-derived · read-only/)).toBeInTheDocument();
-    const visual = within(modeled).getByRole('region', { name: 'Visual source relationship graph' });
-    expect(within(visual).getByRole('img', { name: 'Directed source relationships' })).toBeInTheDocument();
+    const visual = within(modeled).getByRole('region', { name: 'Operation behavior explorer' });
+    expect(within(visual).getByRole('group', { name: 'Selected operation flow' })).toBeInTheDocument();
     await user.click(within(visual).getByRole('button', {
-      name: new RegExp('Graph entity ' + kind + ' ' + symbol + ' in '),
+      name: new RegExp('Choose operation ' + kind + ' ' + symbol),
     }));
     const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
     await user.type(within(structure).getByRole('textbox', { name: 'Filter source entities' }), symbol);
@@ -104,6 +104,24 @@ describe('project source-derived engineering screen', () => {
     expect(within(inspector).getByRole('heading', { name: symbol })).toBeInTheDocument();
     expect(within(inspector).getByText(/Signature:/)).toBeInTheDocument();
     expect(analyzeMock).not.toHaveBeenCalled(); // GitHub was never consulted
+  });
+
+  it('restores an analysis and the selected operation after a simulated full page reload', async () => {
+    await createEngineeringExampleProjects();
+    const user = userEvent.setup();
+    const view = route(TODO_LIST_PROJECT_ID);
+    await user.click(await screen.findByRole('button', { name: 'Analyze bundled source' }));
+    const first = await screen.findByLabelText('Generated source model');
+    const operations = within(first).getByRole('region', { name: 'Operation behavior explorer' });
+    await user.click(within(operations).getByRole('button', { name: 'Choose operation function toggleTask' }));
+    expect(within(first).getByRole('heading', { name: 'toggleTask' })).toBeInTheDocument();
+    view.unmount();
+
+    route(TODO_LIST_PROJECT_ID);
+    const restored = await screen.findByLabelText('Generated source model');
+    expect(screen.getByText(/Restored saved analysis/)).toBeInTheDocument();
+    expect(within(restored).getByRole('heading', { name: 'toggleTask' })).toBeInTheDocument();
+    expect(analyzeMock).not.toHaveBeenCalled();
   });
 
   it('offers repository binding rather than fabricating source when none exists', async () => {
