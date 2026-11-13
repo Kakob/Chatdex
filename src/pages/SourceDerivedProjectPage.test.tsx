@@ -62,6 +62,10 @@ describe('project source-derived engineering screen', () => {
     const modeled = await screen.findByLabelText('Generated source model');
     expect(within(modeled).getByText(/Source-derived · read-only/)).toBeInTheDocument();
     expect(within(modeled).getByText(/Analyzed 1 of 1 TypeScript files/)).toBeInTheDocument();
+    const graphView = within(modeled).getByRole('region', { name: 'Visual source relationship graph' });
+    expect(within(graphView).getByRole('button', { name: 'System map' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(graphView).getByRole('img', { name: 'Directed source relationships' })).toBeInTheDocument();
+    await user.click(within(graphView).getByRole('button', { name: /Graph entity function add in src\/math\.ts/ }));
     const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
     await user.click(within(structure).getByRole('button', { name: /function add/ }));
     const inspector = within(modeled).getByRole('region', { name: 'Derived source inspector' });
