@@ -40,6 +40,9 @@ const ENTITY_HEIGHT = 44;
 const ROW_HEIGHT = 57;
 const MARGIN = 18;
 const cmp = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+const isTestPath = (path: string): boolean =>
+  /(?:\.test\.|\.spec\.|\/__tests__\/|\/tests?\/)/.test(path);
+
 
 function byPosition(a: SourceEntity, b: SourceEntity): number {
   return a.location.startOffset - b.location.startOffset ||
@@ -67,7 +70,7 @@ export function layoutSourceOverview(
   const entities = new Map(graph.entities.map((entity) => [entity.id, entity]));
   const modules = [...graph.entities]
     .filter((entity) => entity.kind === 'module')
-    .sort((a, b) => cmp(a.path, b.path));
+    .sort((a, b) => Number(isTestPath(a.path)) - Number(isTestPath(b.path)) || cmp(a.path, b.path));
   const nonModules = [...graph.entities]
     .filter((entity) => entity.kind !== 'module')
     .sort((a, b) => cmp(a.path, b.path) || byPosition(a, b));
