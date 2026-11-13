@@ -6,6 +6,7 @@ import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import { EngineeringPrototypePage } from './pages/EngineeringPrototypePage';
 import { EngineeringExplorerPage } from './pages/EngineeringExplorerPage';
 import { EngineeringProjectPage } from './pages/EngineeringProjectPage';
+import { SourceDerivedProjectPage } from './pages/SourceDerivedProjectPage';
 import {
   LandingPage,
   SearchPage,
@@ -63,6 +64,7 @@ export function App() {
           <Route path="engineering/explore" element={<EngineeringExplorerPage />} />
           {/* Project-scoped engineering adapter; intentionally separate from the tall workflow header. */}
           <Route path="projects/:id/engineering" element={<EngineeringProjectPage />} />
+          <Route path="projects/:id/engineering/source" element={<SourceDerivedProjectPage />} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
