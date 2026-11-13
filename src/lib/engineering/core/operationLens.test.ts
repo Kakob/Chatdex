@@ -20,6 +20,8 @@ describe('source-derived operation lens', () => {
       .toBe(true);
     expect(details.decisions.some((d) => d.kind === 'case' && d.expression.includes('toggle')))
       .toBe(true);
+    expect(details.decisions.some((d) => d.kind === 'case' &&
+      d.expression.includes('toggle') && d.invokes?.includes('toggleTask'))).toBe(true);
     expect(details.calls.some((e) => e.name === 'addTask')).toBe(true);
     expect(details.calls.some((e) => e.name === 'toggleTask')).toBe(true);
     expect(details.mentionedInTests.some((path) => path.endsWith('todoModel.test.ts'))).toBe(true);
