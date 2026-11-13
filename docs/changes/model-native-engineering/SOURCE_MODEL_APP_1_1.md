@@ -13,7 +13,7 @@ Task 1 built `analyzeTypeScript()`, but the application had no route, source-sel
 
 1. Check out this branch, install dependencies and run the existing Chatdex web app.
 2. Open **Projects**, then a project. **Todo List and Event Queue engineering examples need no repository binding**: their implementation and tests are bundled with Chatdex. For other projects, bind a GitHub repository from the project overview (read-only).
-3. Use the **Analyze source (new)** link in the project header, or **Analyze real repository source** from the existing engineering model. The direct project route is `/projects/:id/engineering/source`.
+3. Use **Explore source-derived model** in the project header or from the existing engineering model. The direct project route is `/projects/:id/engineering/source`.
 4. For GitHub-bound projects, optionally set a folder prefix such as `src/lib/engineering/` or select an individual source file by repo-relative path. For bundled examples the shipped file set is already selected.
 5. Press **Analyze repository source** for a bound GitHub project, or **Analyze bundled source** for either unbound built-in example. Both feed the **same portable TypeScript analyzer** and show discovered modules, symbols, code excerpts and supported structural relationships. GitHub analysis resolves an immutable SHA and uses `RepoSource` / `ensureIndexed`; bundled analysis uses actual build-time `?raw` source text with **no claimed Git revision**.
 6. Use **Filter source entities** to locate an operation, or expand the file groups. The inspector shows the exact analyzed source text; GitHub results display their pinned commit, while bundled examples are explicitly labeled as unpinned shipped snapshots.
