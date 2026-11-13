@@ -1,8 +1,8 @@
 # Task 1.1 — connect the deterministic analyzer to Chatdex projects
 
 **Status:** Implemented on feature branch; **manual mobile acceptance pending**  
-**Branch:** `feature/engineering-core-app-surface-1-1`  
-**Base:** `feature/engineering-core-analyzer-1`  
+**Active branch:** [`feature/engineering`](https://github.com/Kakob/Chatdex/tree/feature/engineering)  
+**Implementation history:** originally built on `feature/engineering-core-app-surface-1-1`, on top of `feature/engineering-core-analyzer-1`; both histories are included in the consolidated branch.  
 **Scope:** Read-only navigation of *actual source-derived structural entities* from an existing project's GitHub binding. This is a UI/data integration follow-up to Task 1, **not** Task 2's phone-to-laptop service or Task 4's editing/reconciliation.
 
 ## Why this change exists
