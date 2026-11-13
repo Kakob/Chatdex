@@ -53,7 +53,7 @@ describe('project source-derived engineering screen', () => {
     route(project.id);
     const controls = await screen.findByRole('region', { name: 'Repository source analysis controls' });
     expect(analyzeMock).not.toHaveBeenCalled(); // never transmit code or fetch on mount
-    expect(within(controls).getByText('Sample/Arbitrary')).toBeInTheDocument();
+    expect(within(controls).getByText(/Sample\/Arbitrary/)).toBeInTheDocument();
     await user.type(within(controls).getByRole('textbox', { name: /Folder or file to analyze/ }), 'src/');
     await user.click(within(controls).getByRole('button', { name: 'Analyze repository source' }));
     expect(analyzeMock).toHaveBeenCalledWith(expect.objectContaining({ id: project.id }),
