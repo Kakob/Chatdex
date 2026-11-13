@@ -92,6 +92,11 @@ describe('project source-derived engineering screen', () => {
     const modeled = await screen.findByLabelText('Generated source model');
     expect(within(modeled).getByText(/shipped source snapshot \(not Git-pinned\)/)).toBeInTheDocument();
     expect(within(modeled).getByText(/Source-derived · read-only/)).toBeInTheDocument();
+    const visual = within(modeled).getByRole('region', { name: 'Visual source relationship graph' });
+    expect(within(visual).getByRole('img', { name: 'Directed source relationships' })).toBeInTheDocument();
+    await user.click(within(visual).getByRole('button', {
+      name: new RegExp('Graph entity ' + kind + ' ' + symbol + ' in '),
+    }));
     const structure = within(modeled).getByRole('region', { name: 'Derived source structure' });
     await user.type(within(structure).getByRole('textbox', { name: 'Filter source entities' }), symbol);
     await user.click(within(structure).getByRole('button', { name: new RegExp(kind + ' ' + symbol) }));
