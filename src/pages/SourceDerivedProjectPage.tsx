@@ -104,7 +104,7 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
                 graph.entities.filter((entity) => entity.name.toLowerCase().includes(filter.trim().toLowerCase()) ||
                   entity.path.toLowerCase().includes(filter.trim().toLowerCase()))
                   .slice(0, 120).map((entity) => (
-                    <button type="button" key={entity.id} onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
+                    <button type="button" key={entity.id} aria-label={entity.kind + " " + entity.name} onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
                       className={'block w-full rounded-md p-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-800 ' +
                         (entity.id === active?.id ? 'bg-violet-100 dark:bg-violet-900/40' : '')}>
                       <span className="font-medium">{entity.name}</span>
