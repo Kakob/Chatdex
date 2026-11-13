@@ -10,11 +10,11 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { GitBranch, Maximize2, Minus, Move, Network, Plus } from 'lucide-react';
-import type { DerivedGraph, SourceRelationKind } from '../lib/engineering/core/contracts';
+import type { DerivedGraph, SourceRelationKind } from '../../lib/engineering/core/contracts';
 import {
   layoutSourceOverview, layoutSourceConnections, sourceEdgePath,
   type PositionedSourceGraph,
-} from '../lib/engineering/core/graphLayout';
+} from '../../lib/engineering/core/graphLayout';
 
 type ViewMode = 'map' | 'connections';
 type RelationFilter = SourceRelationKind | 'all';
