@@ -6,7 +6,7 @@ import { ResearchAtlasPage } from './features/researchAtlas/ResearchAtlasPage';
 import { EngineeringPrototypePage } from './pages/EngineeringPrototypePage';
 import { EngineeringExplorerPage } from './pages/EngineeringExplorerPage';
 import { EngineeringProjectPage } from './pages/EngineeringProjectPage';
-import { SourceDerivedProjectPage } from './pages/SourceDerivedProjectPage';
+import { lazy, Suspense } from 'react';
 import {
   LandingPage,
   SearchPage,
@@ -33,6 +33,10 @@ import {
   LandscapePage,
 } from './pages';
 import { LandscapeLabPage } from './pages/LandscapeLabPage';
+const SourceDerivedProjectPage = lazy(async () => {
+  const module = await import('./pages/SourceDerivedProjectPage');
+  return { default: module.SourceDerivedProjectPage };
+});
 
 export function App() {
   useSyncLifecycle();
@@ -64,7 +68,7 @@ export function App() {
           <Route path="engineering/explore" element={<EngineeringExplorerPage />} />
           {/* Project-scoped engineering adapter; intentionally separate from the tall workflow header. */}
           <Route path="projects/:id/engineering" element={<EngineeringProjectPage />} />
-          <Route path="projects/:id/engineering/source" element={<SourceDerivedProjectPage />} />
+          <Route path="projects/:id/engineering/source" element={<Suspense fallback={<p className="p-4 text-sm text-gray-500">Opening source model…</p>}><SourceDerivedProjectPage /></Suspense>} />
           <Route path="projects/unassigned" element={<ProjectUnderstandingPage />} />
           <Route path="projects/:id" element={<ProjectWorkspaceLayout />}>
             <Route index element={<ProjectOverviewPage />} />
