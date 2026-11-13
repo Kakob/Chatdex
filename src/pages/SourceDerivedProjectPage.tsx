@@ -244,6 +244,7 @@ export function SourceDerivedProjectPage() {
     data: AnalyzedProjectSource;
     selectedId: string | null;
     savedAt: number;
+    sourceChanged?: boolean;
   } | null>(null);
   const [cacheWarning, setCacheWarning] = useState<string | null>(null);
   const [restored, setRestored] = useState(false);
@@ -388,6 +389,12 @@ export function SourceDerivedProjectPage() {
               }).catch(() => setCacheWarning('Could not clear the saved local analysis.'));
             }}>Forget saved analysis</button>
           </div>
+          {result.sourceChanged && (
+            <p role="status" className="rounded-lg border border-amber-400 p-3 text-sm text-amber-800 dark:text-amber-200">
+              The bundled implementation has changed since this analysis. You are viewing a saved historical model and source snapshot.
+              Reanalyze to inspect the current build; your previous analysis stays visible until then.
+            </p>
+          )}
           <SourceModelResult key={result.data.graph.snapshotFingerprint + ':' + result.scope}
             projectId={result.projectId} result={result.data} scope={result.scope}
             initialSelectedId={result.selectedId}/>
