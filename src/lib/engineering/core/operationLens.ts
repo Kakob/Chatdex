@@ -51,6 +51,8 @@ export interface SourceDecision {
   kind: 'switch' | 'case' | 'if' | 'loop';
   expression: string;
   line: number;
+  /** Text of direct source-level calls in this branch; not a control-flow proof. */
+  invokes?: string[];
 }
 
 export interface OperationDetail {
@@ -93,11 +95,23 @@ function inspectSyntax(entity: SourceEntity, source: string) {
     if (decisions.length >= 16) return;
     if (node !== owner && (ts.isFunctionLike(node) || ts.isClassLike(node))) return;
     const line = file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1;
-    const add = (kind: SourceDecision['kind'], text: string) => {
-      if (decisions.length < 16) decisions.push({ kind, expression: text.slice(0, 145), line });
+    const add = (kind: SourceDecision['kind'], text: string, invokes?: string[]) => {
+      if (decisions.length < 16) decisions.push({
+        kind, expression: text.slice(0, 145), line,
+        ...(invokes?.length ? { invokes } : {}),
+      });
     };
     if (ts.isSwitchStatement(node)) add('switch', node.expression.getText(file));
-    else if (ts.isCaseClause(node)) add('case', node.expression.getText(file));
+    else if (ts.isCaseClause(node)) {
+      const calls = new Set<string>();
+      const collect = (nested: ts.Node) => {
+        if (ts.isFunctionLike(nested) || ts.isClassLike(nested)) return;
+        if (ts.isCallExpression(nested)) calls.add(nested.expression.getText(file).slice(0, 80));
+        ts.forEachChild(nested, collect);
+      };
+      node.statements.forEach(collect);
+      add('case', node.expression.getText(file), [...calls].slice(0, 5));
+    }
     else if (ts.isDefaultClause(node)) add('case', 'default');
     else if (ts.isIfStatement(node)) add('if', node.expression.getText(file));
     else if (ts.isForStatement(node) || ts.isForInStatement(node) ||
