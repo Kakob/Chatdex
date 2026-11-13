@@ -31,6 +31,23 @@ For private repositories, configure the existing device-local GitHub credential 
 - Tests: `src/lib/engineering/core/fromRepository.test.ts` and `src/pages/SourceDerivedProjectPage.test.tsx`.
 - CI: `.github/workflows/engineering-core-app-surface.yml`.
 
+## Visual source graph (new)
+
+The source-analysis result now opens with **Visual source model**, an interactive graph **derived entirely from the analyzer's current source entities and typed relationship edges**. The earlier source list and code inspector remain below it as alternate navigation.
+
+- **System map** (default) groups actual declarations inside their source modules. It draws selected-entity links initially to avoid a confusing wall of arrows; **Show all links** reveals every relationship represented in the displayed subset.
+- **Connections** draws a one-hop neighborhood for the selected entity, with incoming nodes to the left, the selection in the center and outgoing nodes to the right. Selecting a neighbor immediately refocuses the graph.
+- Relationship filters show **calls**, **references**, **imports**, **exports**, and **contains** as colored, directed links. Source containment is also visible as file-group membership.
+- Tap a graph node to select its exact analyzer entity. The existing source inspector and relationship list update to the selected declaration. Source-list selection likewise updates graph highlighting.
+- The canvas is two-directionally scrollable on a phone with explicit **zoom in**, **zoom out** and **reset zoom** controls.
+- The overview draws at most 180 entities; a neighborhood draws at most 14 neighbors. The UI explicitly reports nodes/edges outside these visual limits; it does not fabricate missing implementation relationships.
+
+**Important boundary:** These are *static TypeScript structure and supported source references*, not execution traces, Daniel Jackson software concepts, or behavioral verification. A visually connected pair is an analyzer-reported relationship at the analyzed snapshot; lack of an arrow may reflect incomplete analysis input, filtering or visualization limits. Nothing in this view writes to the repository or laptop.
+
+**Tests:** `src/lib/engineering/core/graphLayout.test.ts` verifies deterministic, source-faithful layout and visual truncation; `src/components/engineering/SourceGraphCanvas.test.tsx` verifies real node/edge SVG output, filtering, taps, switching views and zoom. `src/pages/SourceDerivedProjectPage.test.tsx` verifies graph-to-code-inspector selection. The unified engineering CI runs these with existing Todo and Event Queue tests.
+
+**Manual acceptance to check on iPhone:** Analyze the unbound Todo List; scroll to **Visual source model**; choose a source entity (such as `todoTransition`), switch to **Connections**, and tap a related node. The inspector below should show that selected entity's real code. Repeat on Event Queue and on a small GitHub-bound folder.
+
 ## Explicit bounds
 
 - **Source provenance:** GitHub results are revision-pinned snapshots, while built-in examples are source text bundled into the current web app build; **neither** represents a live local working tree. Reading the laptop's files from an iPhone is still Task 2.
