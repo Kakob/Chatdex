@@ -78,7 +78,7 @@ export function OperationExplorer({ graph, sourceFiles, selectedId, onSelect }: 
       <div role="group" aria-label="Discovered operations"
         className="flex max-h-36 gap-2 overflow-auto pb-1 lg:max-h-44">
         {matches.map((op) => (
-          <button key={op.entity.id} type="button" aria-pressed={op.entity.id === chosen.entity.id}
+          <button key={op.entity.id} type="button" aria-label={"Choose operation " + op.entity.kind + " " + op.entity.name} aria-pressed={op.entity.id === chosen.entity.id}
             onClick={() => onSelect(op.entity.id)}
             className={'min-w-32 max-w-56 shrink-0 rounded-lg border px-3 py-2 text-left text-xs ' +
               (op.entity.id === chosen.entity.id ? 'border-amber-300 bg-violet-900/50 text-white' :
