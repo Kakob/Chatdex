@@ -51,7 +51,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
 
   const showEntity = (entity: SourceEntity, depth: number): ReactNode => (
     <div key={entity.id}>
-      <button type="button" onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
+      <button type="button" aria-label={entity.kind + " " + entity.name} onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
         aria-pressed={entity.id === active?.id}
         className={'flex min-h-9 w-full items-center gap-1 rounded-md px-2 py-1 text-left text-xs ' +
           (entity.id === active?.id ? 'bg-violet-100 font-semibold text-violet-800 dark:bg-violet-900/50 dark:text-violet-100' : 'hover:bg-gray-100 dark:hover:bg-gray-800')}
