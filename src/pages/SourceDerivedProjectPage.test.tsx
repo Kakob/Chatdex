@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { clearAllData } from '../lib/db';
@@ -114,6 +114,10 @@ describe('project source-derived engineering screen', () => {
     const operations = within(first).getByRole('region', { name: 'Operation behavior explorer' });
     await user.click(within(operations).getByRole('button', { name: 'Choose operation function toggleTask' }));
     expect(within(first).getByRole('heading', { name: 'toggleTask' })).toBeInTheDocument();
+    await waitFor(async () => {
+      expect((await engineeringModelDb.sourceAnalyses.get(TODO_LIST_PROJECT_ID))?.selectedId)
+        .toContain('toggleTask');
+    });
     view.unmount();
 
     route(TODO_LIST_PROJECT_ID);
