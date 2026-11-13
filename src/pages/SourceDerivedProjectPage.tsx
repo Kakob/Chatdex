@@ -3,7 +3,7 @@
  * This view is deliberately separate from authored Landscape concepts.
  * No fixtures, model mutation, LLM calls, source writes or inferred behavior.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, FileCode2, GitBranch, Network, RefreshCw } from 'lucide-react';
 import { getUnderstandingProject } from '../lib/db/understanding';
@@ -49,7 +49,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
     ? graph.relations.filter((relation) => relation.fromId === active.id || relation.toId === active.id).slice(0, 35)
     : [];
 
-  const showEntity = (entity: SourceEntity, depth: number): React.ReactNode => (
+  const showEntity = (entity: SourceEntity, depth: number): ReactNode => (
     <div key={entity.id}>
       <button type="button" onClick={() => { setSelectedId(entity.id); setFullSource(false); }}
         aria-pressed={entity.id === active?.id}
@@ -107,7 +107,7 @@ function SourceModelResult({ result, scope }: { result: BoundSourceAnalysisResul
                   ))
               ) : (
                 modules.map((module, index) => (
-                  <details key={module.id} open={modules.length === 1 || index === 0 ? undefined : undefined}
+                  <details key={module.id} defaultOpen={index === 0}
                     className="rounded-lg border border-gray-100 px-1 py-1 dark:border-gray-800">
                     <summary className="cursor-pointer break-all px-2 py-1 text-xs font-semibold">{module.path}</summary>
                     {showEntity(module, 0)}
