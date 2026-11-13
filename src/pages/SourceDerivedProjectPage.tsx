@@ -10,6 +10,7 @@ import { getUnderstandingProject } from '../lib/db/understanding';
 import { analyzeBoundProject, type BoundSourceAnalysisResult, type SourceAnalysisProgress } from '../lib/engineering/core/fromRepository';
 import { analyzeBundledExample, type BundledSourceAnalysisResult } from '../lib/engineering/core/fromBundled';
 import { engineeringExampleKind } from '../lib/engineering/demoProjects';
+import { SourceGraphCanvas } from '../components/engineering/SourceGraphCanvas';
 
 type AnalyzedProjectSource = BoundSourceAnalysisResult | BundledSourceAnalysisResult;
 import type { SourceEntity } from '../lib/engineering/core/contracts';
@@ -92,10 +93,13 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
       {graph.entities.length === 0 ? (
         <p className={'rounded-lg border p-4 text-sm ' + muted}>No supported TypeScript entities were found in this selection. Try a different folder scope.</p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+        <>
+          <SourceGraphCanvas graph={graph} selectedId={active?.id ?? null}
+            onSelect={(entityId) => { setSelectedId(entityId); setFullSource(false); }}/>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
           <section aria-label="Derived source structure" className="min-w-0 rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-              <Network size={16}/> Source structure
+              <Network size={16}/> Source list (alternative view)
             </div>
             <input aria-label="Filter source entities" value={filter} onChange={(event) => setFilter(event.target.value)}
               placeholder="Find a function, type, file…" className="mb-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"/>
@@ -164,7 +168,8 @@ function SourceModelResult({ result, scope }: { result: AnalyzedProjectSource; s
               </>
             )}
           </section>
-        </div>
+          </div>
+        </>
       )}
 
       {graph.diagnostics.length > 0 && (
